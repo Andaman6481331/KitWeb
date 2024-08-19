@@ -117,6 +117,10 @@
     font-size: 1.5rem;
     &.item:hover{
       cursor: pointer;
+      img {
+        width: 310px;
+        height: 310px;
+      }
     }
   }
 
