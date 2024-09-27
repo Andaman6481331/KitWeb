@@ -2,11 +2,16 @@
 <template>
   <div class="content">
     <!-- Recommend -->
-    <div class="Recommendation">
+    <div class="recommendation-sec">
       <h1>Today's Recommendation</h1>
       <div class="scroller" ref="scroller">
         <div class="item">
           <img src="https://th-test-11.slatic.net/p/124ca202fccb9636a6e8d32f40cf0c62.jpg" alt="rec1">
+          <div>
+            <label class="pd-name">Eagle Yarn</label>
+            <label class="pd-info"></label>
+            <label class="pd-price">20$</label>
+          </div>
         </div>
         <div class="item">
           <img src="https://th-test-11.slatic.net/p/124ca202fccb9636a6e8d32f40cf0c62.jpg" alt="rec1">
@@ -23,7 +28,7 @@
       </div>
     </div>
     <!-- Stocks -->
-    <div class="Stock">
+    <div class="stock-sec">
       <h1>Stocks</h1>
       <div class="itemlist">
         <div class="item"><img src="https://th-test-11.slatic.net/p/124ca202fccb9636a6e8d32f40cf0c62.jpg" alt="rec1"></div>
@@ -36,7 +41,7 @@
         <div class="item"><img src="https://th-test-11.slatic.net/p/124ca202fccb9636a6e8d32f40cf0c62.jpg" alt="rec1"></div>
         <div class="item"><img src="https://th-test-11.slatic.net/p/124ca202fccb9636a6e8d32f40cf0c62.jpg" alt="rec1"></div>
         <div class="item"><img src="https://th-test-11.slatic.net/p/124ca202fccb9636a6e8d32f40cf0c62.jpg" alt="rec1"></div>
-        <div class="item"><img src="https://th-test-11.slatic.net/p/124ca202fccb9636a6e8d32f40cf0c62.jpg" alt="rec1"></div>
+        <div class="item"></div>
       </div>  
     </div>
   </div>
@@ -45,18 +50,18 @@
 
 <style scoped>
   .content {
-    margin: 150px auto 0 auto;
-    width: 90%;
-    background-color: azure;
+    padding: 0;
+    min-width: 1000px;
   }
 
-  .Recommendation {
+  .recommendation-sec {
     display: flex;
     flex-direction: column;
     align-items: center;
+    background: radial-gradient(#efe7da,#e1b6a3);
   }
 
-  .Stock {
+  .stock-sec {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -78,10 +83,11 @@
   .itemlist .item {
     width: 100%; /* Ensure item takes full width of grid column */
     height: 200px; /* Fixed height */
-    background-color: lightcoral; /* Just for visibility */
+    background: radial-gradient(#efe7da,#e1b6a3);
     display: flex; /* Center content vertically and horizontally */
     align-items: center;
     justify-content: center;
+    border-radius: 10%;
     &.item:hover{
       cursor: pointer;
     }
@@ -106,28 +112,22 @@
   }
 
   .scroller .item {
-    width: 300px;
-    height: 300px;
-    display: inline-block;
-    background-color: lightcoral; /* Just for visibility */
-    margin: 0 10px; /* Space between items */
+    height: 400px;
+    width: 400px;
+    background: radial-gradient(#b3907a,#9c7862);
+    color: #342c22;
     text-align: center;
-    line-height: 300px; /* Center text vertically */
-    color: white;
     font-size: 1.5rem;
+    border-radius: 10px;
     &.item:hover{
       cursor: pointer;
-      img {
-        width: 310px;
-        height: 310px;
-      }
     }
   }
 
   .scroller .item img {
-    width: 300px; /* Ensure image fills the item width */
-    height: 300px; /* Ensure image fills the item height */
-    object-fit: cover; /* Ensure the image covers the container without distortion */
+    position: relative;
+    height: 70%;
+    object-fit: cover; /*fit the whole img to its container*/
   }
 
   ::-webkit-scrollbar {

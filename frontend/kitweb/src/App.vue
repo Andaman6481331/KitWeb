@@ -26,18 +26,20 @@ import { RouterLink, RouterView } from 'vue-router'
 
 <style scoped>
 .NavBar {
-  position: fixed;
+  /* position: fixed; */
   top: 0;
   left: 0;
   width: 86%;
+  min-width: 1000px;
   height: 130px;
-  background: #87551d;
+  background: radial-gradient(#b3907a,#9c7862);
+  color: #342c22;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 7%;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow */
-  z-index: 1000; /* Keep the navbar on top */
+  /* z-index: 1000; */
 }
 
 .nav-group {
@@ -55,10 +57,6 @@ import { RouterLink, RouterView } from 'vue-router'
     /* color: azure; */
   }
 }
-
-/* .logo {
-  height: 40px;
-} */
 
 .item {
   font-size: 18px;
