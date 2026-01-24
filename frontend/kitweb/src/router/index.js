@@ -1,6 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import Home from '../views/HomeView.vue';
 import Test from '../views/Testing.vue';
+import { compile } from 'vue';
+import OrderPage from '../views/OrderPage.vue';
+import CatalogPage from '../views/CatalogPage.vue';
 
 // Define routes
 const routes = [
@@ -13,6 +16,16 @@ const routes = [
         path: '/test',
         name: 'test',
         component: Test
+    },
+    {
+        path: '/orderpage',
+        name: 'orderpage',
+        component: OrderPage
+    },
+    {
+        path: '/catalog',
+        name: 'catalog',
+        component: CatalogPage
     }
 ];
 
