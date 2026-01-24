@@ -1,9 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import Home from '../views/HomeView.vue';
-import Test from '../views/Testing.vue';
-import { compile } from 'vue';
+import Catalog from '../views/CatalogPage.vue';
 import OrderPage from '../views/OrderPage.vue';
-import CatalogPage from '../views/CatalogPage.vue';
 
 // Define routes
 const routes = [
@@ -13,19 +11,14 @@ const routes = [
         component: Home
     },
     {
-        path: '/test',
-        name: 'test',
-        component: Test
+        path: '/catalog',
+        name: 'catalog',
+        component: Catalog
     },
     {
         path: '/orderpage',
         name: 'orderpage',
         component: OrderPage
-    },
-    {
-        path: '/catalog',
-        name: 'catalog',
-        component: CatalogPage
     }
 ];
 
