@@ -219,6 +219,10 @@ const toggleCart = () => {
             </div>
 
             <div class="category-filters">
+                <button class="category-btn" @click="selectedCategory = 'all'"
+                    :class="{ active: selectedCategory === 'all' }">
+                    All
+                </button>
                 <button v-for="category in categories" :key="category" class="category-btn"
                     :class="{ active: selectedCategory === category }" @click="selectedCategory = category">
                     {{ category }}
@@ -605,7 +609,7 @@ const toggleCart = () => {
 /* Cart Sidebar */
 .cart-sidebar {
     position: sticky;
-    top: 20px;
+    top: 100px;
     background: white;
     border-radius: 16px;
     box-shadow: 0 4px 20px rgba(94, 69, 53, 0.1);

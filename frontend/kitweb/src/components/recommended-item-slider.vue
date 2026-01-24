@@ -87,7 +87,7 @@ const moveRight = () => {
             <p class="section-subtitle">Handpicked products just for you</p>
         </div>
         <div class="scroller">
-            <div class="product-card" v-for="product in products" :key="product.id" :class="`card-${product.id}`">
+            <div class="recommended-card" v-for="product in products" :key="product.id" :class="`card-${product.id}`">
                 <div v-if="product.badge" class="product-badge" :class="product.badgeClass">
                     {{ product.badge }}
                 </div>
@@ -129,7 +129,7 @@ const moveRight = () => {
     height: 500px;
 }
 
-.product-card {
+.recommended-card {
     width: 350px;
     background: white;
     border-radius: 20px;
@@ -171,7 +171,7 @@ const moveRight = () => {
     z-index: 18;
 }
 
-.product-card:hover {
+.recommended-card:hover {
     transform: translateY(-8px);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
 }
@@ -198,14 +198,14 @@ const moveRight = () => {
     background: #ff9f43;
 }
 
-.product-card img {
+.recommended-card img {
     width: 100%;
     height: 280px;
     object-fit: cover;
     transition: transform 0.3s ease;
 }
 
-.product-card:hover img {
+.recommended-card:hover img {
     transform: scale(1.05);
 }
 

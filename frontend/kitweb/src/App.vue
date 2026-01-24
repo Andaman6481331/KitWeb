@@ -29,31 +29,13 @@ const toggleLanguageMenu = () => {
         <img src="../components/icons/twitter.svg" alt="logo" class="logo">
         <router-link :to="'/'" class="no-style">
           <div>
-            <h1>Kitcharoen</h1>
+            <h1>KITCHAROEN</h1>
             <p>376 Wanich 1 Chakkrawat Samphantawong Bangkok</p>
           </div>
         </router-link>
-      </div>
-
-      <div class="nav-group">
-        <router-link :to="'/catalog'" class="no-style">
-          <div class="button button-primary">
-            <span class="button-icon">📦</span>
-            Products
-          </div>
-        </router-link>
-
-        <router-link :to="'/orderpage'" class="no-style">
-          <div class="button button-primary">
-            <span class="button-icon">🛒</span>
-            Start Order
-          </div>
-        </router-link>
-
-
         <!-- Language Selector -->
         <div class="language-selector">
-          <div class="button button-lang" @click="toggleLanguageMenu">
+          <div class="button button-lang" @click="toggleLanguageMenu" style="width: 1.5rem;">
             <span class="button-icon">🌐</span>
             {{ currentLanguage }}
             <span class="arrow">▼</span>
@@ -71,9 +53,80 @@ const toggleLanguageMenu = () => {
           </transition>
         </div>
       </div>
+
+      <div class="nav-group">
+        <router-link :to="'/catalog'" class="no-style">
+          <div class="button button-primary">
+            <span class="button-icon">📦</span>
+            Products
+          </div>
+        </router-link>
+
+        <router-link :to="'/orderpage'" class="no-style">
+          <div class="button button-primary">
+            <span class="button-icon">🛒</span>
+            Start Order
+          </div>
+        </router-link>
+
+        <router-link :to="'/contactus'" class="no-style">
+          <div class="button button-primary">
+            <span class="button-icon">💬</span>
+            Contact Us
+          </div>
+        </router-link>
+
+        <router-link :to="'/login'" class="no-style">
+          <div class="button">
+            Login
+          </div>
+        </router-link>
+
+
+      </div>
     </div>
 
     <RouterView />
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-content">
+        <div class="footer-column">
+          <h3>Kitcharoen</h3>
+          <p>Your trusted source for premium yarn and sewing supplies since 1995.</p>
+        </div>
+        <div class="footer-column">
+          <h4>Quick Links</h4>
+          <ul>
+            <li><a href="#">About Us</a></li>
+            <li><a href="#">Products</a></li>
+            <li><a href="#">Contact</a></li>
+            <li><a href="#">FAQ</a></li>
+          </ul>
+        </div>
+        <div class="footer-column">
+          <h4>Contact Info</h4>
+          <ul>
+            <li>📍 376 Wanich 1 Chakkrawat</li>
+            <li>📍 Samphantawong Bangkok</li>
+            <li>📞 +66 (0) 2-XXX-XXXX</li>
+            <li>✉️ info@kitcharoen.com</li>
+          </ul>
+        </div>
+        <div class="footer-column">
+          <h4>Follow Us</h4>
+          <div class="social-links">
+            <a href="#" class="social-icon">📘</a>
+            <a href="#" class="social-icon">📷</a>
+            <a href="#" class="social-icon">🐦</a>
+            <a href="#" class="social-icon">📺</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2026 Kitcharoen. All rights reserved.</p>
+      </div>
+    </footer>
   </div>
 </template>
 
@@ -93,10 +146,10 @@ const toggleLanguageMenu = () => {
   left: 0;
   height: 90px;
   /* background: linear-gradient(135deg, rgba(94, 69, 53, 0.95), rgba(147, 115, 94, 0.95)); */
-  background-color: rgba(210, 180, 160, 0.8);
+  background-color: var(--primary-color);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  color: #fff9f1;
+  color: var(--text-dark-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -212,7 +265,7 @@ const toggleLanguageMenu = () => {
 }
 
 .button-lang {
-  min-width: 100px;
+  min-width: 1.5rem;
   justify-content: center;
 }
 
@@ -289,6 +342,103 @@ const toggleLanguageMenu = () => {
 .dropdown-leave-to {
   opacity: 0;
   transform: translateY(-10px) scale(0.95);
+}
+
+/* ===== FOOTER ===== */
+.footer {
+  background: linear-gradient(135deg, #2d2d2d, #1a1a1a);
+  color: white;
+  padding: 60px 5% 20px 5%;
+}
+
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 40px;
+  margin-bottom: 40px;
+}
+
+.footer-column h3 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+  color: #b89968;
+}
+
+.footer-column h4 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+}
+
+.footer-column p {
+  font-size: 14px;
+  line-height: 1.6;
+  opacity: 0.8;
+  margin: 0;
+}
+
+.footer-column ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.footer-column ul li {
+  margin-bottom: 10px;
+  font-size: 14px;
+  opacity: 0.8;
+  transition: opacity 0.3s ease;
+}
+
+.footer-column ul li:hover {
+  opacity: 1;
+}
+
+.footer-column a {
+  color: white;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.footer-column a:hover {
+  color: #b89968;
+}
+
+.social-links {
+  display: flex;
+  gap: 15px;
+}
+
+.social-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  font-size: 20px;
+  transition: all 0.3s ease;
+}
+
+.social-icon:hover {
+  background: #b89968;
+  transform: translateY(-3px);
+}
+
+.footer-bottom {
+  text-align: center;
+  padding-top: 30px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.footer-bottom p {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.6;
 }
 
 /* Responsive Design */

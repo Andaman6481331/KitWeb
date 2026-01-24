@@ -1,199 +1,82 @@
+<script setup>
+import ProductStock from '../components/products-stock.vue';
+</script>
 <template>
-    <div class="content">
-        <router-link :to="'/'">
-            <div>Back to Home</div>
-        </router-link>
-        <div class="itemlist">
-            <div class="card">
-                <div>
-                    <img src="https://th-test-11.slatic.net/p/124ca202fccb9636a6e8d32f40cf0c62.jpg" alt="yarn">
-                </div>
-                <div class="pd-def"><span class="pd-name">Yarn</span> this is the definition section</div>
-                <div class="pd-price">$140<span class="ind-price">155</span></div>
-                <div class="pd-tag">
-                    <p>knitting</p>
-                    <p>handicraft</p>
-                </div>
-            </div>
-            <div class="card">
-                <div>
-                    <img src="https://th-test-11.slatic.net/p/124ca202fccb9636a6e8d32f40cf0c62.jpg" alt="yarn">
-                </div>
-                <div class="pd-def"><span class="pd-name">Yarn</span> this is the definition section</div>
-                <div class="pd-price">$155</div>
-                <div class="pd-tag">
-                    <p>knitting</p>
-                    <p>handicraft</p>
-                    <p>bruhbruh</p>
-                </div>
-            </div>
-            <div class="card">
-                <div>
-                    <img src="https://th-test-11.slatic.net/p/124ca202fccb9636a6e8d32f40cf0c62.jpg" alt="yarn">
-                </div>
-                <div class="pd-def"><span class="pd-name">Yarn</span> this is the definition section</div>
-                <div class="pd-price">$155</div>
-                <div class="pd-tag">
-                    <p>handicraft</p>
-                </div>
-            </div>
-            <div class="card">
-                <div>
-                    <img src="https://th-test-11.slatic.net/p/124ca202fccb9636a6e8d32f40cf0c62.jpg" alt="yarn">
-                </div>
-                <div class="pd-def"><span class="pd-name">Yarn</span> this is the definition section</div>
-                <div class="pd-price">$155</div>
-                <div class="pd-tag">
-                    <p>knitting</p>
-                    <p>handicraft</p>
-                </div>
-            </div>
-            <div class="card">
-                <div>
-                    <img src="https://th-test-11.slatic.net/p/124ca202fccb9636a6e8d32f40cf0c62.jpg" alt="yarn">
-                </div>
-                <div class="pd-def"><span class="pd-name">Yarn</span> this is the definition section</div>
-                <div class="pd-price">$155</div>
-                <div class="pd-tag">
-                    <p>knitting</p>
-                    <p>handicraft</p>
-                </div>
-            </div>
-            <div class="card">
-                <div>
-                    <img src="https://th-test-11.slatic.net/p/124ca202fccb9636a6e8d32f40cf0c62.jpg" alt="yarn">
-                </div>
-                <div class="pd-def"><span class="pd-name">Yarn</span> this is the definition section</div>
-                <div class="pd-price">$155</div>
-                <div class="pd-tag">
-                    <p>knitting</p>
-                    <p>handicraft</p>
-                </div>
-            </div>
-            <div class="card">
-                <div>
-                    <img src="https://th-test-11.slatic.net/p/124ca202fccb9636a6e8d32f40cf0c62.jpg" alt="yarn">
-                </div>
-                <div class="pd-def"><span class="pd-name">Yarn</span> this is the definition section</div>
-                <div class="pd-price">$155</div>
-                <div class="pd-tag">
-                    <p>knitting</p>
-                    <p>handicraft</p>
-                </div>
-            </div>
-            <div class="card">
-                <div>
-                    <img src="https://th-test-11.slatic.net/p/124ca202fccb9636a6e8d32f40cf0c62.jpg" alt="yarn">
-                </div>
-                <div class="pd-def"><span class="pd-name">Yarn</span> this is the definition section</div>
-                <div class="pd-price">$155</div>
-                <div class="pd-tag">
-                    <p>knitting</p>
-                    <p>handicraft</p>
-                </div>
-            </div>
-            <div class="card">
-                <div>
-                    <img src="https://th-test-11.slatic.net/p/124ca202fccb9636a6e8d32f40cf0c62.jpg" alt="yarn">
-                </div>
-                <div class="pd-def"><span class="pd-name">Yarn</span> this is the definition section</div>
-                <div class="pd-price">$155</div>
-                <div class="pd-tag">
-                    <p>knitting</p>
-                    <p>handicraft</p>
-                </div>
-            </div>
-            <div class="card">
-                <div>
-                    <img src="https://th-test-11.slatic.net/p/124ca202fccb9636a6e8d32f40cf0c62.jpg" alt="yarn">
-                </div>
-                <div class="pd-def"><span class="pd-name">Yarn</span> this is the definition section</div>
-                <div class="pd-price">$155</div>
-                <div class="pd-tag">
-                    <p>knitting</p>
-                    <p>handicraft</p>
-                </div>
-            </div>
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <h1>🍜 Order Now</h1>
+            <p>Select your favorite dishes and create your perfect meal</p>
         </div>
+
+        <!-- Cart Button (Mobile) -->
+        <button class="cart-toggle mobile-only" @click="toggleCart">
+            🛒
+            <span v-if="cartItemCount > 0" class="cart-badge">{{ cartItemCount }}</span>
+        </button>
     </div>
+    <ProductStock />
 </template>
-
-<style scoped>
-.content {
-    padding: 0;
-    min-width: 1000px;
-    min-height: 100vh;
-    background: radial-gradient(#e9e1d7, #fbfbfb);
-}
-
-.itemlist {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    width: 75%;
-    margin: 0 auto;
-}
-
-.itemlist .card {
+<style>
+/* Page Header */
+.page-header {
+    /* background: linear-gradient(135deg, rgba(94, 69, 53, 0.95), rgba(147, 115, 94, 0.95)); */
+    background-image: url('../assets/texture-bg02.jpg');
+    color: #fff9f1;
+    padding: 40px 5%;
     display: flex;
-    flex-direction: column;
-    height: 22vw;
-    background: white;
-    border: 1px solid #efe7da;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s ease;
-
-    /* Smooth transition */
-    &.card:hover {
-        cursor: pointer;
-        transform: translateY(-2px);
-    }
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
-.itemlist .card img {
-    width: 15vw;
-    /* Make image fill the item width */
-    height: 15vw;
-    object-fit: cover;
+.header-content h1 {
+    font-size: 42px;
+    font-weight: 700;
+    margin: 0 0 10px 0;
+    letter-spacing: -0.5px;
 }
 
-.pd-def {
-    width: 85%;
-    margin: 0 auto;
-    font-size: 1em;
-
-    &.pd-def .pd-name {
-        font-weight: bold;
-    }
-}
-
-.pd-price {
-    width: 70%;
-    margin: 5px auto;
-    font-size: 1em;
-    color: rgb(215, 28, 28);
-    text-align: center;
-
-    &.pd-price .ind-price {
-        margin: 0 3px 5px 3px;
-        font-size: 0.7em;
-        color: #e9e1d7;
-        background-color: rgb(222, 68, 34);
-        border-radius: 0.3em;
-    }
-}
-
-.pd-tag {
-    display: flex;
-    width: 90%;
-    justify-content: space-around;
-    margin: 0 auto;
-}
-
-.pd-tag p {
-    font-size: 0.8em;
-    color: rgb(57, 208, 120);
-    border: 1px solid rgb(57, 208, 120);
-    border-radius: 0.1em;
+.header-content p {
+    font-size: 16px;
     margin: 0;
+    opacity: 0.9;
+}
+
+.cart-toggle {
+    display: none;
+    position: relative;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-size: 24px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.cart-toggle:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+.cart-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #ff6b6b;
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 10px;
+    min-width: 20px;
+}
+
+
+@media (max-width: 768px) {
+    .mobile-only {
+        display: block;
+    }
 }
 </style>

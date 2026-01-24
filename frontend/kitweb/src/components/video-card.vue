@@ -6,7 +6,7 @@ const videos = ref([
   {
     id: 1,
     src: '/shop-clip01.mp4',
-    poster: '/shop-clip01.jpg',
+    poster: '/shop-clip01-tn.jpg',
     title: 'Signature Thai Dishes',
     description: 'Authentic flavors from Bangkok',
     duration: '2:30'
@@ -14,7 +14,7 @@ const videos = ref([
   {
     id: 2,
     src: '/shop-clip01.mp4',
-    poster: '/shop-clip01.jpg',
+    poster: '/shop-clip01-tn.jpg',
     title: 'Fresh Ingredients',
     description: 'Quality you can taste',
     duration: '1:45'
@@ -22,7 +22,7 @@ const videos = ref([
   {
     id: 3,
     src: '/shop-clip01.mp4',
-    poster: '/shop-clip01.jpg',
+    poster: '/shop-clip01-tn.jpg',
     title: 'Chef\'s Special',
     description: 'Handcrafted with love',
     duration: '3:00'
@@ -30,7 +30,7 @@ const videos = ref([
   {
     id: 4,
     src: '/shop-clip01.mp4',
-    poster: '/shop-clip01.jpg',
+    poster: '/shop-clip01-tn.jpg',
     title: 'Delivery Service',
     description: 'Hot & fresh to your door',
     duration: '1:20'
@@ -57,7 +57,7 @@ const handleTouchMove = (e) => {
 const handleTouchEnd = () => {
   const swipeThreshold = 50
   const diff = touchStartX - touchEndX
-  
+
   if (Math.abs(diff) > swipeThreshold) {
     if (diff > 0) {
       nextVideo()
@@ -88,7 +88,7 @@ const goToVideo = (index) => {
 
 const togglePlay = () => {
   if (!videoElement.value) return
-  
+
   if (isPlaying.value) {
     videoElement.value.pause()
   } else {
@@ -133,39 +133,34 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <!-- Decorative wave top -->
+  <div style="width: 100%; overflow: hidden; line-height: 0;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 120" preserveAspectRatio="none"
+      style="width: 100%; height: 120px; display: block;">
+      <path fill="#d2b4a0cc"
+        d="M0,64L48,69.3C96,75,192,85,288,80C384,75,480,53,576,48C672,43,768,53,864,58.7C960,64,1056,64,1152,58.7C1248,53,1344,43,1392,37.3L1440,32L1440,120L1392,120C1344,120,1248,120,1152,120C1056,120,960,120,864,120C768,120,672,120,576,120C480,120,384,120,288,120C192,120,96,120,48,120L0,120Z">
+      </path>
+    </svg>
+  </div>
   <div class="video-card-container">
     <div class="section-header">
       <h2>✨ Discover Our Story</h2>
-      <p>Swipe through our culinary journey</p>
     </div>
 
-    <div 
-      class="video-card"
-      ref="containerElement"
-      @touchstart="handleTouchStart"
-      @touchmove="handleTouchMove"
-      @touchend="handleTouchEnd"
-    >
+    <div class="video-card" ref="containerElement" @touchstart="handleTouchStart" @touchmove="handleTouchMove"
+      @touchend="handleTouchEnd">
       <!-- Navigation Arrows -->
-      <button 
-        class="nav-arrow nav-arrow-left" 
-        @click="prevVideo"
-        :disabled="currentIndex === 0"
-        v-show="currentIndex > 0"
-      >
+      <button class="nav-arrow nav-arrow-left" @click="prevVideo" :disabled="currentIndex === 0"
+        v-show="currentIndex > 0">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M15 18l-6-6 6-6"/>
+          <path d="M15 18l-6-6 6-6" />
         </svg>
       </button>
 
-      <button 
-        class="nav-arrow nav-arrow-right" 
-        @click="nextVideo"
-        :disabled="currentIndex === videos.length - 1"
-        v-show="currentIndex < videos.length - 1"
-      >
+      <button class="nav-arrow nav-arrow-right" @click="nextVideo" :disabled="currentIndex === videos.length - 1"
+        v-show="currentIndex < videos.length - 1">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 18l6-6-6-6"/>
+          <path d="M9 18l6-6-6-6" />
         </svg>
       </button>
 
@@ -173,15 +168,9 @@ onUnmounted(() => {
       <div class="video-wrapper">
         <transition name="fade" mode="out-in">
           <div :key="currentIndex" class="video-content">
-            <video 
-              ref="videoElement"
-              :src="videos[currentIndex].src"
-              :poster="videos[currentIndex].poster"
-              @ended="handleVideoEnd"
-              class="video-player"
-              preload="metadata"
-            />
-            
+            <video ref="videoElement" :src="videos[currentIndex].src" :poster="videos[currentIndex].poster"
+              @ended="handleVideoEnd" class="video-player" preload="metadata" />
+
             <!-- Play/Pause Overlay -->
             <div class="video-overlay" @click="togglePlay">
               <transition name="scale-fade">
@@ -208,14 +197,9 @@ onUnmounted(() => {
 
       <!-- Indicator Dots -->
       <div class="indicators">
-        <button
-          v-for="(video, index) in videos"
-          :key="video.id"
-          class="indicator-dot"
-          :class="{ active: index === currentIndex }"
-          @click="goToVideo(index)"
-          :aria-label="`Go to video ${index + 1}`"
-        >
+        <button v-for="(video, index) in videos" :key="video.id" class="indicator-dot"
+          :class="{ active: index === currentIndex }" @click="goToVideo(index)"
+          :aria-label="`Go to video ${index + 1}`">
           <span class="dot-inner"></span>
         </button>
       </div>
@@ -227,25 +211,47 @@ onUnmounted(() => {
         <span class="total">{{ videos.length }}</span>
       </div>
     </div>
+    <p style="margin: 10px auto 0; text-align: center; font-size: 18px; color: #93735E; opacity: 0.8;">
+      Swipe through our culinary journey</p>
 
     <!-- Swipe Hint (shows briefly on mobile) -->
     <div class="swipe-hint">
       <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-        <path d="M10 20 L20 10 M20 10 L30 20 M20 10 L20 30" stroke="#93735E" stroke-width="2" stroke-linecap="round"/>
+        <path d="M10 20 L20 10 M20 10 L30 20 M20 10 L20 30" stroke="#93735E" stroke-width="2" stroke-linecap="round" />
       </svg>
       <p>Swipe to explore</p>
     </div>
   </div>
+
+  <!-- Decorative wave bottom -->
+  <div style="width: 100%; overflow: hidden; line-height: 0;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 120" preserveAspectRatio="none"
+      style="width: 100%; height: 120px; display: block;">
+      <path fill="#d2b4a0cc"
+        d="M0,64L48,69.3C96,75,192,85,288,80C384,75,480,53,576,48C672,43,768,53,864,58.7C960,64,1056,64,1152,58.7C1248,53,1344,43,1392,37.3L1440,32L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z">
+      </path>
+    </svg>
+  </div>
 </template>
 
 <style scoped>
+.slant-top {
+  background: linear-gradient(to bottom right, transparent 50%, #fff 50%);
+  padding-top: 100px;
+}
+
+/* Using clip-path */
+.diagonal-border {
+  background: #fff;
+  clip-path: polygon(0 10%, 100% 0, 100% 90%, 0 100%);
+}
+
 .video-card-container {
-  background-image: url('../assets/texture-bg02.jpg');
+  background-color: var(--primary-color);
   background-size: cover;
   background-position: center;
-  /* max-width: 1200px; */
   margin: 0 auto;
-  padding: 40px 20px;
+  padding: 0 20px;
 }
 
 .section-header {
@@ -256,16 +262,9 @@ onUnmounted(() => {
 .section-header h2 {
   font-size: 42px;
   font-weight: 700;
-  color: #5E4535;
+  color: var(--text-dark-color);
   margin: 0 0 10px 0;
   letter-spacing: -0.5px;
-}
-
-.section-header p {
-  font-size: 18px;
-  color: #93735E;
-  margin: 0;
-  opacity: 0.8;
 }
 
 .video-card {
@@ -493,8 +492,15 @@ onUnmounted(() => {
 
 /* Animations */
 @keyframes fadeInOut {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.8; }
+
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+
+  50% {
+    opacity: 0.8;
+  }
 }
 
 .fade-enter-active,
