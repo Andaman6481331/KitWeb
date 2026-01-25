@@ -281,6 +281,7 @@ onUnmounted(() => {
 
 .video-card:hover {
   transform: translateY(-5px);
+  transform: scale(1.1);
   box-shadow: 0 15px 50px rgba(94, 69, 53, 0.25);
 }
 

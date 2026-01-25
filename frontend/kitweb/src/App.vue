@@ -41,7 +41,7 @@ const toggleLanguageMenu = () => {
             <span class="arrow">▼</span>
           </div>
 
-          <transition name="dropdown">
+          <transition name="button-dropdown" style="top: 50px;">
             <div v-if="showLanguageMenu" class="language-dropdown">
               <div v-for="lang in languages" :key="lang.code" class="language-option"
                 :class="{ active: currentLanguage === lang.code }" @click="changeLanguage(lang.code)">
@@ -81,8 +81,23 @@ const toggleLanguageMenu = () => {
             Login
           </div>
         </router-link>
+      </div>
 
-
+      <div class="dropdown">
+        <div class="nav-item">
+          <router-link :to="'/event'" class="no-style">
+            <div class="secondary-nav-button">
+              <span class="button-icon">📦</span>
+              Events
+            </div>
+          </router-link>
+          <router-link :to="'/diyproduct'" class="no-style">
+            <div class="secondary-nav-button">
+              <span class="button-icon">🎨</span>
+              DIY-Products
+            </div>
+          </router-link>
+        </div>
       </div>
     </div>
 
@@ -325,6 +340,57 @@ const toggleLanguageMenu = () => {
   color: #ffd4a3;
   font-weight: bold;
   font-size: 16px;
+}
+
+
+/* The Secondary Navbar (Dropdown) */
+.dropdown {
+  position: absolute;
+  top: 90px;
+  left: 0;
+  background-color: var(--primary-color);
+  min-width: 200px;
+  width: 100%;
+  list-style: none;
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+
+  /* Hidden state */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all 0.3s ease;
+}
+
+.NavBar:hover .dropdown {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.secondary-nav-button {
+  color: var(--text-dark-color);
+  padding: 6px 20px;
+  display: block;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+
+.secondary-nav-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--accent-color, #5e4535);
+  cursor: pointer;
 }
 
 /* Dropdown Animation */

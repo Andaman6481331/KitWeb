@@ -38,7 +38,7 @@ import instagramCard from './instragram-card.vue';
 
             <div class="cta-group">
                 <button class="btn-primary" @click="handleStartCrafting">Start Crafting</button>
-                <button class="btn-secondary" @click="handleLearnMore">Learn More</button>
+                <router-link to="/event" class="btn-secondary">Learn More</router-link>
             </div>
         </div>
 

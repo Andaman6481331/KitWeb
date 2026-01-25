@@ -41,7 +41,28 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
 </script>
 
 <template>
+    <!-- Hero Section -->
+    <!-- <section class="hero-section">
+        <div class="hero-content">
+            <div class="hero-text">
+                <h1 class="hero-title">Premium Quality Yarn & Sewing Supplies</h1>
+                <p class="hero-subtitle">Discover the finest materials for your creative projects. From
+                    professional-grade
+                    yarns to precision needles.</p>
+                <div class="hero-buttons">
+                    <button class="cta-primary">Shop Now</button>
+                    <button class="cta-secondary">View Catalog</button>
+                </div>
+            </div>
+            <div class="hero-decoration">
+                <div class="floating-card card-1">
+                    <img src="../assets/card-img05.webp" alt="">
+                </div>
+            </div>
+        </div>
+    </section> -->
     <section class="about-section">
+
         <div class="container">
             <!-- Left Side - About Us Information -->
             <div class="text-content">
@@ -74,7 +95,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
 
 
         <!-- Four Properties -->
-        <div class="features-grid">
+        <!-- <div class="features-grid">
             <div v-for="feature in aboutInfo.features" :key="feature.title" class="feature-item">
                 <div class="feature-icon">{{ feature.icon }}</div>
                 <div class="feature-content">
@@ -82,7 +103,9 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
                     <p>{{ feature.description }}</p>
                 </div>
             </div>
-        </div>
+        </div> -->
+
+
         <div class="contact-info">
             <h3>Visit Us</h3>
             <div class="contact-item">
@@ -106,6 +129,127 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
 </template>
 
 <style scoped>
+/* ===== HERO SECTION ===== */
+.hero-section {
+    /* background: linear-gradient(135deg, #8b6f47 0%, #b89968 50%, #d4a574 100%); */
+    background: url('../assets/yaowarat01.jpg');
+    background-size: contain;
+    background-position: center;
+    min-height: 600px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="2" fill="rgba(255,255,255,0.1)"/></svg>');
+    opacity: 0.3;
+}
+
+.hero-content {
+    max-width: 1200px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 60px;
+    position: relative;
+    z-index: 1;
+}
+
+.hero-text {
+    flex: 1;
+    color: black;
+}
+
+.hero-title {
+    font-size: 56px;
+    font-weight: 800;
+    line-height: 1.2;
+    margin: 0 0 20px 0;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+    animation: fadeInUp 0.8s ease;
+}
+
+.hero-subtitle {
+    font-size: 20px;
+    font-weight: 400;
+    line-height: 1.6;
+    margin: 0 0 40px 0;
+    opacity: 0.95;
+    animation: fadeInUp 0.8s ease 0.2s backwards;
+}
+
+.hero-buttons {
+    display: flex;
+    gap: 20px;
+    animation: fadeInUp 0.8s ease 0.4s backwards;
+}
+
+.hero-decoration {
+    flex: 1;
+    position: relative;
+    height: 400px;
+}
+
+.floating-card {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 20px;
+    animation: float 6s ease-in-out infinite;
+    overflow: hidden;
+    display: flex;
+}
+
+.floating-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.card-1 {
+    width: 280px;
+    height: 460px;
+    top: 0;
+    right: -50px;
+    animation-delay: 0s;
+}
+
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Content Section */
 .about-section {
     background: linear-gradient(135deg, #f5f7fa 0%, #e8ebe8 100%);
     padding: 50px 0 100px;

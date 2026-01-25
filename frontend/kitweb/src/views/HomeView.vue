@@ -5,6 +5,7 @@ import KitCraftAds from '../components/kitcraft-ads.vue';
 // import RecommendedItemSlider from '../components/recommended-item-slider.vue';
 import CalenderSection from '../components/calender-section.vue';
 import HistoryMap from '../components/history-map.vue';
+import AutoScrollBanner from '../components/auto-scroll-banner.vue';
 
 // Function for the button
 const handleQuickView = (item) => {
@@ -22,19 +23,47 @@ const handleQuickView = (item) => {
           <p class="hero-subtitle">Discover the finest materials for your creative projects. From professional-grade
             yarns to precision needles.</p>
           <div class="hero-buttons">
-            <button class="cta-primary">Shop Now</button>
-            <button class="cta-secondary">View Catalog</button>
+            <router-link :to="'/orderpage'" class="no-style">
+              <button class="cta-primary">Shop Now</button>
+            </router-link>
+            <router-link :to="'/catalog'" class="no-style">
+              <button class="cta-secondary">View Catalog</button>
+            </router-link>
           </div>
         </div>
         <div class="hero-decoration">
-          <div class="floating-card card-1">
-            <img src="../assets/card-img03.jpg" alt="">
+          <div class="floating-card-container container-group-1">
+            <div class="floating-card card-1">
+              <img src="../assets/card-img09.jpg" alt="">
+            </div>
+            <div class="floating-card card-2">
+              <img src="../assets/card-img01.jpg" alt="">
+            </div>
+            <div class="floating-card card-3">
+              <img src="../assets/card-img07.jpg" alt="">
+            </div>
+            <!-- <div class="floating-card card-4">
+              <img src="../assets/card-img06.jpg" alt="">
+            </div> -->
           </div>
-          <div class="floating-card card-2">
-            <img src="../assets/card-img01.jpg" alt="">
+          <div class="floating-card-container container-group-2">
+            <div class="floating-card card-5">
+              <img src="../assets/card-img09.jpg" alt="">
+            </div>
+            <div class="floating-card card-6">
+              <img src="../assets/card-img09.jpg" alt="">
+            </div>
           </div>
-          <div class="floating-card card-3">
-            <img src="../assets/card-img05.webp" alt="">
+          <div class="floating-card-container container-group-3">
+            <div class="floating-card card-7">
+              <img src="../assets/card-img09.jpg" alt="">
+            </div>
+            <div class="floating-card card-8">
+              <img src="../assets/card-img09.jpg" alt="">
+            </div>
+            <div class="floating-card card-9">
+              <img src="../assets/card-img09.jpg" alt="">
+            </div>
           </div>
         </div>
       </div>
@@ -42,19 +71,6 @@ const handleQuickView = (item) => {
 
     <!-- About us / History / Location -->
     <HistoryMap />
-    <!-- <section class="about-section">
-      <div class="about-content">
-        <div class="about-text">
-          <h2 class="about-title">About Us</h2>
-          <p class="about-subtitle">Discover the finest materials for your creative projects. From professional-grade
-            yarns to precision needles.</p>
-          <div class="about-buttons">
-            <button class="cta-primary">Shop Now</button>
-            <button class="cta-secondary">View Catalog</button>
-          </div>
-        </div>
-      </div>
-    </section> -->
 
     <!-- Video Card Display -->
     <VideoCard />
@@ -95,12 +111,7 @@ const handleQuickView = (item) => {
     </section>
 
     <!-- Auto Item Scroll Banner -->
-    <section class="auto-scroll-banner">
-      <div v-for="item in items" :key="item.id" class="auto-scroll-banner-item">
-        <img :src="item.image" :alt="item.index">
-      </div>
-      this is auto scroll banner section
-    </section>
+    <AutoScrollBanner />
 
     <!-- Calender -->
     <CalenderSection />
@@ -139,7 +150,7 @@ const handleQuickView = (item) => {
   align-items: center;
   justify-content: center;
   position: relative;
-  overflow: hidden;
+  /* overflow: hidden; */
 }
 
 .hero-section::before {
@@ -233,6 +244,63 @@ const handleQuickView = (item) => {
   height: 400px;
 }
 
+.floating-card-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  /* Hidden by default */
+  /* 16s total duration (8s per group), infinite loop */
+  animation: fade-in-up-sequence 24s infinite;
+}
+
+/* Group 2 starts halfway through the 16s cycle */
+.container-group-2 {
+  animation-delay: 8s;
+}
+
+.container-group-3 {
+  animation-delay: 16s;
+}
+
+@keyframes fade-in-up-sequence {
+
+  /* 0-5%: Fade In and Move Up */
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+    pointer-events: none;
+  }
+
+  5% {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  /* 5-28%: Stay Visible */
+  30% {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  /* 28-33%: Fade Out and continue moving Down slightly */
+  33% {
+    opacity: 0;
+    transform: translateY(20px);
+    pointer-events: none;
+  }
+
+  /* 33-100%: Remain Hidden while other groups play */
+  100% {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
 .floating-card {
   position: absolute;
   background: rgba(255, 255, 255, 0.15);
@@ -242,6 +310,7 @@ const handleQuickView = (item) => {
   animation: float 6s ease-in-out infinite;
   overflow: hidden;
   display: flex;
+  z-index: 99;
 }
 
 .floating-card img {
@@ -252,26 +321,74 @@ const handleQuickView = (item) => {
 
 .card-1 {
   width: 280px;
-  height: 360px;
-  top: -50px;
-  right: 10px;
+  height: 320px;
+  top: 40px;
+  right: -10px;
   animation-delay: 0s;
 }
 
 .card-2 {
-  width: 300px;
-  height: 320px;
-  top: 120px;
+  width: 250px;
+  height: 280px;
+  top: 200px;
   right: -120px;
   animation-delay: 2s;
 }
 
 .card-3 {
   width: 200px;
-  height: 250px;
-  top: 230px;
+  height: 220px;
+  top: 310px;
   right: 100px;
-  animation-delay: 4s;
+  animation-delay: 1.5s;
+}
+
+.card-4 {
+  width: 200px;
+  height: 200px;
+  top: 410px;
+  right: -20px;
+  animation-delay: 1s;
+}
+
+.card-5 {
+  width: 250px;
+  height: 400px;
+  top: 40px;
+  right: -40px;
+  animation-delay: 1s;
+}
+
+.card-6 {
+  width: 200px;
+  height: 200px;
+  top: 280px;
+  right: -120px;
+  animation-delay: 2s;
+}
+
+.card-7 {
+  width: 220px;
+  height: 280px;
+  top: 40px;
+  right: -40px;
+  animation-delay: 1s;
+}
+
+.card-8 {
+  width: 220px;
+  height: 220px;
+  top: 180px;
+  right: 130px;
+  animation-delay: 2s;
+}
+
+.card-9 {
+  width: 210px;
+  height: 170px;
+  top: 300px;
+  right: 20px;
+  animation-delay: 1.5s;
 }
 
 @keyframes float {

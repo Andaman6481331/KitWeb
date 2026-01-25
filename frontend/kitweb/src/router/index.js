@@ -4,6 +4,8 @@ import Catalog from '../views/CatalogPage.vue';
 import OrderPage from '../views/OrderPage.vue';
 import ContactUsPage from '../views/ContactUsPage.vue';
 import Login from '../views/Login.vue';
+import EventPage from '../views/EventPage.vue';
+import DIYProductPage from '../views/DIYProductPage.vue';
 
 // Define routes
 const routes = [
@@ -31,7 +33,18 @@ const routes = [
         path: '/login',
         name: 'login',
         component: Login
+    },
+    {
+        path: '/event',
+        name: 'event',
+        component: EventPage
+    },
+    {
+        path: '/diyproduct',
+        name: 'diyproduct',
+        component: DIYProductPage
     }
+
 ];
 
 // Create router instance
