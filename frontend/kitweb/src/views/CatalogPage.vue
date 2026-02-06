@@ -1,5 +1,10 @@
 <script setup>
 import ProductStock from '../components/products-stock.vue';
+
+const toggleCart = () => {
+    
+}
+
 </script>
 <template>
     <!-- Page Header -->
