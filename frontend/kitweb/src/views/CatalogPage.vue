@@ -2,7 +2,7 @@
 import ProductStock from '../components/products-stock.vue';
 
 const toggleCart = () => {
-    
+
 }
 
 </script>
@@ -25,8 +25,15 @@ const toggleCart = () => {
 <style>
 /* Page Header */
 .page-header {
-    /* background: linear-gradient(135deg, rgba(94, 69, 53, 0.95), rgba(147, 115, 94, 0.95)); */
-    background-image: url('../assets/texture-bg02.jpg');
+    background:
+        linear-gradient(135deg,
+            rgba(94, 69, 53, 0.75),
+            rgba(147, 115, 94, 0.75)),
+        url('../assets/texture-bg02.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+
     color: #fff9f1;
     padding: 40px 5%;
     display: flex;

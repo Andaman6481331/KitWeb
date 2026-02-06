@@ -6,6 +6,7 @@ import KitCraftAds from '../components/kitcraft-ads.vue';
 import CalenderSection from '../components/calender-section.vue';
 import HistoryMap from '../components/history-map.vue';
 import AutoScrollBanner from '../components/auto-scroll-banner.vue';
+import FeaturedCategories from '../components/featured-categories.vue';
 
 // Function for the button
 const handleQuickView = (item) => {
@@ -19,9 +20,10 @@ const handleQuickView = (item) => {
     <section class="hero-section">
       <div class="hero-content">
         <div class="hero-text">
-          <h1 class="hero-title">Premium Quality Yarn & Sewing Supplies</h1>
-          <p class="hero-subtitle">Discover the finest materials for your creative projects. From professional-grade
-            yarns to precision needles.</p>
+          <h1 class="hero-title">Kitcharoen Craft & Sewing Supplies</h1>
+          <p class="hero-subtitle">Trusted materials, honest prices, and friendly service from Sampeng Market, Bangkok.
+            Since 1984
+          </p>
           <div class="hero-buttons">
             <router-link :to="'/orderpage'" class="no-style">
               <button class="cta-primary">Shop Now</button>
@@ -51,7 +53,7 @@ const handleQuickView = (item) => {
               <img src="../assets/card-img09.jpg" alt="">
             </div>
             <div class="floating-card card-6">
-              <img src="../assets/card-img09.jpg" alt="">
+              <img src="../assets/card-img06.jpg" alt="">
             </div>
           </div>
           <div class="floating-card-container container-group-3">
@@ -75,40 +77,13 @@ const handleQuickView = (item) => {
     <!-- Video Card Display -->
     <VideoCard />
 
-    <!-- KitCraft Instagram Ads -->
-    <KitCraftAds />
-
     <!-- <RecommendedItemSlider /> -->
 
     <!-- Featured Categories -->
-    <section class="categories-section">
-      <div class="section-header">
-        <h2 class="section-title">Shop by Category</h2>
-        <p class="section-subtitle">Find exactly what you need</p>
-      </div>
-      <div class="categories-grid">
-        <div class="category-card">
-          <div class="category-icon">🧶</div>
-          <h3>Premium Yarn</h3>
-          <p>High-quality yarns in various colors</p>
-        </div>
-        <div class="category-card">
-          <div class="category-icon">🪡</div>
-          <h3>Needles & Tools</h3>
-          <p>Professional sewing equipment</p>
-        </div>
-        <div class="category-card">
-          <div class="category-icon">🔘</div>
-          <h3>Buttons & Fasteners</h3>
-          <p>Decorative and functional buttons</p>
-        </div>
-        <div class="category-card">
-          <div class="category-icon">✂️</div>
-          <h3>Accessories</h3>
-          <p>Everything for your craft</p>
-        </div>
-      </div>
-    </section>
+    <FeaturedCategories />
+
+    <!-- KitCraft Instagram Ads -->
+    <KitCraftAds />
 
     <!-- Auto Item Scroll Banner -->
     <AutoScrollBanner />
@@ -165,12 +140,12 @@ const handleQuickView = (item) => {
 }
 
 .hero-content {
-  max-width: 1200px;
+  max-width: 1300px;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 60px;
+  gap: 40px;
   position: relative;
   z-index: 1;
 }
@@ -181,7 +156,7 @@ const handleQuickView = (item) => {
 }
 
 .hero-title {
-  font-size: 56px;
+  font-size: 64px;
   font-weight: 800;
   line-height: 1.2;
   margin: 0 0 20px 0;
@@ -247,7 +222,7 @@ const handleQuickView = (item) => {
 .floating-card-container {
   position: absolute;
   top: 0;
-  left: 0;
+  left: -40px;
   width: 100%;
   height: 100%;
   opacity: 0;
@@ -433,62 +408,6 @@ const handleQuickView = (item) => {
   color: #666;
   margin: 0;
   font-weight: 400;
-}
-
-/* ===== CATEGORIES SECTION ===== */
-.categories-section {
-  padding: 60px 0;
-  background: white;
-}
-
-.categories-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 30px;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 5%;
-}
-
-.category-card {
-  background: linear-gradient(135deg, #f8f4f0 0%, #efe7da 100%);
-  padding: 40px 30px;
-  border-radius: 20px;
-  text-align: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
-  border: 2px solid transparent;
-}
-
-.category-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-  border-color: #b89968;
-}
-
-.category-icon {
-  font-size: 64px;
-  margin-bottom: 20px;
-  filter: grayscale(0.3);
-  transition: all 0.3s ease;
-}
-
-.category-card:hover .category-icon {
-  filter: grayscale(0);
-  transform: scale(1.1);
-}
-
-.category-card h3 {
-  font-size: 22px;
-  font-weight: 600;
-  color: #2d2d2d;
-  margin: 0 0 10px 0;
-}
-
-.category-card p {
-  font-size: 14px;
-  color: #666;
-  margin: 0;
 }
 
 /* ===== PROMO SECTION ===== */

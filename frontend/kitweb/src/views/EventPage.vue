@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue';
+import AutoScrollEvent from '../components/auto-scroll-event.vue';
 
 const pastEvents = ref([
     {
@@ -245,6 +246,8 @@ const handleContactSubmit = () => {
                 </div>
             </div>
         </section>
+
+        <AutoScrollEvent />
 
         <!-- Product Modal -->
         <div v-if="showProductModal" class="modal-overlay" @click="closeModal">
