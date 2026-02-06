@@ -26,7 +26,7 @@ const toggleLanguageMenu = () => {
   <div>
     <div class="NavBar">
       <div class="nav-group">
-        <img src="../components/icons/twitter.svg" alt="logo" class="logo">
+        <img src="./components/icons/Twitter.svg" alt="logo" class="logo">
         <router-link :to="'/'" class="no-style">
           <div>
             <h1>KITCHAROEN</h1>
