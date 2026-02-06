@@ -1,0 +1,9 @@
+[build]
+  # The directory where your frontend source code lives
+  base = "frontend/kitweb"
+  
+  # The command to run (Netlify will run this INSIDE the base directory)
+  command = "npm run build"
+  
+  # The directory containing the build output (relative to the base)
+  publish = "dist"
