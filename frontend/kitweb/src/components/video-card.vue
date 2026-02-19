@@ -6,7 +6,7 @@ const videos = ref([
   {
     id: 1,
     src: '/shop-clip01.mp4',
-    poster: '/shop-clip01-tn.jpg',
+    poster: '/shop-clip01-tn.png',
     title: 'Signature Thai Dishes',
     description: 'Authentic flavors from Bangkok',
     duration: '2:30'
@@ -14,7 +14,7 @@ const videos = ref([
   {
     id: 2,
     src: '/shop-clip01.mp4',
-    poster: '/shop-clip01-tn.jpg',
+    poster: '/shop-clip02-tn.png',
     title: 'Fresh Ingredients',
     description: 'Quality you can taste',
     duration: '1:45'
@@ -22,7 +22,7 @@ const videos = ref([
   {
     id: 3,
     src: '/shop-clip01.mp4',
-    poster: '/shop-clip01-tn.jpg',
+    poster: '/shop-clip01-tn.png',
     title: 'Chef\'s Special',
     description: 'Handcrafted with love',
     duration: '3:00'
@@ -30,7 +30,7 @@ const videos = ref([
   {
     id: 4,
     src: '/shop-clip01.mp4',
-    poster: '/shop-clip01-tn.jpg',
+    poster: '/shop-clip02-tn.png',
     title: 'Delivery Service',
     description: 'Hot & fresh to your door',
     duration: '1:20'
@@ -143,12 +143,12 @@ onUnmounted(() => {
     </svg>
   </div>
   <div class="video-card-container">
-    <div class="section-header">
+    <div v-reveal class="section-header">
       <h2>✨ Discover Our Story</h2>
     </div>
 
-    <div class="video-card" ref="containerElement" @touchstart="handleTouchStart" @touchmove="handleTouchMove"
-      @touchend="handleTouchEnd">
+    <div v-reveal class="video-card delay4" ref="containerElement" @touchstart="handleTouchStart"
+      @touchmove="handleTouchMove" @touchend="handleTouchEnd">
       <!-- Navigation Arrows -->
       <button class="nav-arrow nav-arrow-left" @click="prevVideo" :disabled="currentIndex === 0"
         v-show="currentIndex > 0">

@@ -157,10 +157,10 @@ const cartItemCount = computed(() => {
 const addToCart = (product) => {
     const selection = productSelections.value[product.id]
     const cartItemKey = `${product.id}-${selection.size}-${selection.color}`
-    
-    const existingItem = cart.value.find(item => 
-        item.id === product.id && 
-        item.selectedSize === selection.size && 
+
+    const existingItem = cart.value.find(item =>
+        item.id === product.id &&
+        item.selectedSize === selection.size &&
         item.selectedColor === selection.color
     )
 
@@ -224,7 +224,7 @@ const checkout = () => {
         showNotificationMsg('Your cart is empty!')
         return
     }
-    
+
     // Open checkout popup instead of immediate alert
     showCheckoutPopup.value = true
 }
@@ -245,7 +245,7 @@ const formatOrderMessage = () => {
     let message = `🧾 New Order (Website)\n`
     message += `Order ID: ${orderId}\n`
     message += `Customer: ${customerName.value || 'Guest'}\n\n`
-    
+
     cart.value.forEach((item, index) => {
         message += `${index + 1}) ${item.name}\n`
         message += `   Size: ${item.selectedSize} | Color: ${item.selectedColor}\n`
@@ -253,13 +253,13 @@ const formatOrderMessage = () => {
         message += `   Unit: ${item.price.toFixed(2)}\n`
         message += `   Subtotal: ${(item.price * item.quantity).toFixed(2)}\n\n`
     })
-    
+
     message += `Total: ${cartTotal.value.toFixed(2)}\n`
     message += `Payment: ${paymentMethod.value}\n`
     if (orderNote.value) {
         message += `Note: ${orderNote.value}\n`
     }
-    
+
     return message
 }
 
@@ -268,18 +268,18 @@ const submitOrder = async () => {
         showNotificationMsg('Please enter your name')
         return
     }
-    
+
     isSubmittingOrder.value = true
-    
+
     try {
         const orderMessage = formatOrderMessage()
-        
+
         // LINE Notify API endpoint
         const lineNotifyToken = 'YOUR_LINE_NOTIFY_TOKEN_HERE' // Replace with your actual token
-        
+
         const formData = new FormData()
         formData.append('message', orderMessage)
-        
+
         const response = await fetch('https://notify-api.line.me/api/notify', {
             method: 'POST',
             headers: {
@@ -287,7 +287,7 @@ const submitOrder = async () => {
             },
             body: formData
         })
-        
+
         if (response.ok) {
             showNotificationMsg('Order sent successfully! 🎉')
             cart.value = []
@@ -330,8 +330,8 @@ const isProductInCart = (productId) => {
         <!-- Page Header -->
         <div class="page-header">
             <div class="header-content">
-                <h1>🛍️ Order Products</h1>
-                <p>Select your items with preferred size and color</p>
+                <h1 v-reveal>🛍️ Order Products</h1>
+                <p v-reveal class="delay2">Select your items with preferred size and color</p>
             </div>
 
             <!-- Cart Button (Mobile) -->
@@ -352,7 +352,8 @@ const isProductInCart = (productId) => {
             </div>
 
             <div class="category-filters">
-                <button class="category-btn" :class="{ active: selectedCategory === 'All' }" :key="'All'" @click="selectedCategory = 'All'">
+                <button class="category-btn" :class="{ active: selectedCategory === 'All' }" :key="'All'"
+                    @click="selectedCategory = 'All'">
                     All
                 </button>
                 <button v-for="category in categories" :key="category" class="category-btn"
@@ -380,13 +381,11 @@ const isProductInCart = (productId) => {
 
                     <!-- Table Body -->
                     <div class="table-body">
-                        <div v-for="product in filteredProducts" :key="product.id" 
-                            class="table-row" 
-                            :class="{ 
-                                'out-of-stock': !product.inStock,
-                                'in-cart': isProductInCart(product.id)
-                            }">
-                            
+                        <div v-for="product in filteredProducts" :key="product.id" class="table-row" :class="{
+                            'out-of-stock': !product.inStock,
+                            'in-cart': isProductInCart(product.id)
+                        }">
+
                             <!-- Image -->
                             <div class="td-image">
                                 <img :src="product.image" :alt="product.name" class="product-thumb" />
@@ -406,10 +405,8 @@ const isProductInCart = (productId) => {
 
                             <!-- Size Selector -->
                             <div class="td-size">
-                                <select 
-                                    v-model="productSelections[product.id].size"
-                                    @change="updateSize(product.id, $event.target.value)"
-                                    class="size-select"
+                                <select v-model="productSelections[product.id].size"
+                                    @change="updateSize(product.id, $event.target.value)" class="size-select"
                                     :disabled="!product.inStock">
                                     <option v-for="size in product.sizes" :key="size" :value="size">
                                         {{ size }}
@@ -419,10 +416,8 @@ const isProductInCart = (productId) => {
 
                             <!-- Color Selector -->
                             <div class="td-color">
-                                <select 
-                                    v-model="productSelections[product.id].color"
-                                    @change="updateColor(product.id, $event.target.value)"
-                                    class="color-select"
+                                <select v-model="productSelections[product.id].color"
+                                    @change="updateColor(product.id, $event.target.value)" class="color-select"
                                     :disabled="!product.inStock">
                                     <option v-for="color in product.colors" :key="color" :value="color">
                                         {{ color }}
@@ -437,12 +432,10 @@ const isProductInCart = (productId) => {
 
                             <!-- Action Button -->
                             <div class="td-action">
-                                <button 
-                                    class="add-btn" 
-                                    :disabled="!product.inStock"
-                                    @click="addToCart(product)">
+                                <button class="add-btn" :disabled="!product.inStock" @click="addToCart(product)">
                                     <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                                        <path d="M10 5V15M5 10H15" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+                                        <path d="M10 5V15M5 10H15" stroke="currentColor" stroke-width="2.5"
+                                            stroke-linecap="round" />
                                     </svg>
                                     Add to Cart
                                 </button>
@@ -485,8 +478,10 @@ const isProductInCart = (productId) => {
 
                         <button @click="removeFromCart(item.cartItemKey)" class="remove-btn">
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                                <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                <path
+                                    d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                                <path
+                                    d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
                             </svg>
                         </button>
                     </div>
@@ -513,14 +508,10 @@ const isProductInCart = (productId) => {
                         <!-- Customer Information -->
                         <div class="form-group">
                             <label>Name <span class="required">*</span></label>
-                            <input 
-                                v-model="customerName" 
-                                type="text" 
-                                placeholder="Enter your name"
-                                class="form-input"
-                            />
+                            <input v-model="customerName" type="text" placeholder="Enter your name"
+                                class="form-input" />
                         </div>
-                        
+
                         <div class="form-group">
                             <label>Payment Method</label>
                             <select v-model="paymentMethod" class="form-select">
@@ -530,7 +521,7 @@ const isProductInCart = (productId) => {
                                 <option>PromptPay</option>
                             </select>
                         </div>
-            
+
                         <div class="summary-row total">
                             <span>Total</span>
                             <span>฿{{ cartTotal + 30 }}</span>
@@ -560,86 +551,81 @@ const isProductInCart = (productId) => {
         <!-- Cart Overlay (Mobile) -->
         <div v-if="showCart" class="cart-overlay mobile-only" @click="toggleCart"></div>
         <!-- Checkout Popup -->
-<div v-if="showCheckoutPopup" class="checkout-overlay" @click="closeCheckoutPopup">
-    <div class="checkout-popup" @click.stop>
-        <button class="popup-close-btn" @click="closeCheckoutPopup">✕</button>
-        
-        <div class="popup-header">
-            <h2>🧾 Complete Your Order</h2>
-            <p>Review your order and provide details</p>
-        </div>
-        
-        <div class="popup-body">
-            
-            <!-- Order Summary -->
-            <div class="order-summary-section">
-                <div class="order-summary-header">
-                    <h3>Order Summary</h3>
-                    <h3>Qty</h3>
-                    <h3>Price</h3>
-                    <h3>Total</h3>
+        <div v-if="showCheckoutPopup" class="checkout-overlay" @click="closeCheckoutPopup">
+            <div class="checkout-popup" @click.stop>
+                <button class="popup-close-btn" @click="closeCheckoutPopup">✕</button>
+
+                <div class="popup-header">
+                    <h2>🧾 Complete Your Order</h2>
+                    <p>Review your order and provide details</p>
                 </div>
-                <div class="summary-items">
-                    <div v-for="item in cart" :key="item.cartItemKey" class="summary-item">
-                        <div class="summary-item-info">
-                            <strong>{{ item.name }}</strong>
-                            <span class="summary-specs">{{ item.selectedSize }} • {{ item.selectedColor }}</span>
+
+                <div class="popup-body">
+
+                    <!-- Order Summary -->
+                    <div class="order-summary-section">
+                        <div class="order-summary-header">
+                            <h3>Order Summary</h3>
+                            <h3>Qty</h3>
+                            <h3>Price</h3>
+                            <h3>Total</h3>
                         </div>
-                        <div class="summary-item-calc">
-                            <span>{{ item.quantity }}</span>
-                            <span>•</span>
-                            <span>{{ item.price }}</span>
-                            <strong>฿{{ item.quantity * item.price }}</strong>
+                        <div class="summary-items">
+                            <div v-for="item in cart" :key="item.cartItemKey" class="summary-item">
+                                <div class="summary-item-info">
+                                    <strong>{{ item.name }}</strong>
+                                    <span class="summary-specs">{{ item.selectedSize }} • {{ item.selectedColor
+                                        }}</span>
+                                </div>
+                                <div class="summary-item-calc">
+                                    <span>{{ item.quantity }}</span>
+                                    <span>•</span>
+                                    <span>{{ item.price }}</span>
+                                    <strong>฿{{ item.quantity * item.price }}</strong>
+                                </div>
+                            </div>
                         </div>
+
+                        <div class="summary-total">
+                            <div class="total-row">
+                                <span>Subtotal</span>
+                                <span>฿{{ cartTotal }}</span>
+                            </div>
+                            <div class="total-row">
+                                <span>Delivery</span>
+                                <span>฿30</span>
+                            </div>
+                            <div class="total-row grand-total">
+                                <span>Grand Total</span>
+                                <span>฿{{ cartTotal + 30 }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Order Note (Optional)</label>
+                        <textarea v-model="orderNote" placeholder="Special requests or delivery instructions..."
+                            class="form-textarea" rows="3"></textarea>
                     </div>
                 </div>
-                
-                <div class="summary-total">
-                    <div class="total-row">
-                        <span>Subtotal</span>
-                        <span>฿{{ cartTotal }}</span>
-                    </div>
-                    <div class="total-row">
-                        <span>Delivery</span>
-                        <span>฿30</span>
-                    </div>
-                    <div class="total-row grand-total">
-                        <span>Grand Total</span>
-                        <span>฿{{ cartTotal + 30 }}</span>
-                    </div>
+
+                <div class="popup-footer">
+                    <button @click="closeCheckoutPopup" class="cancel-btn">Cancel</button>
+                    <button @click="submitOrder" class="submit-order-btn" :disabled="isSubmittingOrder">
+                        <span v-if="!isSubmittingOrder">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                <path
+                                    d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                                    stroke="currentColor" stroke-width="2" />
+                            </svg>
+                            Send Order to LINE
+                        </span>
+                        <span v-else>Sending...</span>
+                    </button>
                 </div>
             </div>
-            <div class="form-group">
-                <label>Order Note (Optional)</label>
-                <textarea 
-                    v-model="orderNote" 
-                    placeholder="Special requests or delivery instructions..."
-                    class="form-textarea"
-                    rows="3"
-                ></textarea>
-            </div>
-        </div>
-        
-        <div class="popup-footer">
-            <button @click="closeCheckoutPopup" class="cancel-btn">Cancel</button>
-            <button 
-                @click="submitOrder" 
-                class="submit-order-btn"
-                :disabled="isSubmittingOrder"
-            >
-                <span v-if="!isSubmittingOrder">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                        <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" stroke="currentColor" stroke-width="2"/>
-                    </svg>
-                    Send Order to LINE
-                </span>
-                <span v-else>Sending...</span>
-            </button>
         </div>
     </div>
-</div>
-    </div>
-    
+
 </template>
 
 <style scoped>
@@ -652,11 +638,9 @@ const isProductInCart = (productId) => {
 /* Page Header */
 .page-header {
     background:
-        linear-gradient(
-            135deg,
+        linear-gradient(135deg,
             rgba(94, 69, 53, 0.75),
-            rgba(147, 115, 94, 0.75)
-        ),
+            rgba(147, 115, 94, 0.75)),
         url('../assets/texture-bg01.jpg');
     background-size: cover;
     background-position: center;
@@ -1302,6 +1286,7 @@ const isProductInCart = (productId) => {
 
 /* Responsive Design */
 @media (max-width: 1200px) {
+
     .table-header,
     .table-row {
         grid-template-columns: 80px 1.5fr 100px 100px 100px 80px 150px;
@@ -1429,6 +1414,7 @@ const isProductInCart = (productId) => {
         font-size: 24px;
     }
 }
+
 /* Checkout Popup */
 .checkout-overlay {
     position: fixed;
@@ -1458,8 +1444,13 @@ const isProductInCart = (productId) => {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 @keyframes slideUp {
@@ -1467,6 +1458,7 @@ const isProductInCart = (productId) => {
         transform: translateY(30px);
         opacity: 0;
     }
+
     to {
         transform: translateY(0);
         opacity: 1;
@@ -1583,6 +1575,7 @@ const isProductInCart = (productId) => {
     font-size: 14px;
     color: #5E4535;
 }
+
 .order-summary-header :first-child {
     text-align: left;
 }
@@ -1716,7 +1709,7 @@ const isProductInCart = (productId) => {
         border-radius: 20px 20px 0 0;
         max-height: 95vh;
     }
-    
+
     .popup-header,
     .popup-body,
     .popup-footer {

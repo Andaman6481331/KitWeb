@@ -1,29 +1,29 @@
 <template>
     <section class="categories-section">
-        <div class="section-header">
-            <h2 class="section-title">Shop by Category</h2>
-            <p class="section-subtitle">Find exactly what you need</p>
+        <div v-reveal class="section-header">
+            <h2 class="section-title">{{ $t('categories.title') }}</h2>
+            <p class="section-subtitle">{{ $t('categories.subtitle') }}</p>
         </div>
-        <div class="categories-grid">
+        <div v-reveal class="categories-grid">
             <div class="category-card cat-card-1">
                 <div class="category-icon">🧶</div>
-                <h3>Premium Yarn</h3>
-                <p>High-quality yarns in various colors</p>
+                <h3>{{ $t('categories.premiumYarn') }}</h3>
+                <p>{{ $t('categories.premiumYarnDesc') }}</p>
             </div>
             <div class="category-card cat-card-2">
                 <div class="category-icon">🪡</div>
-                <h3>Needles & Tools</h3>
-                <p>Professional sewing equipment</p>
+                <h3>{{ $t('categories.needlesTools') }}</h3>
+                <p>{{ $t('categories.needlesToolsDesc') }}</p>
             </div>
             <div class="category-card cat-card-3">
                 <div class="category-icon">🔘</div>
-                <h3>Buttons & Fasteners</h3>
-                <p>Decorative and functional buttons</p>
+                <h3>{{ $t('categories.buttonsFasteners') }}</h3>
+                <p>{{ $t('categories.buttonsFastenersDesc') }}</p>
             </div>
             <div class="category-card cat-card-4">
                 <div class="category-icon">✂️</div>
-                <h3>Accessories</h3>
-                <p>Everything for your craft</p>
+                <h3>{{ $t('categories.accessories') }}</h3>
+                <p>{{ $t('categories.accessoriesDesc') }}</p>
             </div>
             <div class="popup popup-1">
                 <div class="floating-card-container">

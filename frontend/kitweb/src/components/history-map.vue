@@ -1,24 +1,25 @@
 <script setup>
 import { RouterLink } from 'vue-router';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 
-const aboutInfo = ref({
-    title: 'About Kitcharoen',
-    subtitle: 'Your Trusted Handicraft Partner Since 1995',
-    description: `
-    Kitcharoen is a family-run craft supply shop located in Sampeng Market, Bangkok, near Yaowarat (Chinatown). Founded in 1984, our business has been passed down through three generations, from my grandfather to my father and now to me.The name Kitcharoen comes from Thai words meaning business and prosperity, reflecting our belief in honest, steady growth.
-    `,
-    mission: `We offer a wide range of craft supplies and sewing materials, including yarns, ribbons, needles, beads, crochet supplies, artificial flowers, and more. Our products are good, reliable quality with wholesale-friendly prices, and we take pride in our kind service, honesty, and long-term trust with customers.`,
+const { t } = useI18n();
+
+const aboutInfo = computed(() => ({
+    title: t('about.title'),
+    subtitle: t('about.subtitle'),
+    description: t('about.description'),
+    mission: t('about.mission'),
     features: [
         {
             icon: '🧶',
-            title: 'Premium Materials',
-            description: 'Carefully selected yarns and beads from trusted suppliers'
+            title: t('contact.premiumMaterials'),
+            description: t('contact.premiumMaterialsDesc')
         },
         {
             icon: '🎨',
-            title: 'Expert Guidance',
-            description: 'Free workshops and tutorials for all skill levels'
+            title: t('contact.expertGuidance'),
+            description: t('contact.expertGuidanceDesc')
         }
     ],
     contact: {
@@ -27,7 +28,7 @@ const aboutInfo = ref({
         email: 'info@kitcharoen.com',
         hours: 'Mon-Sat: 9:00 AM - 6:00 PM'
     }
-});
+}));
 
 // Google Maps embed URL (you'll need to replace with your actual location)
 const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7238744842397!2d100.50747631483044!3d13.739716990349886!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x30e299155bf89a8b%3A0x9a280a6e4e3fc7d0!2sSamphanthawong%2C%20Bangkok!5e0!3m2!1sen!2sth!4v1234567890123!5m2!1sen!2sth');
@@ -37,25 +38,25 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
     <section class="about-section">
         <div class="container">
             <!-- Left Side - Image -->
-            <div class="image-content">
+            <div v-reveal class="image-content">
                 <img src="../assets/card-img02.jpg" alt="">
             </div>
             <!-- Right Side - About Us Information -->
             <div class="text-content">
-                <div class="eyebrow">Our Story</div>
-                <h2 class="title">{{ aboutInfo.title }}</h2>
-                <p class="subtitle">{{ aboutInfo.subtitle }}</p>
+                <div v-reveal class="eyebrow">{{ $t('about.eyebrow') }}</div>
+                <h2 v-reveal class="title delay2">{{ aboutInfo.title }}</h2>
+                <p v-reveal class="subtitle delay4">{{ aboutInfo.subtitle }}</p>
 
-                <div class="description">
+                <div v-reveal class="description delay6">
                     <p>{{ aboutInfo.description }}</p>
                     <p>{{ aboutInfo.mission }}</p>
                 </div>
-                <div class="cta-buttons">
+                <div v-reveal class="cta-buttons">
                     <router-link :to="'/orderpage'" class="no-style">
-                        <button class="cta-primary">Shop Now</button>
+                        <button class="cta-primary">{{ $t('home.shopNow') }}</button>
                     </router-link>
                     <router-link :to="'/catalog'" class="no-style">
-                        <button class="cta-primary">View Catalog</button>
+                        <button class="cta-primary">{{ $t('home.viewCatalog') }}</button>
                     </router-link>
                 </div>
             </div>

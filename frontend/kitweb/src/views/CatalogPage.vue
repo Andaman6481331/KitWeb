@@ -1,4 +1,5 @@
 <script setup>
+import DiyProductKit from '../components/diy-product-kit.vue';
 import ProductStock from '../components/products-stock.vue';
 
 const toggleCart = () => {
@@ -10,8 +11,8 @@ const toggleCart = () => {
     <!-- Page Header -->
     <div class="page-header">
         <div class="header-content">
-            <h1>🍜 Order Now</h1>
-            <p>Select your favorite dishes and create your perfect meal</p>
+            <h1 v-reveal>🍜 Order Now</h1>
+            <p v-reveal class="delay2">Select your favorite dishes and create your perfect meal</p>
         </div>
 
         <!-- Cart Button (Mobile) -->
@@ -20,9 +21,14 @@ const toggleCart = () => {
             <span v-if="cartItemCount > 0" class="cart-badge">{{ cartItemCount }}</span>
         </button>
     </div>
+
+    <!-- Main Stock -->
     <ProductStock />
+
+    <DiyProductKit />
+
 </template>
-<style>
+<style scoped>
 /* Page Header */
 .page-header {
     background:

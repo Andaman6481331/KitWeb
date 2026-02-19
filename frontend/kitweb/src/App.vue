@@ -1,8 +1,14 @@
 <script setup>
 import { RouterLink, RouterView } from 'vue-router'
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { setLocale } from './i18n'
 
-const currentLanguage = ref('EN')
+const { t } = useI18n()
+
+// Get saved language from localStorage or default to 'EN'
+const savedLang = localStorage.getItem('locale') || 'EN'
+const currentLanguage = ref(savedLang)
 const showLanguageMenu = ref(false)
 
 const languages = [
@@ -14,6 +20,7 @@ const languages = [
 
 const changeLanguage = (langCode) => {
   currentLanguage.value = langCode
+  setLocale(langCode)
   showLanguageMenu.value = false
 }
 
@@ -26,11 +33,11 @@ const toggleLanguageMenu = () => {
   <div>
     <div class="NavBar">
       <div class="nav-group">
-        <img src="./components/icons/Twitter.svg" alt="logo" class="logo">
+        <img src="./components/icons/kitcharoen.jpg" alt="logo" class="logo">
         <router-link :to="'/'" class="no-style">
           <div>
-            <h1>KITCHAROEN</h1>
-            <p>376 Wanich 1 Chakkrawat Samphantawong Bangkok</p>
+            <h1>{{ $t('common.name').toUpperCase() }}</h1>
+            <p>{{ $t('common.address') }}</p>
           </div>
         </router-link>
         <!-- Language Selector -->
@@ -58,27 +65,27 @@ const toggleLanguageMenu = () => {
         <router-link :to="'/catalog'" class="no-style">
           <div class="button button-primary">
             <span class="button-icon">📦</span>
-            Products
+            {{ $t('nav.products') }}
           </div>
         </router-link>
 
         <router-link :to="'/orderpage'" class="no-style">
           <div class="button button-primary">
             <span class="button-icon">🛒</span>
-            Start Order
+            {{ $t('nav.startOrder') }}
           </div>
         </router-link>
 
         <router-link :to="'/contactus'" class="no-style">
           <div class="button button-primary">
             <span class="button-icon">💬</span>
-            Contact Us
+            {{ $t('nav.contactUs') }}
           </div>
         </router-link>
 
         <router-link :to="'/login'" class="no-style">
           <div class="button">
-            Login
+            {{ $t('nav.login') }}
           </div>
         </router-link>
       </div>
@@ -88,13 +95,13 @@ const toggleLanguageMenu = () => {
           <router-link :to="'/event'" class="no-style">
             <div class="secondary-nav-button">
               <span class="button-icon">📦</span>
-              Events
+              {{ $t('nav.events') }}
             </div>
           </router-link>
-          <router-link :to="'/diyproduct'" class="no-style">
+          <router-link :to="'/partners'" class="no-style">
             <div class="secondary-nav-button">
               <span class="button-icon">🎨</span>
-              DIY-Products
+              {{ $t('nav.partners') }}
             </div>
           </router-link>
         </div>
@@ -107,20 +114,20 @@ const toggleLanguageMenu = () => {
     <footer class="footer">
       <div class="footer-content">
         <div class="footer-column">
-          <h3>Kitcharoen</h3>
-          <p>Your trusted source for premium yarn and sewing supplies since 1995.</p>
+          <h3>{{ $t('footer.companyName') }}</h3>
+          <p>{{ $t('footer.companyDesc') }}</p>
         </div>
         <div class="footer-column">
-          <h4>Quick Links</h4>
+          <h4>{{ $t('footer.quickLinks') }}</h4>
           <ul>
-            <li><a href="#">About Us</a></li>
-            <li><a href="#">Products</a></li>
-            <li><a href="#">Contact</a></li>
-            <li><a href="#">FAQ</a></li>
+            <li><a href="#">{{ $t('footer.aboutUs') }}</a></li>
+            <li><a href="#">{{ $t('footer.products') }}</a></li>
+            <li><a href="#">{{ $t('footer.contact') }}</a></li>
+            <li><a href="#">{{ $t('footer.faq') }}</a></li>
           </ul>
         </div>
         <div class="footer-column">
-          <h4>Contact Info</h4>
+          <h4>{{ $t('footer.contactInfo') }}</h4>
           <ul>
             <li>📍 376 Wanich 1 Chakkrawat</li>
             <li>📍 Samphantawong Bangkok</li>
@@ -129,7 +136,7 @@ const toggleLanguageMenu = () => {
           </ul>
         </div>
         <div class="footer-column">
-          <h4>Follow Us</h4>
+          <h4>{{ $t('footer.followUs') }}</h4>
           <div class="social-links">
             <a href="#" class="social-icon">📘</a>
             <a href="#" class="social-icon">📷</a>
@@ -139,7 +146,7 @@ const toggleLanguageMenu = () => {
         </div>
       </div>
       <div class="footer-bottom">
-        <p>&copy; 2026 Kitcharoen. All rights reserved.</p>
+        <p>{{ $t('footer.copyright') }}</p>
       </div>
     </footer>
   </div>
@@ -160,7 +167,6 @@ const toggleLanguageMenu = () => {
   top: 0;
   left: 0;
   height: 90px;
-  /* background: linear-gradient(135deg, rgba(94, 69, 53, 0.95), rgba(147, 115, 94, 0.95)); */
   background-color: var(--primary-color);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -185,15 +191,15 @@ const toggleLanguageMenu = () => {
 }
 
 .logo {
-  width: 50px;
+  /* width: 50px; */
   height: 50px;
-  filter: brightness(0) invert(1);
-  transition: transform 0.3s ease;
+  /* filter: brightness(0) invert(1);
+  transition: transform 0.3s ease; */
 }
 
-.logo:hover {
+/* .logo:hover {
   transform: rotate(10deg) scale(1.1);
-}
+} */
 
 .nav-group h1 {
   margin: 0;
@@ -544,6 +550,40 @@ const toggleLanguageMenu = () => {
   .button {
     padding: 8px 16px;
     font-size: 13px;
+  }
+}
+</style>
+<style>
+/* Base state for anything you want to reveal */
+.reveal-hidden {
+  opacity: 0;
+  transform: translateY(20px);
+  will-change: transform, opacity;
+  /* Optimizes performance */
+}
+
+/* The trigger class added by JavaScript */
+.visible {
+  animation: fadeInUp 0.8s ease forwards;
+  animation-delay: 0.1s;
+}
+
+.delay2 {
+  animation-delay: 0.2s;
+}
+
+.delay4 {
+  animation-delay: 0.4s;
+}
+
+.delay6 {
+  animation-delay: 0.6s;
+}
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 </style>

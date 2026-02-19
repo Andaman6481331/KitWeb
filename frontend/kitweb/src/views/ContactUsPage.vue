@@ -1,78 +1,68 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 
-const aboutInfo = ref({
-    title: 'Contact Kitcharoen',
-    subtitle: 'Your Trusted Handicraft Partner Since 1995',
-    description: 'At Kitcharoen, we believe in the beauty of handmade artistry. For over 25 years, we have been providing quality yarns, beads, and craft supplies to artisans, hobbyists, and creative souls across Bangkok and beyond.',
-    mission: 'Our mission is to inspire creativity and preserve the art of traditional handicrafts while embracing modern techniques. We curate the finest materials from around the world, ensuring every project you create is a masterpiece.',
+const { t } = useI18n();
+
+const aboutInfo = computed(() => ({
+    title: t('contact.title'),
+    subtitle: t('contact.subtitle'),
+    description: t('contact.description'),
+    mission: t('contact.mission'),
     features: [
         {
             icon: '🧶',
-            title: 'Premium Materials',
-            description: 'Carefully selected yarns and beads from trusted suppliers'
+            title: t('contact.premiumMaterials'),
+            description: t('contact.premiumMaterialsDesc')
         },
         {
             icon: '🎨',
-            title: 'Expert Guidance',
-            description: 'Free workshops and tutorials for all skill levels'
+            title: t('contact.expertGuidance'),
+            description: t('contact.expertGuidanceDesc')
         },
         {
             icon: '💝',
-            title: 'Community Focus',
-            description: 'Supporting local artisans and craft communities'
+            title: t('contact.communityFocus'),
+            description: t('contact.communityFocusDesc')
         },
         {
             icon: '🌟',
-            title: 'Quality Assured',
-            description: '100% satisfaction guarantee on all products'
+            title: t('contact.qualityAssured'),
+            description: t('contact.qualityAssuredDesc')
         }
     ],
     contact: {
         address: '376 Wanich 1, Chakkrawat, Samphantawong, Bangkok 10100',
         phone: '+66 2 222 3456',
-        email: 'info@kitcharoen.com',
-        hours: 'Mon-Sat: 9:00 AM - 6:00 PM'
+        line: 'https://lin.ee/8pn4sZi',
+        hours: 'Mon-Sat: 8:30 AM - 4:30 PM'
     }
-});
+}));
 
-// Google Maps embed URL (you'll need to replace with your actual location)
+// Google Maps embed URL
 const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7238744842397!2d100.50747631483044!3d13.739716990349886!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x30e299155bf89a8b%3A0x9a280a6e4e3fc7d0!2sSamphanthawong%2C%20Bangkok!5e0!3m2!1sen!2sth!4v1234567890123!5m2!1sen!2sth');
 </script>
 
 <template>
-    <!-- Hero Section -->
-    <!-- <section class="hero-section">
-        <div class="hero-content">
-            <div class="hero-text">
-                <h1 class="hero-title">Premium Quality Yarn & Sewing Supplies</h1>
-                <p class="hero-subtitle">Discover the finest materials for your creative projects. From
-                    professional-grade
-                    yarns to precision needles.</p>
-                <div class="hero-buttons">
-                    <button class="cta-primary">Shop Now</button>
-                    <button class="cta-secondary">View Catalog</button>
-                </div>
-            </div>
-            <div class="hero-decoration">
-                <div class="floating-card card-1">
-                    <img src="../assets/card-img05.webp" alt="">
-                </div>
-            </div>
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <h1>{{ $t('contact.headerTitle') }}</h1>
+            <p>{{ $t('contact.headerDefinition') }}</p>
         </div>
-    </section> -->
+    </div>
     <section class="about-section">
 
         <div class="container">
             <!-- Left Side - About Us Information -->
             <div class="text-content">
-                <div class="eyebrow">Talk to Us</div>
-                <h2 class="title">{{ aboutInfo.title }}</h2>
-                <p class="subtitle">{{ aboutInfo.subtitle }}</p>
+                <div class="eyebrow" v-reveal>{{ $t('contact.eyebrow') }}</div>
+                <h2 class="title" v-reveal>{{ aboutInfo.title }}</h2>
+                <p class="subtitle" v-reveal delay="0.2s">{{ aboutInfo.subtitle }}</p>
 
-                <div class="description">
-                    <p>{{ aboutInfo.description }}</p>
-                    <p>{{ aboutInfo.mission }}</p>
+                <div class="description" style="text-indent: 2rem; text-align: justify;">
+                    <p v-reveal delay="0.4s">{{ aboutInfo.description }}</p>
+                    <p v-reveal delay="0.6s">{{ aboutInfo.mission }}</p>
                 </div>
                 <div class="line"></div>
             </div>
@@ -86,8 +76,8 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
                 <div class="map-badge">
                     <div class="badge-icon">📍</div>
                     <div class="badge-text">
-                        <div class="badge-title">Find Us Here</div>
-                        <div class="badge-subtitle">Click to get directions</div>
+                        <div class="badge-title">{{ $t('contact.findUsHere') }}</div>
+                        <div class="badge-subtitle">{{ $t('contact.clickDirections') }}</div>
                     </div>
                 </div>
             </div>
@@ -106,8 +96,8 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
         </div> -->
 
 
-        <div class="contact-info">
-            <h3>Visit Us</h3>
+        <div class="contact-info" v-reveal>
+            <h3 style="margin-top: 0px;">{{ $t('contact.visitUs') }}</h3>
             <div class="contact-item">
                 <span class="icon">📍</span>
                 <span>{{ aboutInfo.contact.address }}</span>
@@ -117,7 +107,10 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
                 <span>{{ aboutInfo.contact.phone }}</span>
             </div>
             <div class="contact-item">
-                <span class="icon">✉️</span>
+                <p>ID: @yourID</p>
+                <a :href="'https://line.me' + lineId" class="add-friend-btn">
+                    Add Friend
+                </a>
                 <span>{{ aboutInfo.contact.email }}</span>
             </div>
             <div class="contact-item">
@@ -129,123 +122,73 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
 </template>
 
 <style scoped>
-/* ===== HERO SECTION ===== */
-.hero-section {
-    /* background: linear-gradient(135deg, #8b6f47 0%, #b89968 50%, #d4a574 100%); */
-    background: url('../assets/yaowarat01.jpg');
-    background-size: contain;
+/* Page Header */
+.page-header {
+    background:
+        linear-gradient(135deg,
+            rgba(94, 69, 53, 0.55),
+            rgba(147, 115, 94, 0.55)),
+        url('../assets/texture-bg01.jpg');
+    background-size: cover;
     background-position: center;
-    min-height: 600px;
+    background-repeat: no-repeat;
+    color: #fff9f1;
+    padding: 40px 5%;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    overflow: hidden;
-}
-
-.hero-section::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: url('data:image/svg+xml,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="2" fill="rgba(255,255,255,0.1)"/></svg>');
-    opacity: 0.3;
-}
-
-.hero-content {
-    max-width: 1200px;
-    width: 100%;
-    display: flex;
-    align-items: center;
     justify-content: space-between;
-    gap: 60px;
-    position: relative;
-    z-index: 1;
+    align-items: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
-.hero-text {
-    flex: 1;
-    color: black;
-}
-
-.hero-title {
-    font-size: 56px;
-    font-weight: 800;
-    line-height: 1.2;
-    margin: 0 0 20px 0;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+.header-content h1 {
+    font-size: 42px;
+    font-weight: 700;
+    margin: 0 0 10px 0;
+    letter-spacing: -0.5px;
     animation: fadeInUp 0.8s ease;
 }
 
-.hero-subtitle {
-    font-size: 20px;
-    font-weight: 400;
-    line-height: 1.6;
-    margin: 0 0 40px 0;
-    opacity: 0.95;
+.header-content p {
+    font-size: 16px;
+    margin: 0;
+    opacity: 0.9;
     animation: fadeInUp 0.8s ease 0.2s backwards;
 }
 
-.hero-buttons {
-    display: flex;
-    gap: 20px;
-    animation: fadeInUp 0.8s ease 0.4s backwards;
-}
-
-.hero-decoration {
-    flex: 1;
+.cart-toggle {
+    display: none;
     position: relative;
-    height: 400px;
-}
-
-.floating-card {
-    position: absolute;
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 20px;
-    animation: float 6s ease-in-out infinite;
-    overflow: hidden;
-    display: flex;
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-size: 24px;
+    cursor: pointer;
+    transition: all 0.3s ease;
 }
 
-.floating-card img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+.cart-toggle:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
 }
 
-.card-1 {
-    width: 280px;
-    height: 460px;
-    top: 0;
-    right: -50px;
-    animation-delay: 0s;
+.cart-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #ff6b6b;
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 10px;
+    min-width: 20px;
 }
 
-@keyframes float {
 
-    0%,
-    100% {
-        transform: translateY(0px);
-    }
-
-    50% {
-        transform: translateY(-10px);
-    }
-}
-
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
+@media (max-width: 768px) {
+    .mobile-only {
+        display: block;
     }
 }
 
@@ -463,6 +406,19 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
 .badge-subtitle {
     font-size: 0.85rem;
     color: #666;
+}
+
+/* Animation */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Responsive */

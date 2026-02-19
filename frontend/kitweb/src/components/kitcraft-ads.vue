@@ -1,37 +1,38 @@
 <script setup>
 // Instagram embedding is handled in the instagram-card child component
 import instagramCard from './instragram-card.vue';
+
 </script>
 <template>
     <section class="kitcraft-section">
         <div class="text-content">
-            <div class="eyebrow">Handmade Crafts</div>
-            <h2>Transform Yarn & Beads Into Art</h2>
-            <p class="subtitle">
+            <div v-reveal class="eyebrow">Handmade Crafts</div>
+            <h2 v-reveal>Transform Yarn & Beads Into Art</h2>
+            <p v-reveal class="subtitle">
                 Discover the therapeutic joy of creating beautiful handmade accessories,
                 décor, and gifts with our simple DIY tutorials.
             </p>
 
-            <div class="benefits">
+            <div v-reveal class="benefits">
                 <div class="benefit-item">
                     <div class="benefit-icon">✓</div>
                     <div class="benefit-text">
                         <div class="benefit-title">Beginner Friendly</div>
-                        <div class="benefit-desc">Step-by-step guides perfect for all skill levels</div>
+                        <div class="benefit-desc delay2">Step-by-step guides perfect for all skill levels</div>
                     </div>
                 </div>
                 <div class="benefit-item">
                     <div class="benefit-icon">✓</div>
                     <div class="benefit-text">
                         <div class="benefit-title">Affordable Materials</div>
-                        <div class="benefit-desc">Create stunning pieces without breaking the bank</div>
+                        <div class="benefit-desc delay2">Create stunning pieces without breaking the bank</div>
                     </div>
                 </div>
                 <div class="benefit-item">
                     <div class="benefit-icon">✓</div>
                     <div class="benefit-text">
                         <div class="benefit-title">Endless Creativity</div>
-                        <div class="benefit-desc">Personalize every project to match your style</div>
+                        <div class="benefit-desc delay2">Personalize every project to match your style</div>
                     </div>
                 </div>
             </div>
@@ -45,7 +46,7 @@ import instagramCard from './instragram-card.vue';
         <instagramCard />
     </section>
 </template>
-<style>
+<style scoped>
 .kitcraft-section {
     /* background: linear-gradient(135deg, #ff6b6b, #ff9f43); */
     padding: 5rem 10rem;

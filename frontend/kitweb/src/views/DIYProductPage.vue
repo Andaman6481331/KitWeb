@@ -62,7 +62,7 @@ const diyProducts = ref([
         </button>
     </div>
 
-    <customerReview />
+
 
     <!-- DIY Product Kits Section -->
     <section class="products-section">

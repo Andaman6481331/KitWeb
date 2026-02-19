@@ -82,21 +82,24 @@ const handleContactSubmit = () => {
                     <span class="logo-icon">✂️</span>
                     <h1>KitCraft</h1>
                 </div>
-                <p class="tagline">Create. Learn. Connect.</p>
-                <p class="subtitle">Discover the joy of handmade crafts with our DIY kits and workshops</p>
+                <p class="tagline">{{ $t('events.heroTagline') }}</p>
+                <p class="subtitle">{{ $t('events.heroSubtitle') }}</p>
                 <button class="cta-btn"
                     @click="document.getElementById('contact').scrollIntoView({ behavior: 'smooth' })">
-                    Join Our Next Event
+                    {{ $t('events.joinNextEvent') }}
                 </button>
             </div>
         </section>
+
+
+        <AutoScrollEvent />
 
         <!-- Past Events Section -->
         <section class="events-section">
             <div class="container">
                 <div class="section-header">
-                    <h2>Past Events & Workshops</h2>
-                    <p>Join our creative community - see what we've been crafting together</p>
+                    <h2>{{ $t('events.pastEvents') }}</h2>
+                    <p>{{ $t('events.pastEventsSubtitle') }}</p>
                 </div>
 
                 <div class="events-grid">
@@ -118,7 +121,7 @@ const handleContactSubmit = () => {
                             <div class="event-meta">
                                 <span class="meta-item">
                                     <span class="icon">👥</span>
-                                    {{ event.participants }} attendees
+                                    {{ event.participants }} {{ $t('events.attendees') }}
                                 </span>
                                 <span class="meta-item">
                                     <span class="icon">📍</span>
@@ -131,52 +134,53 @@ const handleContactSubmit = () => {
             </div>
         </section>
 
+
+
         <!-- Contact for Event Participation -->
         <section class="contact-section" id="contact">
             <div class="container">
                 <div class="contact-grid">
                     <!-- Left - Contact Info -->
                     <div class="contact-info">
-                        <h2>Join Our Next Workshop</h2>
+                        <h2>{{ $t('events.joinWorkshop') }}</h2>
                         <p class="contact-intro">
-                            Whether you're planning a team building event, birthday party, or just want to learn
-                            a new craft, we'd love to have you join us!
+                            {{ $t('events.workshopIntro') }}
                         </p>
 
                         <div class="event-types">
-                            <h3>Event Types We Offer</h3>
+                            <h3>{{ $t('events.eventTypes') }}</h3>
                             <div class="event-type-item">
                                 <span class="type-icon">🎨</span>
                                 <div>
-                                    <h4>Public Workshops</h4>
-                                    <p>Join our regular monthly workshops</p>
+                                    <h4>{{ $t('events.publicWorkshops') }}</h4>
+                                    <p>{{ $t('events.publicWorkshopsDesc') }}</p>
                                 </div>
                             </div>
                             <div class="event-type-item">
                                 <span class="type-icon">🎉</span>
                                 <div>
-                                    <h4>Private Parties</h4>
-                                    <p>Birthday parties, bridal showers, celebrations</p>
+                                    <h4>{{ $t('events.privateParties') }}</h4>
+                                    <p>{{ $t('events.privatePartiesDesc') }}</p>
                                 </div>
                             </div>
                             <div class="event-type-item">
                                 <span class="type-icon">💼</span>
                                 <div>
-                                    <h4>Corporate Events</h4>
-                                    <p>Team building and wellness activities</p>
+                                    <h4>{{ $t('events.corporateEvents') }}</h4>
+                                    <p>{{ $t('events.corporateEventsDesc') }}</p>
                                 </div>
                             </div>
                             <div class="event-type-item">
                                 <span class="type-icon">🏫</span>
                                 <div>
-                                    <h4>School Programs</h4>
-                                    <p>Educational craft workshops for students</p>
+                                    <h4>{{ $t('events.schoolPrograms') }}</h4>
+                                    <p>{{ $t('events.schoolProgramsDesc') }}</p>
                                 </div>
                             </div>
                         </div>
 
                         <div class="direct-contact">
-                            <h3>Or Contact Us Directly</h3>
+                            <h3>{{ $t('events.contactDirectly') }}</h3>
                             <a href="tel:+6622223456" class="contact-link">
                                 <span class="icon">📞</span>
                                 +66 2 222 3456
@@ -194,60 +198,59 @@ const handleContactSubmit = () => {
 
                     <!-- Right - Contact Form -->
                     <div class="contact-form">
-                        <h3>Request an Event</h3>
+                        <h3>{{ $t('events.requestEvent') }}</h3>
                         <form @submit.prevent="handleContactSubmit">
                             <div class="form-group">
-                                <label>Your Name *</label>
+                                <label>{{ $t('events.yourName') }} *</label>
                                 <input type="text" v-model="contactForm.name" required />
                             </div>
 
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label>Email *</label>
+                                    <label>{{ $t('events.email') }} *</label>
                                     <input type="email" v-model="contactForm.email" required />
                                 </div>
                                 <div class="form-group">
-                                    <label>Phone *</label>
+                                    <label>{{ $t('events.phone') }} *</label>
                                     <input type="tel" v-model="contactForm.phone" required />
                                 </div>
                             </div>
 
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label>Event Type *</label>
+                                    <label>{{ $t('events.eventType') }} *</label>
                                     <select v-model="contactForm.eventType" required>
-                                        <option value="workshop">Public Workshop</option>
-                                        <option value="private">Private Party</option>
-                                        <option value="corporate">Corporate Event</option>
-                                        <option value="school">School Program</option>
+                                        <option value="workshop">{{ $t('events.publicWorkshop') }}</option>
+                                        <option value="private">{{ $t('events.privateParty') }}</option>
+                                        <option value="corporate">{{ $t('events.corporateEvent') }}</option>
+                                        <option value="school">{{ $t('events.schoolProgram') }}</option>
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label>Group Size</label>
+                                    <label>{{ $t('events.groupSize') }}</label>
                                     <input type="number" v-model="contactForm.groupSize"
-                                        placeholder="How many people?" />
+                                        :placeholder="$t('events.howManyPeople')" />
                                 </div>
                             </div>
 
                             <div class="form-group">
-                                <label>Preferred Date</label>
+                                <label>{{ $t('events.preferredDate') }}</label>
                                 <input type="date" v-model="contactForm.preferredDate" />
                             </div>
 
                             <div class="form-group">
-                                <label>Message</label>
+                                <label>{{ $t('events.message') }}</label>
                                 <textarea v-model="contactForm.message" rows="4"
-                                    placeholder="Tell us about your event ideas..."></textarea>
+                                    :placeholder="$t('events.messagePlaceholder')"></textarea>
                             </div>
 
-                            <button type="submit" class="submit-btn">Send Request</button>
+                            <button type="submit" class="submit-btn">{{ $t('events.sendRequest') }}</button>
                         </form>
                     </div>
                 </div>
             </div>
         </section>
 
-        <AutoScrollEvent />
 
         <!-- Product Modal -->
         <div v-if="showProductModal" class="modal-overlay" @click="closeModal">
@@ -268,11 +271,11 @@ const handleContactSubmit = () => {
                         <div class="modal-meta">
                             <div class="meta-row">
                                 <span class="icon">⏱️</span>
-                                <span>Completion Time: {{ selectedProduct.duration }}</span>
+                                <span>{{ $t('events.completionTime') }}: {{ selectedProduct.duration }}</span>
                             </div>
                             <div class="meta-row">
                                 <span class="icon">📊</span>
-                                <span>Difficulty: {{ selectedProduct.difficulty }}</span>
+                                <span>{{ $t('events.difficulty') }}: {{ selectedProduct.difficulty }}</span>
                             </div>
                         </div>
 
@@ -285,7 +288,7 @@ const handleContactSubmit = () => {
                             </ul>
                         </div>
 
-                        <button class="add-cart-btn">Add to Cart</button>
+                        <button class="add-cart-btn">{{ $t('events.addToCart') }}</button>
                     </div>
                 </div>
             </div>

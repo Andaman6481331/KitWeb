@@ -7,11 +7,7 @@ import CalenderSection from '../components/calender-section.vue';
 import HistoryMap from '../components/history-map.vue';
 import AutoScrollBanner from '../components/auto-scroll-banner.vue';
 import FeaturedCategories from '../components/featured-categories.vue';
-
-// Function for the button
-const handleQuickView = (item) => {
-  console.log('Viewing:', item.title);
-};
+import customerReview from '../components/customer-review.vue';
 </script>
 <template>
   <div class="content">
@@ -20,16 +16,15 @@ const handleQuickView = (item) => {
     <section class="hero-section">
       <div class="hero-content">
         <div class="hero-text">
-          <h1 class="hero-title">Kitcharoen Craft & Sewing Supplies</h1>
-          <p class="hero-subtitle">Trusted materials, honest prices, and friendly service from Sampeng Market, Bangkok.
-            Since 1984
+          <h1 class="hero-title">{{ $t('home.heroTitle') }}</h1>
+          <p class="hero-subtitle">{{ $t('home.heroSubtitle') }}
           </p>
           <div class="hero-buttons">
             <router-link :to="'/orderpage'" class="no-style">
-              <button class="cta-primary">Shop Now</button>
+              <button class="cta-primary">{{ $t('home.shopNow') }}</button>
             </router-link>
             <router-link :to="'/catalog'" class="no-style">
-              <button class="cta-secondary">View Catalog</button>
+              <button class="cta-secondary">{{ $t('home.viewCatalog') }}</button>
             </router-link>
           </div>
         </div>
@@ -88,15 +83,15 @@ const handleQuickView = (item) => {
     <!-- Auto Item Scroll Banner -->
     <AutoScrollBanner />
 
-    <!-- Calender -->
-    <CalenderSection />
+    <!-- Customer Review -->
+    <customerReview />
 
     <!-- Promotional Banner -->
     <section class="promo-section">
       <div class="promo-content">
-        <h1>Special Offer!</h1>
-        <p>Get 20% off on all yarn products this week</p>
-        <button class="promo-button">Shop Sale Items</button>
+        <h1>{{ $t('home.specialOffer') }}</h1>
+        <p>{{ $t('home.promoText') }}</p>
+        <button class="promo-button">{{ $t('home.shopSale') }}</button>
       </div>
     </section>
   </div>
