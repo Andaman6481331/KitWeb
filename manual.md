@@ -53,6 +53,24 @@ To preview the production build locally:
 npm run preview
 ```
 
+## Cloudflare Backend & Admin
+The project uses Cloudflare Workers, D1 (Database), and R2 (Storage).
+
+### Setting the Admin Password (Live)
+To set or change the admin password for your live website, run this command in the `hidden-water-ed9d` folder:
+
+```sh
+npx wrangler secret put ADMIN_PASSWORD
+```
+
+### Running Backend Locally
+To start the backend worker:
+
+```sh
+cd hidden-water-ed9d
+npm run dev
+```
+
 ## Troubleshooting
 - **Node Version**: If you encounter issues with package installation, ensure your Node.js version is up to date.
 - **Port Conflicts**: If port `5173` is in use, Vite will automatically try the next available port.

@@ -1,0 +1,33 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "hidden-water-ed9d",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-05-02",
+	"observability": {
+		"enabled": true
+	},
+	"upload_source_maps": true,
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"vars": {
+		"ADMIN_PASSWORD": "admin123"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "product-db",
+			"database_id": "192bb2a5-3800-4e9f-92b0-928ade3b2b62"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "IMAGES",
+			"bucket_name": "product-images"
+		}
+	]
+}

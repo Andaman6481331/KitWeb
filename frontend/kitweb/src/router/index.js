@@ -7,9 +7,15 @@ import Login from '../views/Login.vue';
 import EventPage from '../views/EventPage.vue';
 import DIYProductPage from '../views/DIYProductPage.vue';
 import PartnerPage from '../views/PartnerPage.vue';
+import AdminDashboard from '../views/AdminDashboard.vue';
 
 // Define routes
 const routes = [
+    {
+        path: '/admin',
+        name: 'admin',
+        component: AdminDashboard
+    },
     {
         path: '/',
         name: 'home',
@@ -18,6 +24,11 @@ const routes = [
     {
         path: '/catalog',
         name: 'catalog',
+        component: Catalog
+    },
+    {
+        path: '/catalog/:category',
+        name: 'category-products',
         component: Catalog
     },
     {

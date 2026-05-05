@@ -1,121 +1,84 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { api } from '../services/api';
 
-// Current view: 'categories' or 'items'
-const currentView = ref('categories');
-const selectedCategory = ref(null);
+const route = useRoute();
+const router = useRouter();
+
+const products = ref([]);
+const loading = ref(true);
 const showPopup = ref(false);
 const selectedProduct = ref(null);
 
-// Define your data array with detailed information
-const items = ref([
-    {
-        id: 1,
-        category: 'Yarn',
-        title: 'Premium Yarn Collection',
-        image: 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg',
-        alt: 'yarn',
-        description: 'High-quality premium yarn perfect for all your knitting and crochet projects.',
-        usage: 'Ideal for sweaters, scarves, blankets, and decorative items',
-        useFor: 'Knitting, crocheting, weaving, and textile crafts',
-        varieties: ['Merino Wool', 'Cotton Blend', 'Acrylic', 'Silk Blend'],
-        sizes: ['50g', '100g', '200g', '500g'],
-        colors: ['Natural White', 'Deep Blue', 'Forest Green', 'Burgundy', 'Charcoal Grey', 'Mustard Yellow', 'Coral Pink', 'Lavender']
-    },
-    {
-        id: 2,
-        category: 'Buttons',
-        title: 'Designer Buttons Set',
-        image: 'https://m.media-amazon.com/images/I/81U7rrsM8zL._AC_UF894,1000_QL80_.jpg',
-        alt: 'buttons',
-        description: 'Elegant designer buttons to add a professional finish to your garments.',
-        usage: 'Perfect for shirts, jackets, coats, and decorative accents',
-        useFor: 'Clothing fasteners, decorative embellishments, craft projects',
-        varieties: ['Plastic', 'Metal', 'Wood', 'Shell', 'Leather'],
-        sizes: ['10mm', '15mm', '20mm', '25mm', '30mm'],
-        colors: ['Black', 'White', 'Gold', 'Silver', 'Bronze', 'Navy', 'Brown', 'Clear']
-    },
-    {
-        id: 3,
-        category: 'Needles',
-        title: 'Professional Needle Kit',
-        image: 'https://cdn.sparkfun.com/assets/parts/4/8/7/5/10405-04b.jpg',
-        alt: 'needle',
-        description: 'Complete professional needle kit for all sewing and embroidery needs.',
-        usage: 'Essential for hand sewing, embroidery, quilting, and repair work',
-        useFor: 'General sewing, embroidery, quilting, beading, leather work',
-        varieties: ['Sharps', 'Betweens', 'Embroidery', 'Tapestry', 'Quilting', 'Beading'],
-        sizes: ['Size 1', 'Size 3', 'Size 5', 'Size 7', 'Size 9', 'Size 10'],
-        colors: ['Steel Silver', 'Gold Plated', 'Nickel']
-    },
-    {
-        id: 4,
-        category: 'Needles',
-        title: 'Professional Needle Kit 2',
-        image: 'https://cdn.sparkfun.com/assets/parts/4/8/7/5/10405-04b.jpg',
-        alt: 'needle',
-        description: 'Advanced needle collection for specialized sewing projects.',
-        usage: 'Designed for professional tailoring and advanced needlework',
-        useFor: 'Heavy-duty sewing, upholstery, canvas work, industrial projects',
-        varieties: ['Heavy-duty', 'Curved', 'Sailmaker', 'Upholstery', 'Leather'],
-        sizes: ['Size 12', 'Size 14', 'Size 16', 'Size 18'],
-        colors: ['Steel Silver', 'Black Coated']
-    },
-]);
+// Get category from URL
+const currentCategory = computed(() => route.params.category);
 
-// Get unique categories with their items count
+onMounted(loadData);
+watch(() => route.params.category, loadData);
+
+async function loadData() {
+  loading.value = true;
+  try {
+    if (currentCategory.value) {
+      products.value = await api.getProducts(currentCategory.value);
+    } else {
+      products.value = await api.getProducts();
+    }
+  } catch (error) {
+    console.error('Error loading data:', error);
+  } finally {
+    loading.value = false;
+  }
+}
+
 const categories = computed(() => {
     const categoryMap = new Map();
-    
-    items.value.forEach(item => {
-        if (categoryMap.has(item.category)) {
-            categoryMap.get(item.category).count++;
+    if (currentCategory.value) return [];
+    products.value.forEach(p => {
+        if (!p.category) return;
+        if (categoryMap.has(p.category)) {
+            categoryMap.get(p.category).count++;
         } else {
-            categoryMap.set(item.category, {
-                name: item.category,
+            categoryMap.set(p.category, {
+                name: p.category,
                 count: 1,
-                image: item.image
+                image: p.image_key ? `http://127.0.0.1:8787/images/${p.image_key}` : 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg'
             });
         }
     });
-    
     return Array.from(categoryMap.values());
 });
 
-// Filter items by selected category
-const filteredItems = computed(() => {
-    if (!selectedCategory.value) return [];
-    return items.value.filter(item => item.category === selectedCategory.value);
-});
-
-// Handle category selection
 const selectCategory = (categoryName) => {
-    selectedCategory.value = categoryName;
-    currentView.value = 'items';
+    router.push(`/catalog/${categoryName}`);
 };
 
-// Go back to categories view
 const backToCategories = () => {
-    currentView.value = 'categories';
-    selectedCategory.value = null;
+    router.push('/catalog');
 };
 
-// Handle quick view popup
 const handleQuickView = (item) => {
     selectedProduct.value = item;
     showPopup.value = true;
 };
 
-// Close popup
 const closePopup = () => {
     showPopup.value = false;
     selectedProduct.value = null;
+};
+
+// Helper for image URLs
+const getImageUrl = (key) => {
+  if (!key) return 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg';
+  if (key.startsWith('http')) return key;
+  return `http://127.0.0.1:8787/images/${key}`;
 };
 </script>
 
 <template>
     <!-- Categories View -->
-    <section v-if="currentView === 'categories'" class="stock-sec">
+    <section v-if="!currentCategory" class="stock-sec">
         <div class="section-header-wrapper">
             <div class="section-header">
                 <h2 class="section-title">Product Categories</h2>
@@ -148,7 +111,7 @@ const closePopup = () => {
         </div>
     </section>
 
-    <!-- Items View (when category is selected) -->
+    <!-- Items View (when category is in URL) -->
     <section v-else class="stock-sec">
         <div class="section-header-wrapper">
             <div class="section-header">
@@ -156,8 +119,8 @@ const closePopup = () => {
                     <ion-icon name="arrow-back-outline"></ion-icon>
                     Back to Categories
                 </button>
-                <h2 class="section-title">{{ selectedCategory }}</h2>
-                <p class="section-subtitle">{{ filteredItems.length }} {{ filteredItems.length === 1 ? 'product' : 'products' }}</p>
+                <h2 class="section-title">{{ currentCategory }}</h2>
+                <p class="section-subtitle">{{ products.length }} {{ products.length === 1 ? 'product' : 'products' }}</p>
             </div>
             <div class="search-bar">
                 <ion-icon name="search-outline"></ion-icon>
@@ -166,9 +129,9 @@ const closePopup = () => {
         </div>
         
         <div class="itemlist">
-            <div v-for="item in filteredItems" :key="item.id" class="item">
+            <div v-for="item in products" :key="item.id" class="item">
                 <div class="item-image">
-                    <img :src="item.image" :alt="item.alt">
+                    <img :src="getImageUrl(item.image_key)" :alt="item.name">
                     <div class="item-overlay">
                         <button class="quick-view" @click="handleQuickView(item)">
                             Quick View
@@ -177,7 +140,8 @@ const closePopup = () => {
                 </div>
                 <div class="item-content">
                     <span class="item-category">{{ item.category }}</span>
-                    <h4 class="item-title">{{ item.title }}</h4>
+                    <h4 class="item-title">{{ item.name }}</h4>
+                    <div style="font-weight: 700; color: #8b6f47; margin-top: 5px;">${{ item.price_3 || item.price }}</div>
                 </div>
             </div>
         </div>
@@ -185,22 +149,25 @@ const closePopup = () => {
 
     <!-- Product Details Popup -->
     <div v-if="showPopup" class="popup-overlay" @click="closePopup">
-        <div class="popup-content" @click.stop>
+        <div class="popup-content" @click.stop v-if="selectedProduct">
             <button class="close-button" @click="closePopup">
                 <ion-icon name="close-outline"></ion-icon>
             </button>
             
-            <div class="popup-body" v-if="selectedProduct">
+            <div class="popup-body">
                 <div class="popup-image">
-                    <img :src="selectedProduct.image" :alt="selectedProduct.alt">
+                    <img :src="getImageUrl(selectedProduct.image_key)" :alt="selectedProduct.name">
                 </div>
                 
                 <div class="popup-details">
-                    <span class="popup-category">{{ selectedProduct.category }}</span>
-                    <h2 class="popup-title">{{ selectedProduct.title }}</h2>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                      <span class="popup-category">{{ selectedProduct.category }}</span>
+                      <div class="popup-price">${{ selectedProduct.price_3 || selectedProduct.price }}</div>
+                    </div>
+                    <h2 class="popup-title">{{ selectedProduct.name }}</h2>
                     <p class="popup-description">{{ selectedProduct.description }}</p>
                     
-                    <div class="detail-section">
+                    <div class="detail-section" v-if="selectedProduct.usage">
                         <h3 class="detail-heading">
                             <ion-icon name="hammer-outline"></ion-icon>
                             How It's Used
@@ -208,46 +175,46 @@ const closePopup = () => {
                         <p class="detail-text">{{ selectedProduct.usage }}</p>
                     </div>
                     
-                    <div class="detail-section">
+                    <div class="detail-section" v-if="selectedProduct.use_for">
                         <h3 class="detail-heading">
                             <ion-icon name="checkmark-circle-outline"></ion-icon>
                             What It's For
                         </h3>
-                        <p class="detail-text">{{ selectedProduct.useFor }}</p>
+                        <p class="detail-text">{{ selectedProduct.use_for }}</p>
                     </div>
                     
-                    <div class="detail-section">
+                    <div class="detail-section" v-if="selectedProduct.varieties">
                         <h3 class="detail-heading">
                             <ion-icon name="grid-outline"></ion-icon>
                             Varieties
                         </h3>
                         <div class="tags-container">
-                            <span v-for="variety in selectedProduct.varieties" :key="variety" class="tag">
-                                {{ variety }}
+                            <span v-for="variety in selectedProduct.varieties.split(',')" :key="variety" class="tag">
+                                {{ variety.trim() }}
                             </span>
                         </div>
                     </div>
                     
-                    <div class="detail-section">
+                    <div class="detail-section" v-if="selectedProduct.sizes">
                         <h3 class="detail-heading">
                             <ion-icon name="resize-outline"></ion-icon>
                             Available Sizes
                         </h3>
                         <div class="tags-container">
-                            <span v-for="size in selectedProduct.sizes" :key="size" class="tag size-tag">
-                                {{ size }}
+                            <span v-for="size in selectedProduct.sizes.split(',')" :key="size" class="tag size-tag">
+                                {{ size.trim() }}
                             </span>
                         </div>
                     </div>
                     
-                    <div class="detail-section">
+                    <div class="detail-section" v-if="selectedProduct.colors">
                         <h3 class="detail-heading">
                             <ion-icon name="color-palette-outline"></ion-icon>
                             Available Colors
                         </h3>
                         <div class="tags-container">
-                            <span v-for="color in selectedProduct.colors" :key="color" class="tag color-tag">
-                                {{ color }}
+                            <span v-for="color in selectedProduct.colors.split(',')" :key="color" class="tag color-tag">
+                                {{ color.trim() }}
                             </span>
                         </div>
                     </div>
@@ -445,6 +412,9 @@ const closePopup = () => {
     box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    min-height: 400px; /* Ensures all cards are at least this tall */
 }
 
 .item:hover {
@@ -455,14 +425,25 @@ const closePopup = () => {
 .item-image {
     position: relative;
     overflow: hidden;
-    height: 280px;
+    height: 300px; /* Fixed height for consistency */
+    width: 100%;
+    background: #f8f8f8;
 }
 
 .item-image img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: cover; /* This ensures the image fills the area without distortion */
     transition: transform 0.4s ease;
+}
+
+.popup-price {
+    font-size: 24px;
+    font-weight: 700;
+    color: #2d2d2d;
+    background: #fdf2e9;
+    padding: 4px 12px;
+    border-radius: 8px;
 }
 
 .item:hover .item-image img {

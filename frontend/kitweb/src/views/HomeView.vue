@@ -8,6 +8,20 @@ import HistoryMap from '../components/history-map.vue';
 import AutoScrollBanner from '../components/auto-scroll-banner.vue';
 import FeaturedCategories from '../components/featured-categories.vue';
 import customerReview from '../components/customer-review.vue';
+import { api } from '../services/api';
+
+const products = ref([]);
+const loading = ref(true);
+
+onMounted(async () => {
+  try {
+    products.value = await api.getProducts();
+  } catch (error) {
+    console.error('Error loading products:', error);
+  } finally {
+    loading.value = false;
+  }
+});
 </script>
 <template>
   <div class="content">
