@@ -3,8 +3,8 @@
         <!-- Hero Section -->
         <section class="hero">
             <div class="hero-content">
-                <h1>{{ hero.title }}</h1>
-                <p class="subtitle">{{ hero.subtitle }}</p>
+                <h1 v-reveal>{{ hero.title }}</h1>
+                <p class="subtitle" v-reveal delay="0.5s">{{ hero.subtitle }}</p>
             </div>
         </section>
 
@@ -293,12 +293,17 @@ const handleLearnMoreClick = () => {
 }
 
 .hero {
-    background: linear-gradient(135deg, var(--earth-dark) 0%, var(--earth-medium) 100%);
-    color: var(--earth-cream);
-    padding: 5rem 2rem 4rem;
+    background: url('../assets/shop03.png');
+    background-size: contain;
+    background-position: center;
+    min-height: 600px;
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
     position: relative;
-    overflow: hidden;
+    color: white;
 }
 
 .hero::before {
@@ -308,21 +313,10 @@ const handleLearnMoreClick = () => {
     left: 0;
     right: 0;
     bottom: 0;
-    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="1" fill="white" opacity="0.1"/></svg>');
-    background-size: 30px 30px;
-    opacity: 0.3;
-    animation: float 20s linear infinite;
+    background: linear-gradient(to right, rgba(53, 35, 29, 0.703) 0%, rgba(53, 35, 29, 0.632) 10%, transparent 100%);
+    z-index: 1;
 }
 
-@keyframes float {
-    from {
-        transform: translateY(0);
-    }
-
-    to {
-        transform: translateY(-30px);
-    }
-}
 
 .hero-content {
     max-width: 900px;

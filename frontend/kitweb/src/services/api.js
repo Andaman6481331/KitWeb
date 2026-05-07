@@ -79,5 +79,32 @@ export const api = {
       body: formData
     });
     return await response.json();
+  },
+
+  async getCategories() {
+    const response = await fetch(`${API_URL}/categories`);
+    return await response.json();
+  },
+
+  async addCategory(categoryData) {
+    const response = await fetch(`${API_URL}/categories`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': this.getToken()
+      },
+      body: JSON.stringify(categoryData)
+    });
+    return await response.json();
+  },
+
+  async deleteCategory(id) {
+    const response = await fetch(`${API_URL}/categories/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': this.getToken()
+      }
+    });
+    return await response.json();
   }
 };

@@ -79,12 +79,12 @@ const handleContactSubmit = () => {
             <div class="hero-overlay"></div>
             <div class="hero-content">
                 <div class="logo">
-                    <span class="logo-icon">✂️</span>
-                    <h1>KitCraft</h1>
+                    <!-- <span class="logo-icon">✂️</span> -->
+                    <h1 v-reveal>KitCraft</h1>
                 </div>
-                <p class="tagline">{{ $t('events.heroTagline') }}</p>
-                <p class="subtitle">{{ $t('events.heroSubtitle') }}</p>
-                <button class="cta-btn"
+                <p class="tagline" v-reveal style="animation-delay: 0.2s;">{{ $t('events.heroTagline') }}</p>
+                <p class="subtitle" v-reveal style="animation-delay: 0.4s;">{{ $t('events.heroSubtitle') }}</p>
+                <button class="cta-btn" v-reveal style="animation-delay: 0.6s;"
                     @click="document.getElementById('contact').scrollIntoView({ behavior: 'smooth' })">
                     {{ $t('events.joinNextEvent') }}
                 </button>
@@ -311,14 +311,23 @@ const handleContactSubmit = () => {
 /* Hero Section */
 .hero {
     height: 70vh;
-    background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)),
-        url('https://images.unsplash.com/photo-1452860606245-08befc0ff44b?w=1600') center/cover;
+    background: url("../assets/shop05.png") center/cover;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
     text-align: center;
     position: relative;
+}
+
+.hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4));
 }
 
 .hero-content {
@@ -331,7 +340,6 @@ const handleContactSubmit = () => {
     align-items: center;
     justify-content: center;
     gap: 16px;
-    margin-bottom: 24px;
 }
 
 .logo-icon {

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import Home from '../views/HomeView.vue';
 import Catalog from '../views/CatalogPage.vue';
+import CategoryView from '../views/CategoryView.vue';
 import OrderPage from '../views/OrderPage.vue';
 import ContactUsPage from '../views/ContactUsPage.vue';
 import Login from '../views/Login.vue';
@@ -29,7 +30,7 @@ const routes = [
     {
         path: '/catalog/:category',
         name: 'category-products',
-        component: Catalog
+        component: CategoryView
     },
     {
         path: '/orderpage',
@@ -67,7 +68,14 @@ const routes = [
 // Create router instance
 const router = createRouter({
     history: createWebHistory(), // or createWebHistory(process.env.BASE_URL) if needed
-    routes
+    routes,
+    scrollBehavior(to, from, savedPosition) {
+        if (savedPosition) {
+            return savedPosition;
+        } else {
+            return { top: 0 };
+        }
+    }
 });
 
 // Export the router instance as default

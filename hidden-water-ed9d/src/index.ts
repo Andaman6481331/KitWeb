@@ -28,7 +28,7 @@ export default {
 			
 			const newResp = new Response(resp.body, resp);
 			newResp.headers.set("Access-Control-Allow-Origin", "*");
-			newResp.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+			newResp.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
 			newResp.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
 			return newResp;
 		};
@@ -39,7 +39,7 @@ export default {
 				status: 204,
 				headers: {
 					"Access-Control-Allow-Origin": "*",
-					"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+					"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
 					"Access-Control-Allow-Headers": "Content-Type, Authorization",
 					"Access-Control-Max-Age": "86400",
 				},
@@ -59,6 +59,11 @@ export default {
 					query += " ORDER BY created_at DESC";
 				}
 				const { results } = await env.DB.prepare(query).bind(...params).all();
+				return corsResponse(results);
+			}
+
+			if (url.pathname === "/categories" && request.method === "GET") {
+				const { results } = await env.DB.prepare("SELECT * FROM categories ORDER BY name ASC").all();
 				return corsResponse(results);
 			}
 
@@ -108,10 +113,23 @@ export default {
 				return corsResponse({ success: true });
 			}
 
-			if (url.pathname.startsWith("/products/") && request.method === "DELETE") {
-				const id = url.pathname.split("/products/")[1];
-				await env.DB.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
+			if (url.pathname === "/categories" && request.method === "POST") {
+				const { name, path } = await request.json() as any;
+				await env.DB.prepare("INSERT INTO categories (name, path) VALUES (?, ?)").bind(name, path).run();
 				return corsResponse({ success: true });
+			}
+
+			if (request.method === "DELETE") {
+				if (url.pathname.startsWith("/products/")) {
+					const id = url.pathname.split("/products/")[1];
+					await env.DB.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
+					return corsResponse({ success: true });
+				}
+				if (url.pathname.startsWith("/categories/")) {
+					const id = url.pathname.split("/categories/")[1];
+					await env.DB.prepare("DELETE FROM categories WHERE id = ?").bind(id).run();
+					return corsResponse({ success: true });
+				}
 			}
 
 			if (url.pathname === "/upload" && request.method === "POST") {

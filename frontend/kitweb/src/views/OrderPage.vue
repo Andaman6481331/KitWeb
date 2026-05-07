@@ -105,6 +105,59 @@ const customerName = ref('')
 const paymentMethod = ref('Bank Transfer')
 const orderNote = ref('')
 const isSubmittingOrder = ref(false)
+const activeTab = ref('new-order')
+const showOrderDetails = ref(false)
+const selectedOrder = ref(null)
+
+// Sample order history data
+const orders = ref([
+    {
+        id: 'KT-1984-9021',
+        name: 'Premium Cotton & Silk Blend Spools',
+        image: 'https://via.placeholder.com/100x100/F9F5F0/3D2B1F?text=Order1',
+        date: 'Oct 24, 2024',
+        items: 3,
+        price: 1240,
+        status: 'SHIPPED',
+        deliveryStatus: 'Arriving Friday, Oct 28',
+        location: 'Bangkok Hub'
+    },
+    {
+        id: 'KT-1984-8842',
+        name: 'Vintage Brass Buttons Set',
+        image: 'https://via.placeholder.com/60x60/F9F5F0/3D2B1F?text=Order2',
+        date: 'Oct 12, 2024',
+        items: 5,
+        price: 450,
+        status: 'DELIVERED'
+    },
+    {
+        id: 'KT-1984-8109',
+        name: 'Heavy-Duty Tailoring Shears',
+        image: 'https://via.placeholder.com/60x60/F9F5F0/3D2B1F?text=Order3',
+        date: 'Sept 30, 2024',
+        items: 1,
+        price: 2100,
+        status: 'DELIVERED'
+    }
+])
+
+// Recommendations data
+const recommendations = ref([
+    {
+        id: 101,
+        name: 'Bamboo Knitting Needle Set',
+        price: 380,
+        image: 'https://via.placeholder.com/60x60/F9F5F0/3D2B1F?text=Rec1'
+    },
+    {
+        id: 102,
+        name: 'Silk Ribbon Collection',
+        price: 120,
+        unit: '/ yard',
+        image: 'https://via.placeholder.com/60x60/F9F5F0/3D2B1F?text=Rec2'
+    }
+])
 
 // Track selected size and color for each product
 const productSelections = ref({})
@@ -323,6 +376,16 @@ const toggleCart = () => {
 const isProductInCart = (productId) => {
     return cart.value.some(item => item.id === productId)
 }
+
+const selectOrderDetails = (order) => {
+    selectedOrder.value = order
+    showOrderDetails.value = true
+}
+
+const closeOrderDetails = () => {
+    showOrderDetails.value = false
+    selectedOrder.value = null
+}
 </script>
 
 <template>
@@ -330,19 +393,33 @@ const isProductInCart = (productId) => {
         <!-- Page Header -->
         <div class="page-header">
             <div class="header-content">
-                <h1 v-reveal>🛍️ Order Products</h1>
-                <p v-reveal class="delay2">Select your items with preferred size and color</p>
+                <h1 v-reveal>Order Products</h1>
+                <p v-reveal class="delay2">Ordering & Tracking your latest treasures and curated inspirations from
+                    Kitcharoen.</p>
             </div>
 
             <!-- Cart Button (Mobile) -->
-            <button class="cart-toggle mobile-only" @click="toggleCart">
-                🛒
+            <button class="cart-toggle mobile-only" @click="toggleCart" style="margin: auto 0;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0" />
+                </svg>
                 <span v-if="cartItemCount > 0" class="cart-badge">{{ cartItemCount }}</span>
             </button>
         </div>
 
-        <!-- Search & Filter Bar -->
-        <div class="filter-bar">
+        <!-- Secondary Navbar -->
+        <div class="secondary-navbar">
+            <button class="nav-item" :class="{ active: activeTab === 'new-order' }" @click="activeTab = 'new-order'">
+                NEW ORDER
+            </button>
+            <button class="nav-item" :class="{ active: activeTab === 'track-orders' }"
+                @click="activeTab = 'track-orders'">
+                TRACK ORDERS
+            </button>
+        </div>
+
+        <!-- Search & Filter Bar (Only for New Order) -->
+        <div v-if="activeTab === 'new-order'" class="filter-bar">
             <div class="search-box">
                 <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
                     <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="2" />
@@ -352,10 +429,10 @@ const isProductInCart = (productId) => {
             </div>
 
             <div class="category-filters">
-                <button class="category-btn" :class="{ active: selectedCategory === 'All' }" :key="'All'"
+                <!-- <button class="category-btn" :class="{ active: selectedCategory === 'All' }" :key="'All'"
                     @click="selectedCategory = 'All'">
                     All
-                </button>
+                </button> -->
                 <button v-for="category in categories" :key="category" class="category-btn"
                     :class="{ active: selectedCategory === category }" @click="selectedCategory = category">
                     {{ category }}
@@ -365,407 +442,467 @@ const isProductInCart = (productId) => {
 
         <!-- Main Content -->
         <div class="content-wrapper">
-            <!-- Products Table -->
-            <div class="products-section">
-                <div class="products-table">
-                    <!-- Table Header -->
-                    <div class="table-header">
-                        <div class="th-image">Image</div>
-                        <div class="th-product">Product</div>
-                        <div class="th-category">Category</div>
-                        <div class="th-size">Size</div>
-                        <div class="th-color">Color</div>
-                        <div class="th-price">Price</div>
-                        <div class="th-action">Action</div>
-                    </div>
-
-                    <!-- Table Body -->
-                    <div class="table-body">
-                        <div v-for="product in filteredProducts" :key="product.id" class="table-row" :class="{
-                            'out-of-stock': !product.inStock,
-                            'in-cart': isProductInCart(product.id)
-                        }">
-
-                            <!-- Image -->
-                            <div class="td-image">
-                                <img :src="product.image" :alt="product.name" class="product-thumb" />
-                                <div v-if="!product.inStock" class="stock-badge">Out of Stock</div>
-                            </div>
-
-                            <!-- Product Info -->
-                            <div class="td-product">
-                                <h3 class="product-name">{{ product.name }}</h3>
-                                <p class="product-desc">{{ product.description }}</p>
-                            </div>
-
-                            <!-- Category -->
-                            <div class="td-category">
-                                <span class="category-badge">{{ product.category }}</span>
-                            </div>
-
-                            <!-- Size Selector -->
-                            <div class="td-size">
-                                <select v-model="productSelections[product.id].size"
-                                    @change="updateSize(product.id, $event.target.value)" class="size-select"
-                                    :disabled="!product.inStock">
-                                    <option v-for="size in product.sizes" :key="size" :value="size">
-                                        {{ size }}
-                                    </option>
-                                </select>
-                            </div>
-
-                            <!-- Color Selector -->
-                            <div class="td-color">
-                                <select v-model="productSelections[product.id].color"
-                                    @change="updateColor(product.id, $event.target.value)" class="color-select"
-                                    :disabled="!product.inStock">
-                                    <option v-for="color in product.colors" :key="color" :value="color">
-                                        {{ color }}
-                                    </option>
-                                </select>
-                            </div>
-
-                            <!-- Price -->
-                            <div class="td-price">
-                                <span class="price-tag">฿{{ product.price }}</span>
-                            </div>
-
-                            <!-- Action Button -->
-                            <div class="td-action">
-                                <button class="add-btn" :disabled="!product.inStock" @click="addToCart(product)">
-                                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                                        <path d="M10 5V15M5 10H15" stroke="currentColor" stroke-width="2.5"
-                                            stroke-linecap="round" />
-                                    </svg>
-                                    Add to Cart
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Empty State -->
-                <div v-if="filteredProducts.length === 0" class="empty-state">
-                    <div class="empty-icon">🔍</div>
-                    <h3>No products found</h3>
-                    <p>Try adjusting your search or filters</p>
-                </div>
-            </div>
-
-            <!-- Shopping Cart Sidebar -->
-            <div class="cart-sidebar" :class="{ 'show': showCart }">
-                <div class="cart-header">
-                    <h2>🛒 Your Cart</h2>
-                    <button class="close-cart mobile-only" @click="toggleCart">✕</button>
-                </div>
-
-                <!-- Cart Items -->
-                <div class="cart-items" v-if="cart.length > 0">
-                    <div v-for="item in cart" :key="item.cartItemKey" class="cart-item">
-                        <img :src="item.image" :alt="item.name" class="cart-item-image" />
-
-                        <div class="cart-item-details">
-                            <h4>{{ item.name }}</h4>
-                            <p class="cart-item-specs">{{ item.selectedSize }} • {{ item.selectedColor }}</p>
-                            <p class="cart-item-price">฿{{ item.price }}</p>
+            <!-- Products Table Section -->
+            <template v-if="activeTab === 'new-order'">
+                <div class="products-section">
+                    <div class="products-container">
+                        <!-- Table Header -->
+                        <div class="table-header">
+                            <div class="th-image">IMAGE</div>
+                            <div class="th-details">PRODUCT DETAILS</div>
+                            <div class="th-variations">VARIATIONS</div>
+                            <div class="th-price">PRICE</div>
+                            <div class="th-action">ACTION</div>
                         </div>
 
-                        <div class="quantity-controls">
-                            <button @click="updateQuantity(item.cartItemKey, -1)" class="qty-btn">−</button>
-                            <span class="quantity">{{ item.quantity }}</span>
-                            <button @click="updateQuantity(item.cartItemKey, 1)" class="qty-btn">+</button>
-                        </div>
+                        <!-- Table Body -->
+                        <div class="products-list">
+                            <div v-for="product in filteredProducts" :key="product.id" class="product-row" :class="{
+                                'out-of-stock': !product.inStock,
+                                'in-cart': isProductInCart(product.id)
+                            }">
 
-                        <button @click="removeFromCart(item.cartItemKey)" class="remove-btn">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                <path
-                                    d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
-                                <path
-                                    d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Empty Cart -->
-                <div v-else class="empty-cart">
-                    <div class="empty-cart-icon">🛒</div>
-                    <h3>Your cart is empty</h3>
-                    <p>Add some products to get started!</p>
-                </div>
-
-                <!-- Cart Footer -->
-                <div class="cart-footer" v-if="cart.length > 0">
-                    <div class="cart-summary">
-                        <div class="summary-row">
-                            <span>Subtotal</span>
-                            <span>฿{{ cartTotal }}</span>
-                        </div>
-                        <div class="summary-row">
-                            <span>Delivery</span>
-                            <span>฿30</span>
-                        </div>
-                        <!-- Customer Information -->
-                        <div class="form-group">
-                            <label>Name <span class="required">*</span></label>
-                            <input v-model="customerName" type="text" placeholder="Enter your name"
-                                class="form-input" />
-                        </div>
-
-                        <div class="form-group">
-                            <label>Payment Method</label>
-                            <select v-model="paymentMethod" class="form-select">
-                                <option>Bank Transfer</option>
-                                <option>Cash on Delivery</option>
-                                <option>Credit Card</option>
-                                <option>PromptPay</option>
-                            </select>
-                        </div>
-
-                        <div class="summary-row total">
-                            <span>Total</span>
-                            <span>฿{{ cartTotal + 30 }}</span>
-                        </div>
-                    </div>
-
-                    <div class="cart-actions">
-                        <button @click="clearCart" class="clear-btn">Clear Cart</button>
-                        <button @click="checkout" class="checkout-btn">
-                            Checkout
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                                <path d="M6 12l4-4-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Notification Toast -->
-        <transition name="slide-up">
-            <div v-if="showNotification" class="notification">
-                {{ notificationMessage }}
-            </div>
-        </transition>
-
-        <!-- Cart Overlay (Mobile) -->
-        <div v-if="showCart" class="cart-overlay mobile-only" @click="toggleCart"></div>
-        <!-- Checkout Popup -->
-        <div v-if="showCheckoutPopup" class="checkout-overlay" @click="closeCheckoutPopup">
-            <div class="checkout-popup" @click.stop>
-                <button class="popup-close-btn" @click="closeCheckoutPopup">✕</button>
-
-                <div class="popup-header">
-                    <h2>🧾 Complete Your Order</h2>
-                    <p>Review your order and provide details</p>
-                </div>
-
-                <div class="popup-body">
-
-                    <!-- Order Summary -->
-                    <div class="order-summary-section">
-                        <div class="order-summary-header">
-                            <h3>Order Summary</h3>
-                            <h3>Qty</h3>
-                            <h3>Price</h3>
-                            <h3>Total</h3>
-                        </div>
-                        <div class="summary-items">
-                            <div v-for="item in cart" :key="item.cartItemKey" class="summary-item">
-                                <div class="summary-item-info">
-                                    <strong>{{ item.name }}</strong>
-                                    <span class="summary-specs">{{ item.selectedSize }} • {{ item.selectedColor
-                                        }}</span>
+                                <!-- Image -->
+                                <div class="td-image">
+                                    <div class="image-wrapper">
+                                        <img :src="product.image" :alt="product.name" class="product-thumb" />
+                                        <div v-if="!product.inStock" class="stock-badge">Out of Stock</div>
+                                    </div>
                                 </div>
-                                <div class="summary-item-calc">
-                                    <span>{{ item.quantity }}</span>
-                                    <span>•</span>
-                                    <span>{{ item.price }}</span>
-                                    <strong>฿{{ item.quantity * item.price }}</strong>
+
+                                <!-- Product Info -->
+                                <div class="td-details">
+                                    <span class="product-tag">{{ product.category }}</span>
+                                    <h3 class="product-name">{{ product.name }}</h3>
+                                    <p class="product-desc">{{ product.description }}</p>
+                                </div>
+
+                                <!-- Variations -->
+                                <div class="td-variations">
+                                    <select v-model="productSelections[product.id].size"
+                                        @change="updateSize(product.id, $event.target.value)" class="variation-select"
+                                        :disabled="!product.inStock">
+                                        <option v-for="size in product.sizes" :key="size" :value="size">
+                                            {{ size }}
+                                        </option>
+                                    </select>
+                                    <select v-model="productSelections[product.id].color"
+                                        @change="updateColor(product.id, $event.target.value)" class="variation-select"
+                                        :disabled="!product.inStock">
+                                        <option v-for="color in product.colors" :key="color" :value="color">
+                                            {{ color }}
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <!-- Price -->
+                                <div class="td-price">
+                                    <span class="price-currency">฿</span>
+                                    <span class="price-amount">{{ product.price }}</span>
+                                </div>
+
+                                <!-- Action Button -->
+                                <div class="td-action">
+                                    <button class="add-to-cart-btn" :disabled="!product.inStock"
+                                        @click="addToCart(product)">
+                                        <span class="btn-icon">+</span>
+                                        Add
+                                    </button>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="summary-total">
-                            <div class="total-row">
+                    <!-- Empty State -->
+                    <div v-if="filteredProducts.length === 0" class="empty-state">
+                        <div style="display: flex; justify-content: center; margin: 20px 0 0 0;">
+                            <div class="empty-icon" style="margin: auto 0;">🔍</div>
+                            <h2 style="margin: 0;">No products found</h2>
+                        </div>
+                        <p style="display: flex; justify-content: center;">Try adjusting your search or filters</p>
+                    </div>
+                </div>
+
+                <!-- Shopping Cart Sidebar -->
+                <div class="cart-sidebar" :class="{ 'show': showCart }">
+                    <div class="cart-header-modern">
+                        <div class="cart-title-group">
+                            <div class="cart-icon-bg">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path
+                                        d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0" />
+                                </svg>
+                            </div>
+                            <h2>Your Cart</h2>
+                            <div class="items-badge">{{ cartItemCount }} ITEMS</div>
+                        </div>
+                        <button v-if="cart.length > 0" @click="clearCart" class="clear-all-btn">CLEAR ALL</button>
+                        <!-- <button class="close-cart mobile-only" @click="toggleCart">✕</button> -->
+                    </div>
+
+                    <!-- Cart Items -->
+                    <div class="cart-items" v-if="cart.length > 0">
+                        <div v-for="item in cart" :key="item.cartItemKey" class="cart-item-modern">
+                            <img :src="item.image" :alt="item.name" class="cart-item-image" />
+
+                            <div class="cart-item-details">
+                                <h4>{{ item.name }}</h4>
+                                <p class="cart-item-specs">{{ item.selectedSize }} • {{ item.selectedColor }}</p>
+                                <p class="cart-item-price">฿{{ item.price }}</p>
+                            </div>
+
+                            <div class="quantity-controls-modern">
+                                <button @click="updateQuantity(item.cartItemKey, -1)" class="qty-btn">−</button>
+                                <span class="quantity">{{ item.quantity }}</span>
+                                <button @click="updateQuantity(item.cartItemKey, 1)" class="qty-btn">+</button>
+                            </div>
+
+                            <button @click="removeFromCart(item.cartItemKey)" class="remove-btn-modern">✕</button>
+                        </div>
+                    </div>
+
+                    <!-- Empty Cart Modern -->
+                    <div v-else class="empty-cart-modern">
+                        <div class="empty-cart-circle">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5">
+                                <circle cx="9" cy="21" r="1" />
+                                <circle cx="20" cy="21" r="1" />
+                                <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
+                            </svg>
+                        </div>
+                        <h3>Cart is empty</h3>
+                        <p>It looks like you haven't added any premium supplies to your project list yet.</p>
+                        <button class="browse-collections-btn" @click="searchQuery = ''">Browse Collections</button>
+                    </div>
+
+                    <!-- Cart Footer Modern -->
+                    <div class="cart-footer-modern" v-if="cart.length > 0">
+                        <div class="cart-summary-modern">
+                            <div class="summary-row">
                                 <span>Subtotal</span>
                                 <span>฿{{ cartTotal }}</span>
                             </div>
-                            <div class="total-row">
+                            <div class="summary-row">
                                 <span>Delivery</span>
                                 <span>฿30</span>
                             </div>
-                            <div class="total-row grand-total">
-                                <span>Grand Total</span>
+                            <div class="summary-row total">
+                                <span>Total</span>
                                 <span>฿{{ cartTotal + 30 }}</span>
                             </div>
                         </div>
+
+                        <div class="cart-actions-modern">
+                            <button @click="checkout" class="checkout-btn-modern">
+                                Secure Checkout
+                            </button>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Order Note (Optional)</label>
-                        <textarea v-model="orderNote" placeholder="Special requests or delivery instructions..."
-                            class="form-textarea" rows="3"></textarea>
+
+                    <!-- Bottom Trust Badges -->
+                    <div class="cart-trust-badges">
+                        <div class="badge-item">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                            </svg>
+                            SECURE CHECKOUT
+                        </div>
+                        <div class="badge-dot">•</div>
+                        <div class="badge-item">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="12" cy="12" r="10" />
+                                <path d="M2 12h20M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z" />
+                            </svg>
+                            GLOBAL SHIPPING
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Track Orders View -->
+            <template v-else>
+                <div class="history-section">
+                    <div class="history-header">
+                        <div class="history-title">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <h2>Order History</h2>
+                        </div>
+                        <button class="download-statements">Download Statements</button>
+                    </div>
+
+                    <div class="orders-history-list">
+                        <div v-for="order in orders" :key="order.id" class="order-history-card">
+                            <div class="order-main-info">
+                                <div class="order-img-container">
+                                    <img :src="order.image" :alt="order.name">
+                                </div>
+                                <div class="order-text-info">
+                                    <div class="order-id-status">
+                                        <span class="order-id">ORDER #{{ order.id }}</span>
+                                        <span v-if="order.status === 'SHIPPED'"
+                                            class="status-tag shipped">SHIPPED</span>
+                                    </div>
+                                    <h3 class="order-name">{{ order.name }}</h3>
+                                    <p class="order-meta">Placed on {{ order.date }} • {{ order.items }} Items • ฿{{
+                                        order.price.toLocaleString() }}</p>
+                                </div>
+                            </div>
+
+                            <!-- Tracking Bar (Only for Shipped) -->
+                            <div v-if="order.status === 'SHIPPED'" class="tracking-timeline">
+                                <div class="timeline-header">
+                                    <span class="arrival-time">{{ order.deliveryStatus }}</span>
+                                    <span class="current-location">{{ order.location }}</span>
+                                </div>
+                                <div class="timeline-bar">
+                                    <div class="bar-progress" style="width: 70%"></div>
+                                </div>
+                            </div>
+
+                            <div class="order-card-actions">
+                                <button class="track-btn" v-if="order.status === 'SHIPPED'">TRACK SHIPMENT</button>
+                                <button class="order-details-btn" @click="selectOrderDetails(order)">ORDER
+                                    DETAILS</button>
+                                <button class="buy-again-btn" v-if="order.status === 'DELIVERED'">BUY AGAIN</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="popup-footer">
-                    <button @click="closeCheckoutPopup" class="cancel-btn">Cancel</button>
-                    <button @click="submitOrder" class="submit-order-btn" :disabled="isSubmittingOrder">
-                        <span v-if="!isSubmittingOrder">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                                <path
-                                    d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                                    stroke="currentColor" stroke-width="2" />
-                            </svg>
-                            Send Order to LINE
-                        </span>
-                        <span v-else>Sending...</span>
-                    </button>
+                <!-- Sidebar for Track Orders -->
+                <div class="history-sidebar">
+                    <!-- Recommended For You (Default) -->
+                    <div v-if="!showOrderDetails" class="recommendations-container">
+                        <h3>RECOMMENDED FOR YOU</h3>
+                        <div class="rec-list">
+                            <div v-for="rec in recommendations" :key="rec.id" class="rec-item">
+                                <img :src="rec.image" :alt="rec.name">
+                                <div class="rec-info">
+                                    <h4>{{ rec.name }}</h4>
+                                    <p>฿{{ rec.price }}{{ rec.unit || '' }}</p>
+                                </div>
+                                <button class="add-rec-btn">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <circle cx="9" cy="21" r="1" />
+                                        <circle cx="20" cy="21" r="1" />
+                                        <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <button class="view-all-recs">VIEW RECOMMENDATIONS</button>
+                    </div>
+
+                    <!-- Order Details (Toggled) -->
+                    <div v-else class="order-details-sidebar">
+                        <div class="details-header">
+                            <h3>Order Details</h3>
+                            <button @click="closeOrderDetails" class="close-details">✕</button>
+                        </div>
+                        <div v-if="selectedOrder" class="details-content">
+                            <div class="order-summary-mini">
+                                <p><strong>Order ID:</strong> {{ selectedOrder.id }}</p>
+                                <p><strong>Status:</strong> {{ selectedOrder.status }}</p>
+                                <p><strong>Total:</strong> ฿{{ selectedOrder.price.toLocaleString() }}</p>
+                            </div>
+                            <div class="order-items-mini">
+                                <!-- Could map items here if data was available -->
+                            </div>
+                            <button class="checkout-btn-modern">Go to Checkout</button>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </template>
         </div>
     </div>
 
+    <!-- Notification Toast -->
+    <transition name="slide-up">
+        <div v-if="showNotification" class="notification">
+            {{ notificationMessage }}
+        </div>
+    </transition>
+
+    <!-- Cart Overlay (Mobile) -->
+    <div v-if="showCart" class="cart-overlay mobile-only" @click="toggleCart"></div>
+
+    <!-- Checkout Popup -->
+    <div v-if="showCheckoutPopup" class="checkout-overlay" @click="closeCheckoutPopup">
+        <div class="checkout-popup" @click.stop>
+            <button class="popup-close-btn" @click="closeCheckoutPopup">✕</button>
+
+            <div class="popup-header">
+                <h2>🧾 Complete Your Order</h2>
+                <p>Review your order and provide details</p>
+            </div>
+
+            <div class="popup-body">
+
+                <!-- Order Summary -->
+                <div class="order-summary-section">
+                    <div class="order-summary-header">
+                        <h3>Order Summary</h3>
+                        <h3>Qty</h3>
+                        <h3>Price</h3>
+                        <h3>Total</h3>
+                    </div>
+                    <div class="summary-items">
+                        <div v-for="item in cart" :key="item.cartItemKey" class="summary-item">
+                            <div class="summary-item-info">
+                                <strong>{{ item.name }}</strong>
+                                <span class="summary-specs">{{ item.selectedSize }} • {{ item.selectedColor
+                                }}</span>
+                            </div>
+                            <div class="summary-item-calc">
+                                <span>{{ item.quantity }}</span>
+                                <span>•</span>
+                                <span>{{ item.price }}</span>
+                                <strong>฿{{ item.quantity * item.price }}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="summary-total">
+                        <div class="total-row">
+                            <span>Subtotal</span>
+                            <span>฿{{ cartTotal }}</span>
+                        </div>
+                        <div class="total-row">
+                            <span>Delivery</span>
+                            <span>฿30</span>
+                        </div>
+                        <div class="total-row grand-total">
+                            <span>Grand Total</span>
+                            <span>฿{{ cartTotal + 30 }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Order Note (Optional)</label>
+                    <textarea v-model="orderNote" placeholder="Special requests or delivery instructions..."
+                        class="form-textarea" rows="3"></textarea>
+                </div>
+            </div>
+
+            <div class="popup-footer">
+                <button @click="closeCheckoutPopup" class="cancel-btn">Cancel</button>
+                <button @click="submitOrder" class="submit-order-btn" :disabled="isSubmittingOrder">
+                    <span v-if="!isSubmittingOrder">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                            <path
+                                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                                stroke="currentColor" stroke-width="2" />
+                        </svg>
+                        Send Order to LINE
+                    </span>
+                    <span v-else>Sending...</span>
+                </button>
+            </div>
+        </div>
+    </div>
 </template>
 
 <style scoped>
 .order-page {
     min-height: 100vh;
-    background: linear-gradient(135deg, #fff9f1 0%, #f5ebe0 100%);
+    background-color: #FBF7F2;
     padding-bottom: 40px;
+    font-family: 'Work Sans', sans-serif;
+    color: #3D2B1F;
 }
 
 /* Page Header */
 .page-header {
-    background:
-        linear-gradient(135deg,
-            rgba(94, 69, 53, 0.75),
-            rgba(147, 115, 94, 0.75)),
-        url('../assets/texture-bg01.jpg');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-
-    color: #fff9f1;
-    padding: 40px 5%;
+    padding: 20px 5% 20px;
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    align-items: flex-end;
 }
 
-
 .header-content h1 {
-    font-size: 42px;
+    font-family: 'Crimson Pro', serif;
+    font-size: 48px;
     font-weight: 700;
-    margin: 0 0 10px 0;
-    letter-spacing: -0.5px;
+    margin: 0;
+    color: #3D2B1F;
 }
 
 .header-content p {
     font-size: 16px;
     margin: 0;
-    opacity: 0.9;
+    color: #8C7B6E;
 }
 
-.cart-toggle {
-    display: none;
-    position: relative;
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 12px;
-    padding: 12px 20px;
-    font-size: 24px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.cart-toggle:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: scale(1.05);
-}
-
-.cart-badge {
-    position: absolute;
-    top: -5px;
-    right: -5px;
-    background: #ff6b6b;
-    color: white;
-    font-size: 12px;
-    font-weight: 700;
-    padding: 4px 8px;
-    border-radius: 10px;
-    min-width: 20px;
-}
-
-/* Filter Bar */
+/* Filter Bar Modern */
 .filter-bar {
     max-width: 1400px;
-    margin: 30px auto;
+    margin: 0 auto 40px;
     padding: 0 5%;
     display: flex;
+    justify-content: space-between;
+    align-items: center;
     gap: 20px;
-    flex-wrap: wrap;
 }
 
 .search-box {
+    display: flex;
     position: relative;
-    flex: 1;
-    min-width: 250px;
-}
-
-.search-icon {
-    position: absolute;
-    left: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #93735E;
-    pointer-events: none;
+    width: 300px;
 }
 
 .search-input {
     width: 100%;
-    padding: 14px 16px 14px 48px;
-    border: 2px solid rgba(147, 115, 94, 0.2);
-    border-radius: 12px;
-    font-size: 15px;
+    padding: 12px 16px 12px 44px;
+    border: 1px solid #E6E0D9;
+    border-radius: 8px;
+    font-size: 14px;
     background: white;
     transition: all 0.3s ease;
 }
 
 .search-input:focus {
     outline: none;
-    border-color: #93735E;
-    box-shadow: 0 4px 12px rgba(147, 115, 94, 0.1);
+    border-color: #3D2B1F;
+}
+
+.search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #8C7B6E;
+    pointer-events: none;
 }
 
 .category-filters {
     display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .category-btn {
-    padding: 10px 20px;
-    border: 2px solid rgba(147, 115, 94, 0.3);
+    padding: 8px 16px;
+    border: 1px solid #E6E0D9;
     background: white;
     border-radius: 20px;
     cursor: pointer;
-    font-weight: 600;
+    font-weight: 500;
     font-size: 14px;
-    color: #5E4535;
+    color: #8C7B6E;
     transition: all 0.3s ease;
 }
 
-.category-btn:hover {
-    border-color: #93735E;
-    background: rgba(147, 115, 94, 0.1);
-}
-
 .category-btn.active {
-    background: linear-gradient(135deg, #5E4535, #93735E);
+    background: #3D2B1F;
     color: white;
-    border-color: transparent;
+    border-color: #3D2B1F;
 }
 
 /* Content Wrapper */
@@ -774,35 +911,806 @@ const isProductInCart = (productId) => {
     margin: 0 auto;
     padding: 0 5%;
     display: grid;
-    grid-template-columns: 1fr 400px;
-    gap: 30px;
+    grid-template-columns: 1fr 380px;
+    gap: 40px;
     align-items: start;
 }
 
-/* Products Table */
-.products-section {
-    width: 100%;
-}
-
-.products-table {
+/* Products Section */
+.products-container {
     background: white;
-    border-radius: 16px;
+    border-radius: 20px;
+    border: 1px solid #F4EDE6;
     overflow: hidden;
-    box-shadow: 0 4px 20px rgba(94, 69, 53, 0.1);
 }
 
 .table-header {
     display: grid;
-    grid-template-columns: 100px 2fr 1fr 120px 120px 100px 180px;
-    gap: 16px;
-    padding: 20px 24px;
-    background: linear-gradient(135deg, #5E4535, #93735E);
+    grid-template-columns: 140px 2fr 180px 100px 120px;
+    padding: 20px 30px;
+    background: #F9F5F0;
+    border-bottom: 1px solid #F4EDE6;
+    color: #8C7B6E;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+}
+
+.product-row {
+    display: grid;
+    grid-template-columns: 140px 2fr 180px 100px 120px;
+    padding: 30px;
+    border-bottom: 1px solid #F4EDE6;
+    align-items: center;
+    transition: background 0.3s ease;
+}
+
+.product-row:last-child {
+    border-bottom: none;
+}
+
+.product-row:hover {
+    background: #FCFAF8;
+}
+
+.image-wrapper {
+    width: 100px;
+    height: 100px;
+    background: #F9F5F0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.product-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.td-details {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.product-tag {
+    display: inline-block;
+    width: fit-content;
+    padding: 4px 10px;
+    background: #E0F7F9;
+    color: #4DB6C1;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+}
+
+.product-name {
+    font-family: 'Crimson Pro', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: #3D2B1F;
+    margin: 0;
+}
+
+.product-desc {
+    font-size: 14px;
+    color: #8C7B6E;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.td-variations {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.variation-select {
+    width: 140px;
+    padding: 8px 12px;
+    border: 1px solid #E6E0D9;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #3D2B1F;
+    background: white;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238C7B6E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+}
+
+.td-price {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+}
+
+.price-currency {
+    font-family: 'Crimson Pro', serif;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.price-amount {
+    font-family: 'Crimson Pro', serif;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.add-to-cart-btn {
+    padding: 10px 20px;
+    background: #3D2B1F;
     color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+.add-to-cart-btn:hover:not(:disabled) {
+    background: #543D2F;
+}
+
+.add-to-cart-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Cart Sidebar Modern */
+.cart-sidebar {
+    background: #F9F5F0;
+    border-radius: 20px;
+    padding: 30px;
+    position: sticky;
+    top: 40px;
+}
+
+.cart-header-modern {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.cart-title-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.cart-icon-bg {
+    width: 40px;
+    height: 40px;
+    background: #E6E0D9;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #3D2B1F;
+}
+
+.cart-header-modern h2 {
+    font-family: 'Crimson Pro', serif;
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.items-badge {
+    font-size: 10px;
+    font-weight: 700;
+    color: #8C7B6E;
+    background: #E6E0D9;
+    padding: 4px 8px;
+    border-radius: 10px;
+}
+
+/* Empty Cart Modern */
+.empty-cart-modern {
+    text-align: center;
+    padding: 60px 0;
+}
+
+.empty-cart-circle {
+    width: 80px;
+    height: 80px;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+    color: #E6E0D9;
+}
+
+.empty-cart-modern h3 {
+    font-family: 'Crimson Pro', serif;
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0 0 12px 0;
+}
+
+.empty-cart-modern p {
+    font-size: 14px;
+    color: #8C7B6E;
+    line-height: 1.6;
+    margin: 0 0 30px 0;
+}
+
+.browse-collections-btn {
+    width: 100%;
+    padding: 16px;
+    background: #3D2B1F;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.browse-collections-btn:hover {
+    background: #543D2F;
+}
+
+.clear-all-btn {
+    background: none;
+    border: none;
+    color: #8C7B6E;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: underline;
+    letter-spacing: 0.5px;
+    padding: 0;
+}
+
+.clear-all-btn:hover {
+    color: #3D2B1F;
+}
+
+.checkout-btn-modern {
+    width: 100%;
+    padding: 16px;
+    background: #3D2B1F;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.checkout-btn-modern:hover {
+    background: #543D2F;
+    transform: translateY(-2px);
+}
+
+/* Cart Trust Badges */
+.cart-trust-badges {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #E6E0D9;
+}
+
+.badge-item {
+    font-size: 10px;
+    font-weight: 700;
+    color: #B2A69B;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.badge-dot {
+    color: #B2A69B;
+    font-size: 10px;
+}
+
+/* Existing Cart Item Styles Updated */
+.cart-item-modern {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    position: relative;
+}
+
+.cart-item-image {
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    object-fit: cover;
+}
+
+.cart-item-details h4 {
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0 0 4px 0;
+}
+
+.cart-item-specs {
+    font-size: 12px;
+    color: #8C7B6E;
+    margin: 0 0 4px 0;
+}
+
+.cart-item-price {
     font-weight: 700;
     font-size: 14px;
+}
+
+.quantity-controls-modern {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.remove-btn-modern {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: #B2A69B;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+/* Secondary Navbar */
+.secondary-navbar {
+    display: flex;
+    gap: 40px;
+    padding: 0 5%;
+    background: #FBF7F2;
+    border-bottom: 1px solid #E6E0D9;
+    margin-bottom: 30px;
+}
+
+.nav-item {
+    background: none;
+    border: none;
+    padding: 20px 0;
+    font-family: 'Work Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #8C7E71;
+    cursor: pointer;
     text-transform: uppercase;
+    letter-spacing: 1px;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.nav-item:hover {
+    color: #3D2B1F;
+}
+
+.nav-item.active {
+    color: #3D2B1F;
+}
+
+.nav-item.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: #8C7E71;
+}
+
+/* History Section */
+.history-section {
+    flex: 1;
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 4px 20px rgba(61, 43, 31, 0.05);
+}
+
+.history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.history-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #3D2B1F;
+}
+
+.history-title h2 {
+    font-family: 'Crimson Pro', serif;
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.download-statements {
+    background: none;
+    border: none;
+    color: #4DB6C1;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+/* Order History Cards */
+.orders-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.order-history-card {
+    background: #FBF7F2;
+    border: 1px solid #E6E0D9;
+    border-radius: 16px;
+    padding: 24px;
+    transition: all 0.3s ease;
+}
+
+.order-main-info {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.order-img-container {
+    width: 100px;
+    height: 100px;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.order-img-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.order-text-info {
+    flex: 1;
+}
+
+.order-id-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.order-id {
+    font-size: 13px;
+    font-weight: 600;
+    color: #8C7E71;
+}
+
+.status-tag {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
     letter-spacing: 0.5px;
 }
+
+.status-tag.shipped {
+    background: #E0F7F9;
+    color: #4DB6C1;
+}
+
+.order-name {
+    font-family: 'Crimson Pro', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #3D2B1F;
+    margin: 0 0 4px 0;
+}
+
+.order-meta {
+    font-size: 13px;
+    color: #8C7E71;
+    margin: 0;
+}
+
+/* Tracking Timeline */
+.tracking-timeline {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.timeline-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.arrival-time {
+    color: #3D2B1F;
+}
+
+.current-location {
+    color: #4DB6C1;
+}
+
+.timeline-bar {
+    height: 4px;
+    background: #F4EDE6;
+    border-radius: 2px;
+    position: relative;
+}
+
+.bar-progress {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: #4DB6C1;
+    border-radius: 2px;
+}
+
+/* Order Card Actions */
+.order-card-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.track-btn {
+    flex: 1;
+    background: #006D77;
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.order-details-btn {
+    flex: 1;
+    background: white;
+    border: 1px solid #3D2B1F;
+    color: #3D2B1F;
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.buy-again-btn {
+    background: white;
+    border: 1px solid #E6E0D9;
+    color: #8C7E71;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+/* History Sidebar */
+.history-sidebar {
+    width: 380px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.recommendations-container {
+    background: white;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 4px 20px rgba(61, 43, 31, 0.05);
+}
+
+.recommendations-container h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #3D2B1F;
+    letter-spacing: 1px;
+    margin: 0 0 20px 0;
+}
+
+.rec-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.rec-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 12px;
+    background: #FBF7F2;
+}
+
+.rec-item img {
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    object-fit: cover;
+}
+
+.rec-info {
+    flex: 1;
+}
+
+.rec-info h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #3D2B1F;
+    margin: 0 0 4px 0;
+}
+
+.rec-info p {
+    font-size: 13px;
+    color: #4DB6C1;
+    font-weight: 700;
+    margin: 0;
+}
+
+.add-rec-btn {
+    background: none;
+    border: none;
+    color: #8C7E71;
+    cursor: pointer;
+    padding: 8px;
+}
+
+.view-all-recs {
+    width: 100%;
+    padding: 12px;
+    background: white;
+    border: 1px solid #4DB6C1;
+    color: #006D77;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+/* Order Details Sidebar */
+.order-details-sidebar {
+    background: white;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 4px 20px rgba(61, 43, 31, 0.05);
+}
+
+.details-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.details-header h3 {
+    font-family: 'Crimson Pro', serif;
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.close-details {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: #8C7E71;
+    cursor: pointer;
+}
+
+.details-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.order-summary-mini {
+    background: #FBF7F2;
+    padding: 16px;
+    border-radius: 12px;
+    font-size: 14px;
+}
+
+.order-summary-mini p {
+    margin: 8px 0;
+    color: #3D2B1F;
+}
+
+.order-items-mini {
+    font-size: 13px;
+    color: #8C7E71;
+}
+
+/* Responsive Modern */
+@media (max-width: 1100px) {
+    .content-wrapper {
+        grid-template-columns: 1fr;
+    }
+
+    .cart-sidebar {
+        position: static;
+    }
+}
+
+@media (max-width: 1024px) {
+    .history-sidebar {
+        width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .secondary-navbar {
+        gap: 20px;
+    }
+
+    .order-main-info {
+        flex-direction: column;
+    }
+
+    .order-img-container {
+        width: 100%;
+        height: 150px;
+    }
+
+    .order-card-actions {
+        flex-direction: column;
+    }
+
+    .product-row {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .table-header {
+        display: none;
+    }
+
+    .image-wrapper {
+        width: 100%;
+        height: 200px;
+    }
+}
+
+/* font-weight: 700;
+font-size: 14px;
+text-transform: uppercase;
+letter-spacing: 0.5px;
+} */
 
 .table-body {
     max-height: calc(100vh - 100px);
@@ -819,902 +1727,157 @@ const isProductInCart = (productId) => {
     transition: all 0.3s ease;
 }
 
-.table-row:hover {
-    background: #fffaf5;
-}
-
-.table-row.out-of-stock {
-    opacity: 0.5;
-    background: #f8f8f8;
-}
-
-.table-row.in-cart {
-    background: linear-gradient(90deg, rgba(147, 115, 94, 0.08) 0%, rgba(184, 153, 104, 0.05) 100%);
-    border-left: 4px solid #93735E;
-}
-
-.table-row.in-cart:hover {
-    background: linear-gradient(90deg, rgba(147, 115, 94, 0.12) 0%, rgba(184, 153, 104, 0.08) 100%);
-}
-
-/* Table Cells */
-.td-image {
-    position: relative;
-}
-
-.product-thumb {
-    width: 80px;
-    height: 80px;
-    object-fit: cover;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.stock-badge {
-    position: absolute;
-    bottom: -5px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #ff6b6b;
-    color: white;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 4px 8px;
-    border-radius: 8px;
-    white-space: nowrap;
-}
-
-.td-product {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.product-name {
-    font-size: 16px;
-    font-weight: 700;
-    color: #5E4535;
-    margin: 0;
-}
-
-.product-desc {
-    font-size: 13px;
-    color: #93735E;
-    margin: 0;
-}
-
-.td-category {
-    text-align: center;
-}
-
-.category-badge {
-    display: inline-block;
-    background: linear-gradient(135deg, #8b6f47, #b89968);
-    color: white;
-    padding: 6px 14px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.size-select,
-.color-select {
-    width: 100%;
-    padding: 10px 12px;
-    border: 2px solid rgba(147, 115, 94, 0.3);
-    border-radius: 10px;
-    font-size: 14px;
-    font-weight: 600;
-    color: #5E4535;
-    background: white;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.size-select:hover,
-.color-select:hover {
-    border-color: #93735E;
-}
-
-.size-select:focus,
-.color-select:focus {
-    outline: none;
-    border-color: #5E4535;
-    box-shadow: 0 0 0 3px rgba(147, 115, 94, 0.1);
-}
-
-.size-select:disabled,
-.color-select:disabled {
-    background: #f5f5f5;
-    cursor: not-allowed;
-}
-
-.td-price {
-    text-align: center;
-}
-
-.price-tag {
-    font-size: 20px;
-    font-weight: 700;
-    color: #5E4535;
-}
-
-.add-btn {
-    width: 100%;
-    padding: 12px 16px;
-    background: linear-gradient(135deg, #5E4535, #93735E);
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-weight: 600;
-    font-size: 14px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    transition: all 0.3s ease;
-}
-
-.add-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(94, 69, 53, 0.3);
-}
-
-.add-btn:disabled {
-    background: #ccc;
-    cursor: not-allowed;
-}
-
-/* Cart Sidebar */
-.cart-sidebar {
-    position: sticky;
-    top: 100px;
-    background: white;
-    border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(94, 69, 53, 0.1);
-    height: fit-content;
-    max-height: calc(100vh - 40px);
-    display: flex;
-    flex-direction: column;
-}
-
-.cart-header {
-    padding: 24px;
-    border-bottom: 2px solid #f5ebe0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.cart-header h2 {
-    font-size: 24px;
-    font-weight: 700;
-    color: #5E4535;
-    margin: 0;
-}
-
-.close-cart {
-    display: none;
-    background: none;
-    border: none;
-    font-size: 24px;
-    cursor: pointer;
-    color: #93735E;
-}
-
-.cart-items {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px 24px;
-    max-height: 400px;
-}
-
-.cart-item {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    padding: 16px;
-    background: #f5ebe0;
-    border-radius: 12px;
-    margin-bottom: 12px;
-    transition: all 0.3s ease;
-}
-
-.cart-item:hover {
-    background: #ede0d4;
-}
-
-.cart-item-image {
-    width: 60px;
-    height: 60px;
-    border-radius: 8px;
-    object-fit: cover;
-}
-
-.cart-item-details {
-    flex: 1;
-}
-
-.cart-item-details h4 {
-    font-size: 15px;
-    font-weight: 600;
-    color: #5E4535;
-    margin: 0 0 4px 0;
-}
-
-.cart-item-specs {
-    font-size: 12px;
-    color: #93735E;
-    margin: 0 0 4px 0;
-    font-weight: 600;
-}
-
-.cart-item-price {
-    font-size: 14px;
-    font-weight: 700;
-    color: #5E4535;
-    margin: 0;
-}
-
-.quantity-controls {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: white;
-    border-radius: 8px;
-    padding: 4px;
-}
-
-.qty-btn {
-    width: 28px;
-    height: 28px;
-    border: none;
-    background: #5E4535;
-    color: white;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: 700;
-    transition: all 0.2s ease;
-}
-
-.qty-btn:hover {
-    background: #93735E;
-    transform: scale(1.1);
-}
-
-.quantity {
-    min-width: 30px;
-    text-align: center;
-    font-weight: 600;
-    color: #5E4535;
-}
-
-.remove-btn {
-    background: none;
-    border: none;
-    color: #ff6b6b;
-    cursor: pointer;
-    padding: 8px;
-    border-radius: 6px;
-    transition: all 0.2s ease;
-}
-
-.remove-btn:hover {
-    background: rgba(255, 107, 107, 0.1);
-    transform: scale(1.1);
-}
-
-/* Empty Cart */
-.empty-cart {
-    padding: 60px 24px;
-    text-align: center;
-}
-
-.empty-cart-icon {
-    font-size: 64px;
-    margin-bottom: 16px;
+.product-row.out-of-stock {
     opacity: 0.5;
 }
 
-.empty-cart h3 {
-    font-size: 20px;
-    font-weight: 600;
-    color: #5E4535;
-    margin: 0 0 8px 0;
-}
-
-.empty-cart p {
-    font-size: 14px;
-    color: #93735E;
-    margin: 0;
-}
-
-/* Cart Footer */
-.cart-footer {
-    padding: 24px;
-    border-top: 2px solid #f5ebe0;
-}
-
-.cart-summary {
-    margin-bottom: 20px;
-}
-
-.summary-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 0;
-    font-size: 15px;
-    color: #5E4535;
-}
-
-.summary-row.total {
-    font-size: 20px;
-    font-weight: 700;
-    padding-top: 12px;
-    border-top: 2px solid #f5ebe0;
-    margin-top: 8px;
-}
-
-.cart-actions {
-    display: flex;
-    gap: 12px;
-}
-
-.clear-btn {
-    flex: 1;
-    padding: 14px;
-    border: 2px solid #93735E;
-    background: white;
-    color: #5E4535;
-    border-radius: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.clear-btn:hover {
-    background: #f5ebe0;
-}
-
-.checkout-btn {
-    flex: 2;
-    padding: 14px;
-    border: none;
-    background: linear-gradient(135deg, #5E4535, #93735E);
-    color: white;
-    border-radius: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    transition: all 0.3s ease;
-}
-
-.checkout-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(94, 69, 53, 0.3);
-}
-
-/* Empty State */
-.empty-state {
-    text-align: center;
-    padding: 80px 20px;
-    background: white;
-    border-radius: 16px;
-}
-
-.empty-icon {
-    font-size: 72px;
-    margin-bottom: 20px;
-    opacity: 0.3;
-}
-
-.empty-state h3 {
-    font-size: 24px;
-    font-weight: 600;
-    color: #5E4535;
-    margin: 0 0 8px 0;
-}
-
-.empty-state p {
-    font-size: 16px;
-    color: #93735E;
-    margin: 0;
-}
-
-/* Notification */
-.notification {
-    position: fixed;
-    bottom: 30px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: linear-gradient(135deg, #5E4535, #93735E);
-    color: white;
-    padding: 16px 32px;
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-    font-weight: 600;
-    z-index: 10000;
-}
-
-.slide-up-enter-active,
-.slide-up-leave-active {
-    transition: all 0.3s ease;
-}
-
-.slide-up-enter-from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(20px);
-}
-
-.slide-up-leave-to {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-20px);
-}
-
-.cart-overlay {
-    display: none;
-}
-
-.mobile-only {
-    display: none;
-}
-
-/* Custom Scrollbar */
-.table-body::-webkit-scrollbar,
-.cart-items::-webkit-scrollbar {
-    width: 8px;
-}
-
-.table-body::-webkit-scrollbar-track,
-.cart-items::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 10px;
-}
-
-.table-body::-webkit-scrollbar-thumb,
-.cart-items::-webkit-scrollbar-thumb {
-    background: #93735E;
-    border-radius: 10px;
-}
-
-/* Responsive Design */
-@media (max-width: 1200px) {
-
-    .table-header,
-    .table-row {
-        grid-template-columns: 80px 1.5fr 100px 100px 100px 80px 150px;
-        gap: 12px;
-        padding: 16px 20px;
-    }
-
-    .product-thumb {
-        width: 60px;
-        height: 60px;
-    }
-
-    .product-name {
-        font-size: 14px;
-    }
-
-    .product-desc {
-        font-size: 12px;
-    }
-}
-
-@media (max-width: 1024px) {
-    .content-wrapper {
-        grid-template-columns: 1fr;
-    }
-
-    .cart-sidebar {
-        position: fixed;
-        top: 0;
-        right: -100%;
-        width: 90%;
-        max-width: 400px;
-        height: 100vh;
-        max-height: 100vh;
-        z-index: 10001;
-        transition: right 0.3s ease;
-        border-radius: 0;
-    }
-
-    .cart-sidebar.show {
-        right: 0;
-    }
-
-    .cart-toggle {
-        display: flex;
-    }
-
-    .close-cart {
-        display: block;
-    }
-
-    .mobile-only {
-        display: block;
-    }
-
-    .cart-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100vh;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 10000;
-        display: block;
-    }
-}
-
-@media (max-width: 768px) {
-    .page-header {
-        padding: 30px 5%;
-    }
-
-    .header-content h1 {
-        font-size: 28px;
-    }
-
-    .filter-bar {
-        flex-direction: column;
-    }
-
-    .search-box {
-        width: 100%;
-    }
-
-    /* Mobile table - Stack cells vertically */
-    .table-header {
-        display: none;
-    }
-
-    .table-row {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        padding: 20px;
-        border: 2px solid #f5ebe0;
-        border-radius: 12px;
-        margin-bottom: 16px;
-    }
-
-    .td-image,
-    .td-product,
-    .td-category,
-    .td-size,
-    .td-color,
-    .td-price,
-    .td-action {
-        width: 100%;
-    }
-
-    .product-thumb {
-        width: 100%;
-        height: 200px;
-        object-fit: cover;
-    }
-
-    .td-category {
-        text-align: left;
-    }
-
-    .td-price {
-        text-align: left;
-    }
-
-    .price-tag {
-        font-size: 24px;
-    }
-}
-
-/* Checkout Popup */
+/* Checkout Popup Modern */
 .checkout-overlay {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(61, 43, 31, 0.6);
+    backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 10002;
     padding: 20px;
-    animation: fadeIn 0.3s ease;
 }
 
 .checkout-popup {
     background: white;
-    border-radius: 20px;
-    max-width: 700px;
+    border-radius: 24px;
+    max-width: 600px;
     width: 100%;
     max-height: 90vh;
     overflow-y: auto;
     position: relative;
-    animation: slideUp 0.3s ease;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
-    }
-}
-
-@keyframes slideUp {
-    from {
-        transform: translateY(30px);
-        opacity: 0;
-    }
-
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
-.popup-close-btn {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: #f5f5f5;
-    border: none;
-    font-size: 24px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    z-index: 10;
-}
-
-.popup-close-btn:hover {
-    background: #e0e0e0;
-    transform: rotate(90deg);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
 }
 
 .popup-header {
-    padding: 40px 40px 24px 40px;
-    border-bottom: 2px solid #f5ebe0;
+    padding: 40px;
+    border-bottom: 1px solid #F4EDE6;
+    text-align: center;
 }
 
 .popup-header h2 {
-    font-size: 28px;
+    font-family: 'Crimson Pro', serif;
+    font-size: 32px;
     font-weight: 700;
-    color: #5E4535;
-    margin: 0 0 8px 0;
-}
-
-.popup-header p {
-    font-size: 14px;
-    color: #93735E;
-    margin: 0;
+    color: #3D2B1F;
+    margin: 0 0 10px 0;
 }
 
 .popup-body {
-    padding: 30px 40px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.form-section {
-    margin-bottom: 30px;
-}
-
-.form-section h3 {
-    font-size: 18px;
-    font-weight: 700;
-    color: #5E4535;
-    margin: 0 0 16px 0;
+    padding: 40px;
 }
 
 .form-group {
-    margin-bottom: 16px;
+    margin-bottom: 24px;
 }
 
 .form-group label {
     display: block;
     font-size: 14px;
     font-weight: 600;
-    color: #5E4535;
+    color: #3D2B1F;
     margin-bottom: 8px;
 }
 
-.required {
-    color: #ff6b6b;
-}
-
 .form-input,
-.form-select,
-.form-textarea {
-    width: 94%;
+.form-textarea,
+.form-select {
+    width: 100%;
     padding: 12px 16px;
-    border: 2px solid rgba(147, 115, 94, 0.3);
-    border-radius: 10px;
-    font-size: 15px;
-    font-family: inherit;
-    transition: all 0.3s ease;
-}
-
-.form-input:focus,
-.form-select:focus,
-.form-textarea:focus {
-    outline: none;
-    border-color: #93735E;
-    box-shadow: 0 0 0 3px rgba(147, 115, 94, 0.1);
-}
-
-.form-textarea {
-    resize: vertical;
+    border: 1px solid #E6E0D9;
+    border-radius: 8px;
+    font-family: 'Work Sans', sans-serif;
+    font-size: 14px;
 }
 
 .order-summary-section {
-    background: #f5ebe0;
-    padding: 20px;
-    border-radius: 12px;
-}
-
-.order-summary-header {
-    display: grid;
-    grid-template-columns: 5fr 1fr 2fr 2fr;
-    justify-content: space-between;
-    text-align: right;
-    font-size: 14px;
-    color: #5E4535;
-}
-
-.order-summary-header :first-child {
-    text-align: left;
-}
-
-.order-summary-section h3 {
-    font-size: 18px;
-    font-weight: 700;
-    color: #5E4535;
-    margin: 0 0 16px 0;
-}
-
-.summary-items {
-    margin-bottom: 16px;
+    background: #F9F5F0;
+    padding: 24px;
+    border-radius: 16px;
+    margin-bottom: 24px;
 }
 
 .summary-item {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
+    display: flex;
+    justify-content: space-between;
     padding: 12px 0;
-    border-bottom: 1px solid rgba(94, 69, 53, 0.1);
+    border-bottom: 1px solid #E6E0D9;
 }
 
 .summary-item:last-child {
     border-bottom: none;
 }
 
-.summary-item-info {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin-bottom: 8px;
-}
-
-.summary-item-info strong {
-    font-size: 15px;
-    color: #5E4535;
-}
-
-.summary-specs {
-    font-size: 13px;
-    color: #93735E;
-}
-
-.summary-item-calc {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr 2fr;
-    justify-content: space-between;
-    text-align: right;
-    font-size: 14px;
-    color: #5E4535;
-}
-
 .summary-total {
     margin-top: 16px;
     padding-top: 16px;
-    border-top: 2px solid rgba(94, 69, 53, 0.2);
+    border-top: 2px solid #E6E0D9;
 }
 
 .total-row {
     display: flex;
     justify-content: space-between;
-    padding: 8px 0;
-    font-size: 15px;
-    color: #5E4535;
+    margin-bottom: 8px;
 }
 
 .grand-total {
+    font-family: 'Crimson Pro', serif;
     font-size: 20px;
     font-weight: 700;
-    margin-top: 8px;
-    padding-top: 12px;
-    border-top: 2px solid rgba(94, 69, 53, 0.3);
+    color: #3D2B1F;
 }
 
 .popup-footer {
-    padding: 24px 40px;
-    border-top: 2px solid #f5ebe0;
+    padding: 0 40px 40px;
     display: flex;
-    gap: 12px;
+    gap: 16px;
 }
 
 .cancel-btn {
     flex: 1;
     padding: 14px;
-    border: 2px solid #93735E;
     background: white;
-    color: #5E4535;
-    border-radius: 10px;
+    border: 1px solid #E6E0D9;
+    border-radius: 8px;
     font-weight: 600;
-    font-size: 15px;
     cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.cancel-btn:hover {
-    background: #f5ebe0;
 }
 
 .submit-order-btn {
     flex: 2;
     padding: 14px;
-    border: none;
-    background: linear-gradient(135deg, #5E4535, #93735E);
+    background: #3D2B1F;
     color: white;
-    border-radius: 10px;
-    font-weight: 600;
-    font-size: 15px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    transition: all 0.3s ease;
 }
 
-.submit-order-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(94, 69, 53, 0.3);
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
 }
 
-.submit-order-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
+::-webkit-scrollbar-track {
+    background: #F9F5F0;
 }
 
-@media (max-width: 768px) {
-    .checkout-popup {
-        max-width: 100%;
-        margin: 0;
-        border-radius: 20px 20px 0 0;
-        max-height: 95vh;
-    }
+::-webkit-scrollbar-thumb {
+    background: #E6E0D9;
+    border-radius: 10px;
+}
 
-    .popup-header,
-    .popup-body,
-    .popup-footer {
-        padding-left: 24px;
-        padding-right: 24px;
-    }
+::-webkit-scrollbar-thumb:hover {
+    background: #D1C7BD;
 }
 </style>

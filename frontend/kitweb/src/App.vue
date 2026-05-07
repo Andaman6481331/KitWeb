@@ -32,77 +32,52 @@ const toggleLanguageMenu = () => {
 <template>
   <div>
     <div class="NavBar">
-      <div class="nav-group">
-        <img src="./components/icons/kitcharoen.jpg" alt="logo" class="logo">
-        <router-link :to="'/'" class="no-style">
-          <div>
-            <h1>{{ $t('common.name').toUpperCase() }}</h1>
-            <p>{{ $t('common.address') }}</p>
-          </div>
+      <!-- Left: Logo -->
+      <div class="nav-left">
+        <router-link to="/">
+          <img src="./assets/kitWeb_logo.png" alt="KitWeb Logo" class="main-logo">
         </router-link>
-        <!-- Language Selector -->
-        <div class="language-selector">
-          <div class="button button-lang" @click="toggleLanguageMenu" style="width: 1.5rem;">
-            <span class="button-icon">🌐</span>
-            {{ currentLanguage }}
-            <span class="arrow">▼</span>
-          </div>
+      </div>
 
-          <transition name="button-dropdown" style="top: 50px;">
-            <div v-if="showLanguageMenu" class="language-dropdown">
-              <div v-for="lang in languages" :key="lang.code" class="language-option"
-                :class="{ active: currentLanguage === lang.code }" @click="changeLanguage(lang.code)">
-                <span class="flag">{{ lang.flag }}</span>
-                <span class="lang-label">{{ lang.label }}</span>
-                <span v-if="currentLanguage === lang.code" class="check">✓</span>
-              </div>
-            </div>
-          </transition>
+      <!-- Center: Links -->
+      <div class="nav-center">
+        <router-link to="/" class="nav-link" active-class="active">{{ $t('nav.home') }}</router-link>
+        <router-link to="/catalog" class="nav-link" active-class="active">{{ $t('nav.products') }}</router-link>
+        <router-link to="/event" class="nav-link" active-class="active">{{ $t('nav.events') }}</router-link>
+        <router-link to="/partners" class="nav-link" active-class="active">{{ $t('nav.partners') }}</router-link>
+        <router-link to="/contactus" class="nav-link" active-class="active">{{ $t('nav.contactUs') }}</router-link>
+      </div>
+
+      <!-- Right: Search & Actions -->
+      <div class="nav-right">
+        <div class="search-capsule">
+          <ion-icon name="search-outline"></ion-icon>
+          <input type="text" placeholder="Search materials...">
         </div>
-      </div>
 
-      <div class="nav-group">
-        <router-link :to="'/catalog'" class="no-style">
-          <div class="button button-primary">
-            <span class="button-icon">📦</span>
-            {{ $t('nav.products') }}
+        <div class="action-icons">
+          <div class="lang-globe" @click="toggleLanguageMenu">
+            <ion-icon name="globe-outline"></ion-icon>
+            <span class="current-lang-code">{{ currentLanguage }}</span>
+
+            <!-- Language Dropdown -->
+            <transition name="dropdown-fade">
+              <div v-if="showLanguageMenu" class="lang-popup">
+                <div v-for="lang in languages" :key="lang.code" class="lang-item"
+                  :class="{ active: currentLanguage === lang.code }" @click.stop="changeLanguage(lang.code)">
+                  <span class="lang-flag">{{ lang.flag }}</span>
+                  {{ lang.label }}
+                </div>
+              </div>
+            </transition>
           </div>
-        </router-link>
 
-        <router-link :to="'/orderpage'" class="no-style">
-          <div class="button button-primary">
-            <span class="button-icon">🛒</span>
+          <router-link to="/orderpage" class="order-capsule">
             {{ $t('nav.startOrder') }}
-          </div>
-        </router-link>
-
-        <router-link :to="'/contactus'" class="no-style">
-          <div class="button button-primary">
-            <span class="button-icon">💬</span>
-            {{ $t('nav.contactUs') }}
-          </div>
-        </router-link>
-
-        <router-link :to="'/login'" class="no-style">
-          <div class="button">
-            {{ $t('nav.login') }}
-          </div>
-        </router-link>
-      </div>
-
-      <div class="dropdown">
-        <div class="nav-item">
-          <router-link :to="'/event'" class="no-style">
-            <div class="secondary-nav-button">
-              <span class="button-icon">📦</span>
-              {{ $t('nav.events') }}
-            </div>
           </router-link>
-          <router-link :to="'/partners'" class="no-style">
-            <div class="secondary-nav-button">
-              <span class="button-icon">🎨</span>
-              {{ $t('nav.partners') }}
-            </div>
+
+          <router-link to="/login" class="login-capsule">
+            {{ $t('nav.login') }}
           </router-link>
         </div>
       </div>
@@ -152,11 +127,19 @@ const toggleLanguageMenu = () => {
   </div>
 </template>
 
-<style scoped>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&display=swap');
+
 * {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'ZCOOL XiaoWei', serif !important;
 }
 
+body {
+  line-height: 1.6;
+}
+</style>
+
+<style scoped>
 .no-style {
   text-decoration: none;
   color: inherit;
@@ -166,254 +149,190 @@ const toggleLanguageMenu = () => {
   position: sticky;
   top: 0;
   left: 0;
-  height: 90px;
-  background-color: var(--primary-color);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: var(--text-dark-color);
+  height: 80px;
+  background-color: #F3F0EB;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 5%;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   z-index: 1000;
-  transition: all 0.3s ease;
+  border-bottom: 1px solid #f0f0f0;
 }
 
-.NavBar:hover {
-  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.2);
-}
-
-.nav-group {
+/* Left: Logo */
+.nav-left {
   display: flex;
   align-items: center;
-  gap: 15px;
 }
 
-.logo {
-  /* width: 50px; */
-  height: 50px;
-  /* filter: brightness(0) invert(1);
-  transition: transform 0.3s ease; */
-}
-
-/* .logo:hover {
-  transform: rotate(10deg) scale(1.1);
-} */
-
-.nav-group h1 {
-  margin: 0;
-  font-size: 32px;
-  font-weight: 700;
+.main-logo {
+  height: 45px;
   cursor: pointer;
-  letter-spacing: -0.5px;
-  transition: color 0.3s ease;
 }
 
-.nav-group h1:hover {
-  color: #ffd4a3;
-}
-
-.nav-group p {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 400;
-  opacity: 0.9;
-  pointer-events: none;
-}
-
-.button {
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  background: rgba(214, 191, 177, 0.3);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  padding: 12px 24px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
+/* Center: Links */
+.nav-center {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
+  gap: 30px;
 }
 
-.button-icon {
+.nav-link {
+  text-decoration: none;
+  color: #5d4037;
+  /* Dark brownish from image */
   font-size: 16px;
+  font-weight: 600;
+  position: relative;
+  padding: 5px 0;
+  transition: color 0.3s;
 }
 
-.button::before {
+.nav-link:hover {
+  color: #008080;
+  /* Teal */
+}
+
+.nav-link.active::after {
   content: '';
   position: absolute;
-  top: 0;
-  left: -100%;
+  bottom: -2px;
+  left: 0;
   width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s ease;
+  height: 2px;
+  background-color: #008080;
+  /* Teal underline */
 }
 
-.button:hover::before {
-  left: 100%;
-}
-
-.button:hover {
-  background: rgba(214, 191, 177, 0.5);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.button:active {
-  transform: translateY(0);
-}
-
-/* Primary Button (Start Order) */
-.button-primary {
-  background: rgba(147, 115, 94, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.button-primary:hover {
-  background: rgba(147, 115, 94, 0.8);
-  box-shadow: 0 6px 16px rgba(94, 69, 53, 0.4);
-}
-
-/* Language Selector */
-.language-selector {
-  position: relative;
-}
-
-.button-lang {
-  min-width: 1.5rem;
-  justify-content: center;
-}
-
-.arrow {
-  font-size: 10px;
-  transition: transform 0.3s ease;
-}
-
-.button-lang:hover .arrow {
-  transform: translateY(2px);
-}
-
-.language-dropdown {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  background: linear-gradient(135deg, rgba(94, 69, 53, 0.98), rgba(147, 115, 94, 0.98));
-  backdrop-filter: blur(15px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  min-width: 180px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  overflow: hidden;
-  z-index: 1001;
-}
-
-.language-option {
+/* Right: Search & Actions */
+.nav-right {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 20px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  color: #fff9f1;
-  position: relative;
+  gap: 25px;
 }
 
-.language-option:hover {
-  background: rgba(214, 191, 177, 0.4);
+.search-capsule {
+  background-color: #E5E2DD;
+  /* Soft beige background */
+  padding: 10px 20px;
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 280px;
 }
 
-.language-option.active {
-  background: rgba(214, 191, 177, 0.3);
-}
-
-.flag {
+.search-capsule ion-icon {
+  color: #8b6f47;
   font-size: 20px;
 }
 
-.lang-label {
-  flex: 1;
+.search-capsule input {
+  border: none;
+  background: transparent;
+  outline: none;
   font-size: 14px;
-  font-weight: 500;
-}
-
-.check {
-  color: #ffd4a3;
-  font-weight: bold;
-  font-size: 16px;
-}
-
-
-/* The Secondary Navbar (Dropdown) */
-.dropdown {
-  position: absolute;
-  top: 90px;
-  left: 0;
-  background-color: var(--primary-color);
-  min-width: 200px;
   width: 100%;
-  list-style: none;
-  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
-
-  /* Hidden state */
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-10px);
-  transition: all 0.3s ease;
 }
 
-.NavBar:hover .dropdown {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-}
-
-.nav-item {
+.action-icons {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  width: 100%;
+  gap: 20px;
 }
 
-.secondary-nav-button {
-  color: var(--text-dark-color);
-  padding: 6px 20px;
-  display: block;
-  text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: all 0.2s ease-in-out;
-  border-radius: 6px;
-  margin-bottom: 4px;
-}
-
-.secondary-nav-button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--accent-color, #5e4535);
+.lang-globe {
+  position: relative;
   cursor: pointer;
+  display: flex;
+  align-items: center;
 }
 
-/* Dropdown Animation */
-.dropdown-enter-active,
-.dropdown-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  transform-origin: top;
+.lang-globe ion-icon {
+  font-size: 24px;
+  color: #5d4037;
 }
 
-.dropdown-enter-from {
-  opacity: 0;
-  transform: translateY(-10px) scale(0.95);
+.current-lang-code {
+  font-size: 12px;
+  font-weight: 700;
+  color: #5d4037;
+  margin-left: 4px;
 }
 
-.dropdown-leave-to {
-  opacity: 0;
-  transform: translateY(-10px) scale(0.95);
+.lang-popup {
+  position: absolute;
+  top: 45px;
+  right: 0;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  padding: 8px;
+  min-width: 140px;
+  z-index: 100;
+  border: 1px solid #f0f0f0;
+}
+
+.lang-item {
+  padding: 10px 14px;
+  font-size: 14px;
+  color: #2d3436;
+  border-radius: 8px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lang-item:hover {
+  background: #f8f3ee;
+  color: #8b6f47;
+}
+
+.lang-item.active {
+  background: #008080;
+  color: white;
+}
+
+.lang-flag {
+  font-size: 18px;
+}
+
+.login-capsule {
+  background-color: #006666;
+  /* Deep teal from image */
+  color: white;
+  text-decoration: none;
+  padding: 10px 28px;
+  border-radius: 30px;
+  font-weight: 700;
+  font-size: 15px;
+  transition: transform 0.2s, background 0.3s;
+  border: 2px solid #006666;
+}
+
+.order-capsule {
+  background-color: white;
+  color: #006666;
+  text-decoration: none;
+  padding: 10px 28px;
+  border-radius: 30px;
+  font-weight: 700;
+  font-size: 15px;
+  transition: transform 0.2s, background 0.3s;
+  border: 2px solid #006666;
+}
+
+.login-capsule:hover, .order-capsule:hover {
+  transform: translateY(-1px);
+  opacity: 0.9;
+}
+
+.login-capsule:hover {
+  background-color: #004d4d;
+}
+
+.order-capsule:hover {
+  background-color: #f8f8f8;
 }
 
 /* ===== FOOTER ===== */

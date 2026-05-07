@@ -45,10 +45,11 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
 
 <template>
     <!-- Page Header -->
-    <div class="page-header">
+    <div class="catalog-header">
         <div class="header-content">
-            <h1>{{ $t('contact.headerTitle') }}</h1>
-            <p>{{ $t('contact.headerDefinition') }}</p>
+            <span class="since-badge">SINCE 1984</span>
+            <h1 class="catalog-title">{{ $t('contact.headerTitle') }}</h1>
+            <p class="catalog-subtitle">{{ $t('contact.headerDefinition') }}</p>
         </div>
     </div>
     <section class="about-section">
@@ -122,69 +123,73 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
 </template>
 
 <style scoped>
-/* Page Header */
-.page-header {
-    background:
-        linear-gradient(135deg,
-            rgba(94, 69, 53, 0.55),
-            rgba(147, 115, 94, 0.55)),
-        url('../assets/texture-bg01.jpg');
-    background-size: cover;
+/* Catalog Header */
+.catalog-header {
+    background: url('../assets/shop04.png');
+    background-size: contain;
     background-position: center;
-    background-repeat: no-repeat;
-    color: #fff9f1;
-    padding: 40px 5%;
+    min-height: 600px;
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
+    flex-direction: column;
     align-items: center;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    position: relative;
+    color: white;
 }
 
-.header-content h1 {
-    font-size: 42px;
+.catalog-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4));
+}
+
+.catalog-header>* {
+    position: relative;
+    z-index: 2;
+}
+
+.since-badge {
+    display: block;
+    font-size: 14px;
     font-weight: 700;
-    margin: 0 0 10px 0;
-    letter-spacing: -0.5px;
+    color: #e8dcc8;
+    letter-spacing: 4px;
+    margin-bottom: 15px;
+}
+
+.catalog-title {
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 4rem;
+    color: #ffffff;
+    margin: 15px auto;
+    line-height: 1.1;
     animation: fadeInUp 0.8s ease;
 }
 
-.header-content p {
-    font-size: 16px;
-    margin: 0;
+.catalog-subtitle {
+    font-size: 1.2rem;
+    color: #ffffff;
+    max-width: 800px;
+    margin: 0 auto;
+    line-height: 1.6;
     opacity: 0.9;
     animation: fadeInUp 0.8s ease 0.2s backwards;
 }
 
-.cart-toggle {
-    display: none;
-    position: relative;
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 12px;
-    padding: 12px 20px;
-    font-size: 24px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
+@media (max-width: 768px) {
+    .catalog-title {
+        font-size: 2.5rem;
+    }
 
-.cart-toggle:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: scale(1.05);
+    .catalog-subtitle {
+        font-size: 1rem;
+    }
 }
-
-.cart-badge {
-    position: absolute;
-    top: -5px;
-    right: -5px;
-    background: #ff6b6b;
-    color: white;
-    font-size: 12px;
-    font-weight: 700;
-    padding: 4px 8px;
-    border-radius: 10px;
-    min-width: 20px;
-}
-
 
 @media (max-width: 768px) {
     .mobile-only {

@@ -113,9 +113,12 @@ onMounted(async () => {
 
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;600&family=Work+Sans:wght@300;400;500;600&display=swap');
+
 * {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
+
 
 .content {
   padding: 0;
@@ -144,8 +147,8 @@ onMounted(async () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: url('data:image/svg+xml,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="2" fill="rgba(255,255,255,0.1)"/></svg>');
-  opacity: 0.3;
+  background: linear-gradient(to right, rgba(53, 35, 29, 0.703) 0%, rgba(53, 35, 29, 0.5) 40%, transparent 100%);
+  z-index: 1;
 }
 
 .hero-content {
@@ -156,30 +159,37 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 40px;
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .hero-text {
   flex: 1;
-  color: black;
+  color: #ffffff;
 }
 
 .hero-title {
-  font-size: 64px;
-  font-weight: 800;
-  line-height: 1.2;
+  font-family: 'Crimson Pro', serif;
+  font-size: 3.5rem;
+  /* Reduced from 5rem to fit 2 lines */
+  font-weight: 600;
+  line-height: 1.1;
+  /* Slightly more room for the serifs */
   margin: 0 0 20px 0;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
   animation: fadeInUp 0.8s ease;
+  max-width: 900px;
+  /* Ensuring it has enough width to spread out */
 }
 
 .hero-subtitle {
-  font-size: 20px;
+  font-family: 'Work Sans', sans-serif;
+  font-size: 1.4rem;
   font-weight: 400;
-  line-height: 1.6;
+  line-height: 1.5;
   margin: 0 0 40px 0;
   opacity: 0.95;
   animation: fadeInUp 0.8s ease 0.2s backwards;
+  max-width: 700px;
 }
 
 .hero-buttons {

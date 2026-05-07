@@ -34,52 +34,52 @@ const diyProducts = ref([
     }
 ]);
 </script>
-<template>
-    <!-- DIY Product Kits Section -->
-    <section class="products-section">
-        <div style="width: 100%; overflow: hidden; line-height: 0;">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 120" preserveAspectRatio="none"
-                style="width: 100%; height: 120px; display: block;">
-                <path fill="#ffff"
-                    d="M0,64L48,69.3C96,75,192,85,288,80C384,75,480,53,576,48C672,43,768,53,864,58.7C960,64,1056,64,1152,58.7C1248,53,1344,43,1392,37.3L1440,32L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z">
-                </path>
-            </svg>
-        </div>
-        <div class="container">
 
-            <div class="section-header-wrapper">
-                <div class="section-header">
-                    <h2 class="section-title">Product Categories</h2>
-                    <p class="section-subtitle">Browse by category</p>
-                </div>
+<template>
+    <section class="diy-kits-section">
+        <div class="container">
+            <div class="section-header" v-reveal>
+                <span class="section-tag">CURATED KITS</span>
+                <h2 class="section-title">The Maker's Atelier</h2>
+                <p class="section-description">
+                    Everything you need to begin your next masterpiece, thoughtfully assembled for the modern artisan.
+                </p>
             </div>
 
-            <div class="products-grid">
-                <div v-for="product in diyProducts" :key="product.id" class="product-card"
-                    @click="viewProduct(product)">
-                    <div class="product-image">
-                        <img :src="product.image" :alt="product.name" />
-                        <div class="difficulty-badge" :class="product.difficulty.toLowerCase()">
+            <div class="kits-grid">
+                <div v-for="(product, index) in diyProducts" :key="product.id" class="kit-card" v-reveal
+                    :style="{ animationDelay: (index * 0.15) + 's' }">
+
+                    <div class="kit-image-wrapper">
+                        <img :src="product.image" :alt="product.name" class="kit-image" />
+                        <div class="kit-badge" :class="product.difficulty.toLowerCase()">
                             {{ product.difficulty }}
                         </div>
                     </div>
-                    <div class="product-details">
-                        <h3>{{ product.name }}</h3>
-                        <p class="product-desc">{{ product.description }}</p>
-                        <div class="product-meta">
-                            <span class="meta-item">
-                                <span class="icon">⏱️</span>
-                                {{ product.duration }}
-                            </span>
-                            <span class="meta-item">
-                                <span class="icon">📦</span>
-                                {{ product.includes.length }} items
-                            </span>
+
+                    <div class="kit-content">
+                        <div class="kit-header">
+                            <h3 class="kit-name">{{ product.name }}</h3>
+                            <span class="kit-price">฿{{ product.price }}</span>
+                            <p class="kit-description">{{ product.description }}</p>
                         </div>
-                        <div class="product-footer">
-                            <div class="price">฿{{ product.price }}</div>
-                            <button class="view-btn">View Details</button>
+
+
+                        <div class="kit-features">
+                            <div class="feature">
+                                <ion-icon name="time-outline"></ion-icon>
+                                <span>{{ product.duration }}</span>
+                            </div>
+                            <div class="feature">
+                                <ion-icon name="layers-outline"></ion-icon>
+                                <span>{{ product.includes.length }} Essential Items</span>
+                            </div>
                         </div>
+
+                        <button class="kit-btn">
+                            Explore Kit Details
+                            <ion-icon name="chevron-forward-outline"></ion-icon>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -88,133 +88,200 @@ const diyProducts = ref([
 </template>
 
 <style scoped>
-/* Products Section */
-.products-section {
-    background-color: var(--primary-color);
-    padding-bottom: 20px;
+.diy-kits-section {
+    padding: 20px 5% 100px 5%;
+    background-color: #FBF7F2;
+    position: relative;
+    overflow: hidden;
 }
 
-.products-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 32px;
-    max-width: 1200px;
+.container {
+    max-width: 1300px;
     margin: 0 auto;
 }
 
-.product-card {
-    background: white;
-    border-radius: 16px;
+.section-header {
+    margin-bottom: 30px;
+    text-align: left;
+}
+
+.section-tag {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #8b6f47;
+    letter-spacing: 4px;
+}
+
+.section-title {
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 48px;
+    color: #2D241E;
+}
+
+.section-description {
+    font-size: 18px;
+    color: #6B5D54;
+    line-height: 1.6;
+    margin: 0 auto;
+}
+
+/* Grid Layout */
+.kits-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 40px;
+}
+
+/* Card Design */
+.kit-card {
+    background: #FFFAF6;
+    border-radius: 24px;
     overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s ease;
-    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+    border: 1px solid #F3EEEA;
+    display: flex;
+    flex-direction: column;
 }
 
-.product-card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+.kit-card:hover {
+    transform: translateY(-12px);
+    box-shadow: 0 25px 50px -12px rgba(84, 61, 47, 0.15);
+    border-color: #00666633;
 }
 
-.product-image {
+.kit-image-wrapper {
     position: relative;
-    height: 250px;
+    height: 300px;
     overflow: hidden;
 }
 
-.product-image img {
+.kit-image {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.3s ease;
+    transition: transform 0.6s ease;
 }
 
-.product-card:hover .product-image img {
-    transform: scale(1.1);
+.kit-card:hover .kit-image {
+    transform: scale(1.08);
 }
 
-.difficulty-badge {
+.kit-badge {
     position: absolute;
-    top: 12px;
-    right: 12px;
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    font-weight: 600;
+    top: 20px;
+    right: 20px;
+    padding: 8px 18px;
     background: white;
-    color: #2d2d2d;
-}
-
-.difficulty-badge.beginner {
-    background: #4ecdc4;
-    color: white;
-}
-
-.difficulty-badge.intermediate {
-    background: #ff9f43;
-    color: white;
-}
-
-.product-details {
-    padding: 24px;
-}
-
-.product-details h3 {
-    font-size: 1.4rem;
-    color: #2d2d2d;
-    margin-bottom: 8px;
-}
-
-.product-desc {
-    font-size: 0.95rem;
-    color: #666;
-    margin-bottom: 16px;
-    line-height: 1.5;
-}
-
-.product-meta {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 20px;
-}
-
-.meta-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.9rem;
-    color: #666;
-}
-
-.meta-item .icon {
-    font-size: 1.1rem;
-}
-
-.product-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.price {
-    font-size: 1.8rem;
+    border-radius: 50px;
+    font-size: 12px;
     font-weight: 700;
-    color: #ff6b6b;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #2D241E;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
-.view-btn {
-    padding: 10px 24px;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: white;
-    border: none;
-    border-radius: 8px;
+.kit-badge.beginner {
+    color: #006666;
+}
+
+.kit-badge.intermediate {
+    color: #8b6f47;
+}
+
+.kit-content {
+    padding: 35px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.kit-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 5px;
+
+}
+
+.kit-name {
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 26px;
+    color: #2D241E;
+    flex: 1;
+}
+
+.kit-price {
+    font-size: 22px;
+    font-weight: 700;
+    color: #006666;
+    margin-left: 15px;
+}
+
+.kit-description {
+    font-size: 15px;
+    color: #6B5D54;
+    line-height: 1.6;
+    margin-bottom: 25px;
+    flex-grow: 1;
+}
+
+.kit-features {
+    display: flex;
+    gap: 25px;
+    margin-bottom: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #E8E2DD;
+}
+
+.feature {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
     font-weight: 600;
+    color: #A0948C;
+}
+
+.feature ion-icon {
+    font-size: 18px;
+    color: #8b6f47;
+}
+
+.kit-btn {
+    width: 100%;
+    padding: 18px;
+    background: transparent;
+    border: 1px solid #006666;
+    border-radius: 50px;
+    color: #006666;
+    font-size: 15px;
+    font-weight: 700;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
     transition: all 0.3s ease;
 }
 
-.view-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+.kit-card:hover .kit-btn {
+    background: #006666;
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .section-title {
+        font-size: 36px;
+    }
+
+    .desktop-only {
+        display: none;
+    }
+
+    .kits-grid {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
