@@ -12,9 +12,51 @@ CREATE TABLE IF NOT EXISTS products (
     varieties TEXT,
     sizes TEXT,
     colors TEXT,
+    price_1 REAL,
+    price_2 REAL,
+    price_3 REAL,
+    price_4 REAL,
+    price_5 REAL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Table for multiple images per product
+CREATE TABLE IF NOT EXISTS product_images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    image_key TEXT NOT NULL,
+    attribute_type TEXT, -- 'variety', 'color', 'size', or 'gallery'
+    attribute_value TEXT, -- e.g., 'Blue', 'XL'
+    is_main BOOLEAN DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
 -- Optional: Seed with some test data
-INSERT INTO products (name, description, price, category, stock) 
-VALUES ('Sample Product', 'This is a test product created by Antigravity', 99.99, 'Test', 10);
+-- INSERT INTO products (name, description, price, category, stock) 
+-- VALUES ('Sample Product', 'This is a test product created by Antigravity', 99.99, 'Test', 10);
+
+-- Table for orders
+CREATE TABLE IF NOT EXISTS orders (
+    id TEXT PRIMARY KEY,
+    customer_name TEXT,
+    total_amount REAL,
+    status TEXT DEFAULT 'PENDING',
+    payment_method TEXT,
+    note TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table for order items
+CREATE TABLE IF NOT EXISTS order_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id TEXT,
+    product_id INTEGER,
+    product_name TEXT,
+    size TEXT,
+    color TEXT,
+    quantity INTEGER,
+    price REAL,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id)
+);

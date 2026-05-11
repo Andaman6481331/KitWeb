@@ -95,7 +95,6 @@ const diyProducts = ref([
                             </span>
                         </div>
                         <div class="product-footer">
-                            <div class="price">฿{{ product.price }}</div>
                             <button class="view-btn">View Details</button>
                         </div>
                     </div>
@@ -264,14 +263,8 @@ const diyProducts = ref([
 
 .product-footer {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
-}
-
-.price {
-    font-size: 1.8rem;
-    font-weight: 700;
-    color: #ff6b6b;
 }
 
 .view-btn {

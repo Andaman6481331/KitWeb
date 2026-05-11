@@ -1,5 +1,6 @@
 // Service to communicate with Cloudflare Backend
-const API_URL = 'http://127.0.0.1:8787';
+// const API_URL = 'http://127.0.0.1:8787';
+export const API_URL = 'https://hidden-water-ed9d.shop-backend-kitweb.workers.dev';
 
 export const api = {
   getToken() {
@@ -36,6 +37,7 @@ export const api = {
       },
       body: JSON.stringify(productData)
     });
+    if (!response.ok) throw new Error(`Add product failed: ${response.status} ${response.statusText}`);
     return await response.json();
   },
 
@@ -48,6 +50,7 @@ export const api = {
       },
       body: JSON.stringify(productData)
     });
+    if (!response.ok) throw new Error(`Update product failed: ${response.status} ${response.statusText}`);
     return await response.json();
   },
 
@@ -58,6 +61,7 @@ export const api = {
         'Authorization': this.getToken()
       }
     });
+    if (!response.ok) throw new Error(`Delete product failed: ${response.status} ${response.statusText}`);
     return await response.json();
   },
 
@@ -78,6 +82,7 @@ export const api = {
       headers: { 'Authorization': this.getToken() },
       body: formData
     });
+    if (!response.ok) throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
     return await response.json();
   },
 
@@ -104,6 +109,37 @@ export const api = {
       headers: {
         'Authorization': this.getToken()
       }
+    });
+    return await response.json();
+  },
+
+  async submitOrder(message, orderData = null) {
+    const response = await fetch(`${API_URL}/notify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, orderData })
+    });
+    return await response.json();
+  },
+
+  async getOrders() {
+    const response = await fetch(`${API_URL}/orders`, {
+      headers: {
+        'Authorization': this.getToken()
+      }
+    });
+    if (!response.ok) throw new Error('Failed to fetch orders');
+    return await response.json();
+  },
+
+  async adjustStock(productId, change, reason = 'MANUAL_ADJUSTMENT') {
+    const response = await fetch(`${API_URL}/products/${productId}/stock`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': this.getToken()
+      },
+      body: JSON.stringify({ change, reason, admin_id: 'admin' }) // admin_id can be dynamic if you have multiple admins
     });
     return await response.json();
   }

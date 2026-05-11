@@ -1,10 +1,10 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import VideoCard from '../components/video-card.vue';
-import KitCraftAds from '../components/kitcraft-ads.vue';
+import InstagramSection from '../components/InstagramSection.vue';
 // import RecommendedItemSlider from '../components/recommended-item-slider.vue';
-import CalenderSection from '../components/calender-section.vue';
-import HistoryMap from '../components/history-map.vue';
+// import CalenderSection from '../components/calender-section.vue';
+import AboutKitcharoen from '../components/AboutKitcharoen.vue';
 import AutoScrollBanner from '../components/auto-scroll-banner.vue';
 import FeaturedCategories from '../components/featured-categories.vue';
 import customerReview from '../components/customer-review.vue';
@@ -81,7 +81,7 @@ onMounted(async () => {
     </section>
 
     <!-- About us / History / Location -->
-    <HistoryMap />
+    <AboutKitcharoen />
 
     <!-- Video Card Display -->
     <VideoCard />
@@ -92,7 +92,7 @@ onMounted(async () => {
     <FeaturedCategories />
 
     <!-- KitCraft Instagram Ads -->
-    <KitCraftAds />
+    <InstagramSection />
 
     <!-- Auto Item Scroll Banner -->
     <AutoScrollBanner />
@@ -123,7 +123,7 @@ onMounted(async () => {
 .content {
   padding: 0;
   margin: 0;
-  background: #fafafa;
+  background-color: #FBF7F2;
 }
 
 /* ===== HERO SECTION ===== */

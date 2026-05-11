@@ -60,7 +60,6 @@ const diyProducts = ref([
                     <div class="kit-content">
                         <div class="kit-header">
                             <h3 class="kit-name">{{ product.name }}</h3>
-                            <span class="kit-price">฿{{ product.price }}</span>
                             <p class="kit-description">{{ product.description }}</p>
                         </div>
 
@@ -210,13 +209,6 @@ const diyProducts = ref([
     font-size: 26px;
     color: #2D241E;
     flex: 1;
-}
-
-.kit-price {
-    font-size: 22px;
-    font-weight: 700;
-    color: #006666;
-    margin-left: 15px;
 }
 
 .kit-description {

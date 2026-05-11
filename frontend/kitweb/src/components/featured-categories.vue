@@ -1,67 +1,66 @@
+<script setup>
+import { ref } from 'vue';
+
+const activeCat = ref(null);
+
+const categories = [
+    {
+        id: 1,
+        name: 'Needles',
+        description: 'Hand-polished precision tools designed for comfort and durability.',
+        image: new URL('../assets/cat-needles.png', import.meta.url).href
+    },
+    {
+        id: 2,
+        name: 'Yarn',
+        description: 'Premium organic fibers available in a curated palette of artisanal tones.',
+        image: new URL('../assets/cat-yarn.png', import.meta.url).href
+    },
+    {
+        id: 3,
+        name: 'Accessories',
+        description: 'Professional-grade scissors, tapes, and tools for the meticulous crafter.',
+        image: new URL('../assets/cat-accessories.png', import.meta.url).href
+    },
+    {
+        id: 4,
+        name: 'Beads',
+        description: 'Exquisite glass and crystal beads to add a touch of brilliance to any project.',
+        image: new URL('../assets/cat-beads.png', import.meta.url).href
+    }
+];
+</script>
+
 <template>
     <section class="categories-section">
         <div v-reveal class="section-header">
-            <h2 class="section-title">{{ $t('categories.title') }}</h2>
-            <p class="section-subtitle">{{ $t('categories.subtitle') }}</p>
+            <h2 class="section-title" style="margin: 0;">Artisan Collections</h2>
+            <p class="section-subtitle">Discover the finest materials for your next masterpiece.</p>
         </div>
-        <div v-reveal class="categories-grid">
-            <div class="category-card cat-card-1">
-                <div class="category-icon">🧶</div>
-                <h3>{{ $t('categories.premiumYarn') }}</h3>
-                <p>{{ $t('categories.premiumYarnDesc') }}</p>
-            </div>
-            <div class="category-card cat-card-2">
-                <div class="category-icon">🪡</div>
-                <h3>{{ $t('categories.needlesTools') }}</h3>
-                <p>{{ $t('categories.needlesToolsDesc') }}</p>
-            </div>
-            <div class="category-card cat-card-3">
-                <div class="category-icon">🔘</div>
-                <h3>{{ $t('categories.buttonsFasteners') }}</h3>
-                <p>{{ $t('categories.buttonsFastenersDesc') }}</p>
-            </div>
-            <div class="category-card cat-card-4">
-                <div class="category-icon">✂️</div>
-                <h3>{{ $t('categories.accessories') }}</h3>
-                <p>{{ $t('categories.accessoriesDesc') }}</p>
-            </div>
-            <div class="popup popup-1">
-                <div class="floating-card-container">
-                    <div class="floating-card card-5">
-                        <img src="../assets/card-img09.jpg" alt="">
-                    </div>
-                    <div class="floating-card card-6">
-                        <img src="../assets/card-img06.jpg" alt="">
-                    </div>
+
+        <div class="categories-accordion" v-reveal>
+            <div v-for="cat in categories" :key="cat.id" class="accordion-item"
+                :class="{ active: activeCat === cat.id }" @mouseenter="activeCat = cat.id"
+                @mouseleave="activeCat = null">
+
+                <div class="cat-image-wrapper">
+                    <img :src="cat.image" :alt="cat.name" class="cat-bg" />
+                    <div class="cat-overlay"></div>
                 </div>
-            </div>
-            <div class="popup popup-2">
-                <div class="floating-card-container">
-                    <div class="floating-card card-5">
-                        <img src="../assets/card-img09.jpg" alt="">
+
+                <div class="cat-content">
+                    <div class="cat-icon-container">
+                        <span class="cat-icon">{{ cat.icon }}</span>
+                        <h3 class="cat-name-vertical">{{ cat.name }}</h3>
                     </div>
-                    <div class="floating-card card-6">
-                        <img src="../assets/card-img06.jpg" alt="">
-                    </div>
-                </div>
-            </div>
-            <div class="popup popup-3">
-                <div class="floating-card-container">
-                    <div class="floating-card card-5">
-                        <img src="../assets/card-img09.jpg" alt="">
-                    </div>
-                    <div class="floating-card card-6">
-                        <img src="../assets/card-img06.jpg" alt="">
-                    </div>
-                </div>
-            </div>
-            <div class="popup popup-4">
-                <div class="floating-card-container">
-                    <div class="floating-card card-5">
-                        <img src="../assets/card-img09.jpg" alt="">
-                    </div>
-                    <div class="floating-card card-6">
-                        <img src="../assets/card-img06.jpg" alt="">
+
+                    <div class="cat-details">
+                        <h3 class="cat-name">{{ cat.name }}</h3>
+                        <p class="cat-desc">{{ cat.description }}</p>
+                        <button class="explore-btn">
+                            Explore Collection
+                            <span class="btn-arrow">→</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -69,231 +68,230 @@
     </section>
 </template>
 
-<style scope>
-/* ===== CATEGORIES SECTION ===== */
+<style scoped>
 .categories-section {
-    padding: 60px 0;
-    background: white;
-}
-
-.categories-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 30px;
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
-    padding: 0 5%;
 }
 
-.category-card {
-    background: linear-gradient(135deg, #f8f4f0 0%, #efe7da 100%);
-    padding: 40px 30px;
-    border-radius: 20px;
+.section-header {
     text-align: center;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    cursor: pointer;
-    border: 2px solid transparent;
+    margin-bottom: 60px;
 }
 
-.category-card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-    border-color: #b89968;
+.section-title {
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 3.5rem;
+    color: #5E4535;
 }
 
-.category-icon {
-    font-size: 64px;
-    margin-bottom: 20px;
-    filter: grayscale(0.3);
-    transition: all 0.3s ease;
+.section-subtitle {
+    font-size: 1.2rem;
+    color: #8b6f47;
+    font-weight: 500;
 }
 
-.category-card:hover .category-icon {
-    filter: grayscale(0);
-    transform: scale(1.1);
-}
-
-.category-card h3 {
-    font-size: 22px;
-    font-weight: 600;
-    color: #2d2d2d;
-    margin: 0 0 10px 0;
-}
-
-.category-card p {
-    font-size: 14px;
-    color: #666;
-    margin: 0;
-}
-
-.category-card:hover .popup {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
-}
-
-.cat-card-1:hover~.popup-1,
-.cat-card-2:hover~.popup-2,
-.cat-card-3:hover~.popup-3,
-.cat-card-4:hover~.popup-4 {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-}
-
-.popup {
-    position: fixed;
-    inset: 0;
-    /* full screen */
+/* Accordion Layout */
+.categories-accordion {
     display: flex;
-    align-items: center;
-    justify-content: center;
-
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-
-    transition: opacity 0.3s ease, visibility 0.3s ease;
-    z-index: 50;
+    gap: 20px;
+    height: 600px;
+    padding: 0 40px;
 }
 
-.popup::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.35);
-}
-
-.floating-card-container {
+.accordion-item {
+    flex: 1;
     position: relative;
-    width: 600px;
-    height: 400px;
-    z-index: 1;
-}
-
-@keyframes fade-in-up-sequence {
-
-    /* 0-5%: Fade In and Move Up */
-    0% {
-        opacity: 0;
-        transform: translateY(30px);
-        pointer-events: none;
-    }
-
-    5% {
-        opacity: 1;
-        transform: translateY(0);
-        pointer-events: auto;
-    }
-
-    /* 5-28%: Stay Visible */
-    30% {
-        opacity: 1;
-        transform: translateY(0);
-        pointer-events: auto;
-    }
-
-    /* 28-33%: Fade Out and continue moving Down slightly */
-    33% {
-        opacity: 0;
-        transform: translateY(20px);
-        pointer-events: none;
-    }
-
-    /* 33-100%: Remain Hidden while other groups play */
-    100% {
-        opacity: 0;
-        pointer-events: none;
-    }
-}
-
-.floating-card {
-    position: absolute;
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 20px;
-    animation: float 6s ease-in-out infinite;
+    border-radius: 30px;
     overflow: hidden;
-    display: flex;
-    z-index: 99;
+    cursor: pointer;
+    transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    background: #f8f4f0;
 }
 
-.floating-card img {
+.accordion-item.active {
+    flex: 3;
+    box-shadow: 0 30px 60px rgba(94, 69, 53, 0.2);
+}
+
+/* Image Handling */
+.cat-image-wrapper {
+    position: absolute;
+    inset: 0;
+}
+
+.cat-bg {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transition: transform 1s ease;
+    filter: saturate(0.8) contrast(1.1);
 }
 
-.card-1 {
-    width: 280px;
-    height: 320px;
+.accordion-item.active .cat-bg {
+    transform: scale(1.1);
+    filter: saturate(1.1) contrast(1.1);
+}
+
+.cat-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom,
+            rgba(94, 69, 53, 0.1) 0%,
+            rgba(0, 0, 0, 0.4) 100%);
+    transition: opacity 0.5s ease;
+}
+
+.accordion-item.active .cat-overlay {
+    background: linear-gradient(to bottom,
+            rgba(0, 0, 0, 0) 0%,
+            rgba(0, 0, 0, 0.7) 100%);
+}
+
+/* Content Layout */
+.cat-content {
+    position: absolute;
+    inset: 0;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    z-index: 2;
+}
+
+.cat-icon-container {
+    position: absolute;
     top: 40px;
-    right: -10px;
-    animation-delay: 0s;
+    left: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    transition: opacity 0.3s ease;
 }
 
-.card-2 {
-    width: 250px;
-    height: 280px;
-    top: 200px;
-    right: -120px;
-    animation-delay: 2s;
+.cat-icon {
+    font-size: 3rem;
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.3));
 }
 
-.card-3 {
-    width: 200px;
-    height: 220px;
-    top: 310px;
-    right: 100px;
-    animation-delay: 1.5s;
+.cat-name-vertical {
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 2rem;
+    color: white;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    margin: 0;
+    letter-spacing: 4px;
+    opacity: 1;
+    transition: opacity 0.3s ease, transform 0.5s ease;
 }
 
-.card-4 {
-    width: 200px;
-    height: 200px;
-    top: 410px;
-    right: -20px;
-    animation-delay: 1s;
+.accordion-item.active .cat-name-vertical {
+    opacity: 0;
+    transform: translateY(-20px);
 }
 
-.card-5 {
-    width: 250px;
-    height: 400px;
-    top: 40px;
-    right: -40px;
-    animation-delay: 1s;
+/* Expanded Details */
+.cat-details {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 0.5s ease 0.2s;
+    pointer-events: none;
+    max-width: 500px;
 }
 
-.card-6 {
-    width: 200px;
-    height: 200px;
-    top: 280px;
-    right: -120px;
-    animation-delay: 2s;
+.accordion-item.active .cat-details {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
-.card-7 {
-    width: 220px;
-    height: 280px;
-    top: 40px;
-    right: -40px;
-    animation-delay: 1s;
+.cat-name {
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 3rem;
+    color: white;
+    margin-bottom: 15px;
 }
 
-.card-8 {
-    width: 220px;
-    height: 220px;
-    top: 180px;
-    right: 130px;
-    animation-delay: 2s;
+.cat-desc {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.1rem;
+    line-height: 1.6;
+    margin-bottom: 30px;
 }
 
-.card-9 {
-    width: 210px;
-    height: 170px;
-    top: 300px;
-    right: 20px;
-    animation-delay: 1.5s;
+.explore-btn {
+    background: white;
+    color: #5E4535;
+    border: none;
+    padding: 15px 35px;
+    border-radius: 50px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: all 0.3s ease;
+}
+
+.explore-btn:hover {
+    background: #5E4535;
+    color: white;
+    transform: translateX(10px);
+}
+
+.btn-arrow {
+    transition: transform 0.3s ease;
+}
+
+.explore-btn:hover .btn-arrow {
+    transform: translateX(5px);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .categories-accordion {
+        flex-direction: column;
+        height: 1000px;
+        padding: 0 20px;
+    }
+
+    .accordion-item {
+        width: 100%;
+        flex: 1;
+    }
+
+    .accordion-item.active {
+        flex: 3;
+    }
+
+    .cat-name-vertical {
+        writing-mode: horizontal-tb;
+    }
+
+    .cat-icon-container {
+        flex-direction: row;
+        align-items: center;
+    }
+}
+
+@media (max-width: 768px) {
+    .section-title {
+        font-size: 2.5rem;
+    }
+
+    .categories-accordion {
+        height: 1200px;
+    }
+
+    .cat-name {
+        font-size: 2.2rem;
+    }
+
+    .cat-desc {
+        font-size: 1rem;
+    }
 }
 </style>

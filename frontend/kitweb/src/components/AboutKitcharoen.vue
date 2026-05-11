@@ -30,8 +30,6 @@ const aboutInfo = computed(() => ({
     }
 }));
 
-// Google Maps embed URL (you'll need to replace with your actual location)
-const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7238744842397!2d100.50747631483044!3d13.739716990349886!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x30e299155bf89a8b%3A0x9a280a6e4e3fc7d0!2sSamphanthawong%2C%20Bangkok!5e0!3m2!1sen!2sth!4v1234567890123!5m2!1sen!2sth');
 </script>
 
 <template>

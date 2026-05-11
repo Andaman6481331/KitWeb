@@ -39,6 +39,31 @@ const aboutInfo = computed(() => ({
     }
 }));
 
+// Form state
+const form = ref({
+    name: '',
+    email: '',
+    subject: 'Wholesale Inquiry',
+    message: ''
+});
+
+const isSubmitting = ref(false);
+
+const handleSubmit = () => {
+    isSubmitting.value = true;
+    // Simulate API call
+    setTimeout(() => {
+        alert('Thank you for your inquiry! We will get back to you shortly.');
+        form.value = {
+            name: '',
+            email: '',
+            subject: 'Wholesale Inquiry',
+            message: ''
+        };
+        isSubmitting.value = false;
+    }, 1500);
+};
+
 // Google Maps embed URL
 const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7238744842397!2d100.50747631483044!3d13.739716990349886!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x30e299155bf89a8b%3A0x9a280a6e4e3fc7d0!2sSamphanthawong%2C%20Bangkok!5e0!3m2!1sen!2sth!4v1234567890123!5m2!1sen!2sth');
 </script>
@@ -85,38 +110,146 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
         </div>
 
 
-        <!-- Four Properties -->
-        <!-- <div class="features-grid">
-            <div v-for="feature in aboutInfo.features" :key="feature.title" class="feature-item">
-                <div class="feature-icon">{{ feature.icon }}</div>
-                <div class="feature-content">
-                    <h4>{{ feature.title }}</h4>
-                    <p>{{ feature.description }}</p>
+        <!-- Contact & Inquiry Section -->
+        <div class="contact-inquiry-container" v-reveal>
+            <div class="contact-grid">
+                <!-- Left: Heritage Hub -->
+                <div class="heritage-hub">
+                    <div class="info-card">
+                        <h2 class="hub-title">Heritage Hub</h2>
+
+                        <div class="hub-item">
+                            <div class="hub-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                    <circle cx="12" cy="10" r="3"></circle>
+                                </svg>
+                            </div>
+                            <div class="hub-text">
+                                <strong>Physical Address</strong>
+                                <p>{{ aboutInfo.contact.address }}</p>
+                            </div>
+                        </div>
+
+                        <div class="hub-item">
+                            <div class="hub-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path
+                                        d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z">
+                                    </path>
+                                </svg>
+                            </div>
+                            <div class="hub-text">
+                                <strong>Phone Number</strong>
+                                <p>{{ aboutInfo.contact.phone }}</p>
+                            </div>
+                        </div>
+
+                        <div class="hub-item">
+                            <div class="hub-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path
+                                        d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z">
+                                    </path>
+                                    <polyline points="22,6 12,13 2,6"></polyline>
+                                </svg>
+                            </div>
+                            <div class="hub-text">
+                                <strong>Email Address</strong>
+                                <p>hello@kitcharoen.com</p>
+                            </div>
+                        </div>
+
+                        <div class="social-connect">
+                            <strong>Connect With Us</strong>
+                            <div class="social-icons">
+                                <a href="#" class="social-btn">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z">
+                                        </path>
+                                    </svg>
+                                </a>
+                                <a href="#" class="social-btn">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                                        <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                                        <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                                    </svg>
+                                </a>
+                                <a href="#" class="social-btn">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path
+                                            d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z">
+                                        </path>
+                                    </svg>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quote Image Card -->
+                    <div class="quote-card">
+                        <img src="../assets/shop02.jpg" alt="Heritage Store" class="quote-bg" />
+                        <div class="quote-overlay">
+                            <p>"Honoring the thread that binds generations together."</p>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div> -->
 
+                <!-- Right: Inquiry Form -->
+                <div class="inquiry-form-card">
+                    <h2 class="form-title">Inquiry Form</h2>
+                    <p class="form-subtitle">Tell us about your project or ask a question about our heritage
+                        collections.
+                    </p>
 
-        <div class="contact-info" v-reveal>
-            <h3 style="margin-top: 0px;">{{ $t('contact.visitUs') }}</h3>
-            <div class="contact-item">
-                <span class="icon">📍</span>
-                <span>{{ aboutInfo.contact.address }}</span>
-            </div>
-            <div class="contact-item">
-                <span class="icon">📞</span>
-                <span>{{ aboutInfo.contact.phone }}</span>
-            </div>
-            <div class="contact-item">
-                <p>ID: @yourID</p>
-                <a :href="'https://line.me' + lineId" class="add-friend-btn">
-                    Add Friend
-                </a>
-                <span>{{ aboutInfo.contact.email }}</span>
-            </div>
-            <div class="contact-item">
-                <span class="icon">🕒</span>
-                <span>{{ aboutInfo.contact.hours }}</span>
+                    <form @submit.prevent="handleSubmit" class="hub-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>FULL NAME</label>
+                                <input type="text" v-model="form.name" placeholder="Arun Kitcharoen" required />
+                            </div>
+                            <div class="form-group">
+                                <label>EMAIL ADDRESS</label>
+                                <input type="email" v-model="form.email" placeholder="arun@example.com" required />
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>SUBJECT</label>
+                            <select v-model="form.subject">
+                                <option>Wholesale Inquiry</option>
+                                <option>Product Question</option>
+                                <option>Shipping Support</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>MESSAGE</label>
+                            <textarea v-model="form.message" placeholder="Tell us how we can help your craft..."
+                                rows="6"></textarea>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="submit-btn" :disabled="isSubmitting">
+                                {{ isSubmitting ? 'Sending...' : 'Send Message' }}
+                                <svg v-if="!isSubmitting" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                </svg>
+                            </button>
+                            <span class="response-time">Expect a response within 24 hours.</span>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </section>
@@ -199,7 +332,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
 
 /* Content Section */
 .about-section {
-    background: linear-gradient(135deg, #f5f7fa 0%, #e8ebe8 100%);
+    background-color: #FBF7F2;
     padding: 50px 0 100px;
     position: relative;
     overflow: hidden;
@@ -413,7 +546,253 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
     color: #666;
 }
 
-/* Animation */
+/* Contact & Inquiry Grid */
+.contact-inquiry-container {
+    margin: 80px auto 0;
+    padding: 0 20px;
+    max-width: 1300px;
+}
+
+.contact-grid {
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    gap: 30px;
+    align-items: stretch;
+}
+
+/* Heritage Hub Styling */
+.heritage-hub {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+.info-card {
+    background: #ffffff;
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 4px 30px rgba(94, 69, 53, 0.05);
+    border: 1px solid rgba(94, 69, 53, 0.1);
+}
+
+.hub-title {
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 2.2rem;
+    color: #5E4535;
+    margin-bottom: 30px;
+}
+
+.hub-item {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 25px;
+}
+
+.hub-icon {
+    width: 44px;
+    height: 44px;
+    background: #fdfaf7;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #006064;
+    flex-shrink: 0;
+    border: 1px solid rgba(0, 96, 100, 0.1);
+}
+
+.hub-text strong {
+    display: block;
+    font-size: 1rem;
+    color: #5E4535;
+    margin-bottom: 4px;
+    text-transform: none;
+}
+
+.hub-text p {
+    font-size: 0.95rem;
+    color: #7a7a7a;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.social-connect {
+    margin-top: 40px;
+    padding-top: 30px;
+    border-top: 1px solid #f0f0f0;
+}
+
+.social-connect strong {
+    display: block;
+    font-size: 1rem;
+    color: #5E4535;
+    margin-bottom: 15px;
+}
+
+.social-icons {
+    display: flex;
+    gap: 12px;
+}
+
+.social-btn {
+    width: 40px;
+    height: 40px;
+    background: #f5f5f5;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #5E4535;
+    transition: all 0.3s ease;
+}
+
+.social-btn:hover {
+    background: #006064;
+    color: #ffffff;
+    transform: translateY(-3px);
+}
+
+/* Quote Card Styling */
+.quote-card {
+    position: relative;
+    height: 240px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.quote-bg {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.quote-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 25px;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    color: #ffffff;
+}
+
+.quote-overlay p {
+    font-size: 1.1rem;
+    font-style: italic;
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Inquiry Form Styling */
+.inquiry-form-card {
+    background: #ffffff;
+    padding: 50px;
+    border-radius: 20px;
+    box-shadow: 0 4px 30px rgba(94, 69, 53, 0.05);
+    border: 1px solid rgba(94, 69, 53, 0.1);
+}
+
+.form-title {
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 2.2rem;
+    color: #5E4535;
+    margin-bottom: 10px;
+}
+
+.form-subtitle {
+    color: #7a7a7a;
+    font-size: 1.1rem;
+    margin-bottom: 40px;
+    line-height: 1.5;
+}
+
+.hub-form {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #5E4535;
+    letter-spacing: 1px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    padding: 14px 18px;
+    background: #FDFBFA;
+    border: 1px solid #e8e0d5;
+    border-radius: 12px;
+    font-size: 1rem;
+    color: #2d2d2d;
+    transition: all 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #006064;
+    background: #ffffff;
+    box-shadow: 0 0 0 4px rgba(0, 96, 100, 0.05);
+}
+
+.form-actions {
+    margin-top: 15px;
+    display: flex;
+    align-items: center;
+    gap: 25px;
+}
+
+.submit-btn {
+    background: #006064;
+    color: #ffffff;
+    border: none;
+    padding: 16px 35px;
+    border-radius: 50px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.3s ease;
+}
+
+.submit-btn:hover:not(:disabled) {
+    background: #004d40;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 96, 100, 0.2);
+}
+
+.submit-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.response-time {
+    color: #9c9c9c;
+    font-size: 0.95rem;
+    font-style: italic;
+}
+
+/* Animations */
 @keyframes fadeInUp {
     from {
         opacity: 0;
@@ -449,6 +828,18 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
     .features-grid {
         grid-template-columns: 1fr;
     }
+
+    .contact-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .heritage-hub {
+        order: 2;
+    }
+
+    .inquiry-form-card {
+        order: 1;
+    }
 }
 
 @media (max-width: 640px) {
@@ -476,6 +867,33 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
         left: 20px;
         bottom: 20px;
         padding: 12px 16px;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .inquiry-form-card {
+        padding: 30px 20px;
+    }
+
+    .form-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 15px;
+    }
+
+    .submit-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .response-time {
+        text-align: center;
+    }
+
+    .contact-inquiry-container {
+        margin-top: 40px;
     }
 }
 </style>

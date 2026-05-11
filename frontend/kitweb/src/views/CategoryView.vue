@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { api } from '../services/api';
+import { api, API_URL } from '../services/api';
 
 const route = useRoute();
 const router = useRouter();
@@ -47,20 +47,42 @@ async function loadData() {
     }
 }
 
+const currentImageKey = ref(null);
+
 const handleQuickView = (item) => {
     selectedProduct.value = item;
+    currentImageKey.value = item.image_key; // default to main
     showPopup.value = true;
 };
 
 const closePopup = () => {
     showPopup.value = false;
     selectedProduct.value = null;
+    currentImageKey.value = null;
+};
+
+const setMainImage = (key) => {
+    currentImageKey.value = key;
+};
+
+// Logic to find an image matching a specific attribute value
+const handleAttributeClick = (type, value) => {
+    if (!selectedProduct.value || !selectedProduct.value.images) return;
+    
+    // Find image that matches this attribute value
+    const match = selectedProduct.value.images.find(img => 
+        img.attribute_type === type && 
+        img.attribute_value?.trim().toLowerCase() === value.trim().toLowerCase()
+    );
+    
+    if (match) {
+        currentImageKey.value = match.image_key;
+    }
 };
 
 const getImageUrl = (key) => {
     if (!key) return 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg';
-    if (key.startsWith('http')) return key;
-    return `http://127.0.0.1:8787/images/${key}`;
+    return `${API_URL}/images/${key}`;
 };
 
 const backToCatalog = () => {
@@ -132,9 +154,8 @@ const sortedProducts = computed(() => {
                 <div class="card-content">
                     <h3 class="card-title">{{ item.name }}</h3>
                     <p class="card-desc">{{ item.description || 'Premium quality material sourced for the modern maker.'
-                    }}</p>
+                        }}</p>
                     <div class="card-footer">
-                        <span class="card-price">฿{{ item.price_1 || item.price || 0 }}</span>
                         <button class="add-btn" @click.stop="handleQuickView(item)">
                             <ion-icon name="cart"></ion-icon> Add to Order
                         </button>
@@ -152,15 +173,31 @@ const sortedProducts = computed(() => {
 
                 <div class="popup-body">
                     <div class="popup-image">
-                        <img :src="getImageUrl(selectedProduct.image_key)" :alt="selectedProduct.name">
+                        <div class="main-image-display">
+                            <img :src="getImageUrl(currentImageKey || selectedProduct.image_key)" :alt="selectedProduct.name">
+                        </div>
+
+                        <!-- Gallery Thumbnails -->
+                        <div class="gallery-thumbnails" v-if="selectedProduct.images && selectedProduct.images.length > 0">
+                            <div class="thumb" 
+                                 :class="{ active: currentImageKey === selectedProduct.image_key || !currentImageKey }"
+                                 @click="setMainImage(selectedProduct.image_key)">
+                                <img :src="getImageUrl(selectedProduct.image_key)" alt="Main">
+                            </div>
+                            <div v-for="img in selectedProduct.images" :key="img.id" 
+                                 class="thumb"
+                                 :class="{ active: currentImageKey === img.image_key }"
+                                 @click="setMainImage(img.image_key)">
+                                <img :src="getImageUrl(img.image_key)" :alt="img.attribute_value || 'Gallery'">
+                            </div>
+                        </div>
                     </div>
 
                     <div class="popup-details">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div class="popup-info-header">
                             <span class="popup-category">{{ selectedProduct.category }}</span>
-                            <div class="popup-price">฿{{ selectedProduct.price_1 || selectedProduct.price || 0 }}</div>
+                            <h2 class="popup-title">{{ selectedProduct.name }}</h2>
                         </div>
-                        <h2 class="popup-title">{{ selectedProduct.name }}</h2>
                         <p class="popup-description">{{ selectedProduct.description }}</p>
 
                         <div class="detail-section" v-if="selectedProduct.usage">
@@ -186,7 +223,7 @@ const sortedProducts = computed(() => {
                             </h3>
                             <div class="tags-container">
                                 <span v-for="variety in selectedProduct.varieties.split(',')" :key="variety"
-                                    class="tag">
+                                    class="tag" @click="handleAttributeClick('variety', variety)">
                                     {{ variety.trim() }}
                                 </span>
                             </div>
@@ -198,7 +235,8 @@ const sortedProducts = computed(() => {
                                 Available Sizes
                             </h3>
                             <div class="tags-container">
-                                <span v-for="size in selectedProduct.sizes.split(',')" :key="size" class="tag size-tag">
+                                <span v-for="size in selectedProduct.sizes.split(',')" :key="size" class="tag size-tag"
+                                    @click="handleAttributeClick('size', size)">
                                     {{ size.trim() }}
                                 </span>
                             </div>
@@ -211,7 +249,7 @@ const sortedProducts = computed(() => {
                             </h3>
                             <div class="tags-container">
                                 <span v-for="color in selectedProduct.colors.split(',')" :key="color"
-                                    class="tag color-tag">
+                                    class="tag color-tag" @click="handleAttributeClick('color', color)">
                                     {{ color.trim() }}
                                 </span>
                             </div>
@@ -463,9 +501,7 @@ const sortedProducts = computed(() => {
 }
 
 .card-price {
-    font-size: 20px;
-    font-weight: 700;
-    color: #2d3436;
+    display: none;
 }
 
 .add-btn {
@@ -575,18 +611,66 @@ const sortedProducts = computed(() => {
 .popup-image {
     background: #f8f8f8;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    flex-direction: column;
     padding: 40px;
     border-radius: 20px 0 0 20px;
 }
 
-.popup-image img {
+.main-image-display {
     width: 100%;
-    height: auto;
-    max-height: 500px;
+    height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 30px;
+}
+
+.main-image-display img {
+    width: 100%;
+    height: 100%;
     object-fit: contain;
     border-radius: 12px;
+}
+
+.gallery-thumbnails {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 5px 2px 15px 2px;
+    width: 100%;
+}
+
+.thumb {
+    width: 70px;
+    height: 70px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+    background: white;
+}
+
+.thumb:hover {
+    border-color: #b89968;
+    transform: translateY(-2px);
+}
+
+.thumb.active {
+    border-color: #008080;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.popup-info-header {
+    margin-bottom: 25px;
+    width: 100%;
 }
 
 .popup-details {
@@ -608,12 +692,7 @@ const sortedProducts = computed(() => {
 }
 
 .popup-price {
-    font-size: 24px;
-    font-weight: 700;
-    color: #2d2d2d;
-    background: #fdf2e9;
-    padding: 4px 12px;
-    border-radius: 8px;
+    display: none;
 }
 
 .popup-title {

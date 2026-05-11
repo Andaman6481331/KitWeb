@@ -14,9 +14,6 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
-	"vars": {
-		"ADMIN_PASSWORD": "admin123"
-	},
 	"d1_databases": [
 		{
 			"binding": "DB",

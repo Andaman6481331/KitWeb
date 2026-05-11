@@ -1,98 +1,55 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { api, API_URL } from '../services/api'
 
 
 // Sample product data with size and color options
-const products = ref([
-    {
-        id: 1,
-        name: 'Premium Yarn Collection',
-        description: 'High-quality premium yarn',
-        price: 199,
-        image: 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg',
-        category: 'Yarn',
-        inStock: true,
-        sizes: ['50g', '100g', '200g', '500g'],
-        colors: ['White', 'Blue', 'Green', 'Red', 'Grey']
-    },
-    {
-        id: 2,
-        name: 'Designer Buttons Set',
-        description: 'Elegant designer buttons',
-        price: 89,
-        image: 'https://m.media-amazon.com/images/I/81U7rrsM8zL._AC_UF894,1000_QL80_.jpg',
-        category: 'Buttons',
-        inStock: true,
-        sizes: ['10mm', '15mm', '20mm', '25mm'],
-        colors: ['Black', 'White', 'Gold', 'Silver', 'Bronze']
-    },
-    {
-        id: 3,
-        name: 'Professional Needle Kit',
-        description: 'Complete professional needle set',
-        price: 149,
-        image: 'https://cdn.sparkfun.com/assets/parts/4/8/7/5/10405-04b.jpg',
-        category: 'Needles',
-        inStock: true,
-        sizes: ['Size 5', 'Size 7', 'Size 9', 'Size 10'],
-        colors: ['Silver', 'Gold']
-    },
-    {
-        id: 4,
-        name: 'Cotton Fabric Roll',
-        description: 'Premium cotton fabric',
-        price: 250,
-        image: 'https://via.placeholder.com/80x80/93735E/FFFFFF?text=Fabric',
-        category: 'Fabric',
-        inStock: true,
-        sizes: ['1m', '2m', '5m', '10m'],
-        colors: ['White', 'Beige', 'Navy', 'Pink', 'Yellow']
-    },
-    {
-        id: 5,
-        name: 'Embroidery Thread Set',
-        description: 'Colorful embroidery threads',
-        price: 120,
-        image: 'https://via.placeholder.com/80x80/5E4535/FFFFFF?text=Thread',
-        category: 'Thread',
-        inStock: false,
-        sizes: ['Standard'],
-        colors: ['Red', 'Blue', 'Green', 'Yellow', 'Purple', 'Orange']
-    },
-    {
-        id: 6,
-        name: 'Crochet Hooks Set',
-        description: 'Ergonomic crochet hooks',
-        price: 180,
-        image: 'https://via.placeholder.com/80x80/93735E/FFFFFF?text=Hooks',
-        category: 'Tools',
-        inStock: true,
-        sizes: ['2mm', '3mm', '4mm', '5mm', '6mm'],
-        colors: ['Silver', 'Multicolor']
-    },
-    {
-        id: 7,
-        name: 'Knitting Needles',
-        description: 'Bamboo knitting needles',
-        price: 95,
-        image: 'https://via.placeholder.com/80x80/5E4535/FFFFFF?text=Knitting',
-        category: 'Tools',
-        inStock: true,
-        sizes: ['3.5mm', '4mm', '5mm', '6mm'],
-        colors: ['Natural', 'Dark']
-    },
-    {
-        id: 8,
-        name: 'Zipper Pack',
-        description: 'Assorted zipper lengths',
-        price: 65,
-        image: 'https://via.placeholder.com/80x80/93735E/FFFFFF?text=Zipper',
-        category: 'Notions',
-        inStock: true,
-        sizes: ['15cm', '20cm', '30cm', '50cm'],
-        colors: ['Black', 'White', 'Navy', 'Brown']
+const products = ref([])
+const isLoading = ref(true)
+
+// Fetch products from database
+const fetchProducts = async () => {
+    isLoading.value = true
+    try {
+        const data = await api.getProducts()
+        products.value = data.map(p => ({
+            ...p,
+            // Ensure these properties exist for the UI logic
+            sizes: p.sizes ? (typeof p.sizes === 'string' ? p.sizes.split(',').map(s => s.trim()) : p.sizes) : ['Standard'],
+            colors: p.colors ? (typeof p.colors === 'string' ? p.colors.split(',').map(c => c.trim()) : p.colors) : ['Default'],
+            inStock: p.stock !== undefined ? p.stock > 0 : true,
+            image: p.image_key ? `${API_URL}/images/${p.image_key}` : 'https://via.placeholder.com/100x100/F9F5F0/3D2B1F?text=Product'
+        }))
+
+        // Initialize selections for each product after loading
+        products.value.forEach(product => {
+            productSelections.value[product.id] = {
+                size: product.sizes[0],
+                color: product.colors[0]
+            }
+        })
+
+        // Use some products as recommendations
+        if (products.value.length > 0) {
+            recommendations.value = products.value.slice(0, 3).map(p => ({
+                id: p.id,
+                name: p.name,
+                price: p.price,
+                image: p.image
+            }))
+        }
+    } catch (error) {
+        console.error('Error fetching products:', error)
+        showNotificationMsg('Failed to load products')
+    } finally {
+        isLoading.value = false
     }
-])
+}
+
+onMounted(() => {
+    fetchProducts()
+    fetchOrders()
+})
 
 const cart = ref([])
 const searchQuery = ref('')
@@ -109,66 +66,50 @@ const activeTab = ref('new-order')
 const showOrderDetails = ref(false)
 const selectedOrder = ref(null)
 
-// Sample order history data
-const orders = ref([
-    {
-        id: 'KT-1984-9021',
-        name: 'Premium Cotton & Silk Blend Spools',
-        image: 'https://via.placeholder.com/100x100/F9F5F0/3D2B1F?text=Order1',
-        date: 'Oct 24, 2024',
-        items: 3,
-        price: 1240,
-        status: 'SHIPPED',
-        deliveryStatus: 'Arriving Friday, Oct 28',
-        location: 'Bangkok Hub'
-    },
-    {
-        id: 'KT-1984-8842',
-        name: 'Vintage Brass Buttons Set',
-        image: 'https://via.placeholder.com/60x60/F9F5F0/3D2B1F?text=Order2',
-        date: 'Oct 12, 2024',
-        items: 5,
-        price: 450,
-        status: 'DELIVERED'
-    },
-    {
-        id: 'KT-1984-8109',
-        name: 'Heavy-Duty Tailoring Shears',
-        image: 'https://via.placeholder.com/60x60/F9F5F0/3D2B1F?text=Order3',
-        date: 'Sept 30, 2024',
-        items: 1,
-        price: 2100,
-        status: 'DELIVERED'
+// Order history data
+const orders = ref([])
+const isFetchingOrders = ref(false)
+
+// Fetch orders from database
+const fetchOrders = async () => {
+    isFetchingOrders.value = true
+    try {
+        const data = await api.getOrders()
+        orders.value = data.map(order => ({
+            ...order,
+            date: new Date(order.created_at).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            }),
+            price: order.total_amount,
+            // Fallback for UI if items list is empty but count is needed
+            itemsCount: order.items ? order.items.length : 0,
+            image: order.items && order.items.length > 0 ? getProductImage(order.items[0].product_id) : 'https://via.placeholder.com/100x100/F9F5F0/3D2B1F?text=Order'
+        }))
+    } catch (error) {
+        console.error('Error fetching orders:', error)
+    } finally {
+        isFetchingOrders.value = false
     }
-])
+}
+
+// Helper to get image for a product ID
+const getProductImage = (productId) => {
+    const product = products.value.find(p => p.id === productId)
+    if (product && product.image_key) {
+        return `${API_URL}/images/${product.image_key}`
+    }
+    return 'https://via.placeholder.com/100x100/F9F5F0/3D2B1F?text=Product'
+}
 
 // Recommendations data
-const recommendations = ref([
-    {
-        id: 101,
-        name: 'Bamboo Knitting Needle Set',
-        price: 380,
-        image: 'https://via.placeholder.com/60x60/F9F5F0/3D2B1F?text=Rec1'
-    },
-    {
-        id: 102,
-        name: 'Silk Ribbon Collection',
-        price: 120,
-        unit: '/ yard',
-        image: 'https://via.placeholder.com/60x60/F9F5F0/3D2B1F?text=Rec2'
-    }
-])
+const recommendations = ref([])
 
 // Track selected size and color for each product
 const productSelections = ref({})
 
-// Initialize selections for each product
-products.value.forEach(product => {
-    productSelections.value[product.id] = {
-        size: product.sizes[0],
-        color: product.colors[0]
-    }
-})
+// Selections are initialized in fetchProducts
 
 // Categories
 const categories = computed(() => {
@@ -208,8 +149,23 @@ const cartItemCount = computed(() => {
 
 // Add to cart with selected size and color
 const addToCart = (product) => {
+    if (!product.inStock) {
+        showNotificationMsg('This product is out of stock.')
+        return
+    }
+
     const selection = productSelections.value[product.id]
     const cartItemKey = `${product.id}-${selection.size}-${selection.color}`
+
+    // Total already in cart for this product (across all size/color combos)
+    const totalInCart = cart.value
+        .filter(i => i.id === product.id)
+        .reduce((sum, i) => sum + i.quantity, 0)
+
+    if (product.stock !== undefined && product.stock !== null && totalInCart >= product.stock) {
+        showNotificationMsg(`Only ${product.stock} left in stock for ${product.name}.`)
+        return
+    }
 
     const existingItem = cart.value.find(item =>
         item.id === product.id &&
@@ -246,6 +202,17 @@ const updateColor = (productId, color) => {
 const updateQuantity = (cartItemKey, delta) => {
     const item = cart.value.find(i => i.cartItemKey === cartItemKey)
     if (item) {
+        if (delta > 0) {
+            // Check stock limit
+            const product = products.value.find(p => p.id === item.id)
+            const totalInCart = cart.value
+                .filter(i => i.id === item.id)
+                .reduce((sum, i) => sum + i.quantity, 0)
+            if (product && product.stock !== undefined && product.stock !== null && totalInCart >= product.stock) {
+                showNotificationMsg(`Only ${product.stock} left in stock for ${product.name}.`)
+                return
+            }
+        }
         item.quantity += delta
         if (item.quantity <= 0) {
             removeFromCart(cartItemKey)
@@ -293,8 +260,7 @@ const generateOrderId = () => {
     return `WH-${year}-${random}`
 }
 
-const formatOrderMessage = () => {
-    const orderId = generateOrderId()
+const formatOrderMessage = (orderId) => {
     let message = `🧾 New Order (Website)\n`
     message += `Order ID: ${orderId}\n`
     message += `Customer: ${customerName.value || 'Guest'}\n\n`
@@ -321,35 +287,45 @@ const submitOrder = async () => {
         showNotificationMsg('Please enter your name')
         return
     }
-
     isSubmittingOrder.value = true
+    const orderId = generateOrderId()
 
     try {
-        const orderMessage = formatOrderMessage()
+        console.log('start try catch')
+        const orderMessage = formatOrderMessage(orderId)
+        console.log(orderMessage)
 
-        // LINE Notify API endpoint
-        const lineNotifyToken = 'YOUR_LINE_NOTIFY_TOKEN_HERE' // Replace with your actual token
+        // Prepare structured data for persistence
+        const orderData = {
+            id: orderId,
+            customerName: customerName.value,
+            totalAmount: cartTotal.value,
+            paymentMethod: paymentMethod.value,
+            note: orderNote.value,
+            cartItems: cart.value.map(item => ({
+                id: item.id,
+                name: item.name,
+                selectedSize: item.selectedSize,
+                selectedColor: item.selectedColor,
+                quantity: item.quantity,
+                price: item.price
+            }))
+        }
 
-        const formData = new FormData()
-        formData.append('message', orderMessage)
-
-        const response = await fetch('https://notify-api.line.me/api/notify', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${lineNotifyToken}`
-            },
-            body: formData
-        })
-
-        if (response.ok) {
+        const result = await api.submitOrder(orderMessage, orderData)
+        console.log(result.message)
+        if (result.status === 200 || result.success || result.message === 'ok') {
             showNotificationMsg('Order sent successfully! 🎉')
             cart.value = []
             customerName.value = ''
             paymentMethod.value = 'Bank Transfer'
             orderNote.value = ''
             showCheckoutPopup.value = false
+
+            // Refresh order history
+            fetchOrders()
         } else {
-            throw new Error('Failed to send order')
+            throw new Error(result.error || 'Failed to send order')
         }
     } catch (error) {
         console.error('Error sending order:', error)
@@ -457,69 +433,73 @@ const closeOrderDetails = () => {
 
                         <!-- Table Body -->
                         <div class="products-list">
-                            <div v-for="product in filteredProducts" :key="product.id" class="product-row" :class="{
-                                'out-of-stock': !product.inStock,
-                                'in-cart': isProductInCart(product.id)
-                            }">
+                            <div v-if="isLoading" class="loading-products">
+                                <div class="loader"></div>
+                                <p>Curating premium supplies...</p>
+                            </div>
+                            <template v-else>
+                                <div v-for="product in filteredProducts" :key="product.id" class="product-row" :class="{
+                                    'out-of-stock': !product.inStock,
+                                    'in-cart': isProductInCart(product.id)
+                                }">
 
-                                <!-- Image -->
-                                <div class="td-image">
-                                    <div class="image-wrapper">
-                                        <img :src="product.image" :alt="product.name" class="product-thumb" />
-                                        <div v-if="!product.inStock" class="stock-badge">Out of Stock</div>
+                                    <!-- Image -->
+                                    <div class="td-image">
+                                        <div class="image-wrapper">
+                                            <img :src="product.image" :alt="product.name" class="product-thumb" />
+                                            <div v-if="!product.inStock" class="stock-badge">Out of Stock</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Product Info -->
+                                    <div class="td-details">
+                                        <span class="product-tag">{{ product.category }}</span>
+                                        <h3 class="product-name">{{ product.name }}</h3>
+                                        <p class="product-desc">{{ product.description }}</p>
+                                    </div>
+
+                                    <!-- Variations -->
+                                    <div class="td-variations" v-if="productSelections[product.id]">
+                                        <select v-model="productSelections[product.id].size"
+                                            @change="updateSize(product.id, $event.target.value)"
+                                            class="variation-select" :disabled="!product.inStock">
+                                            <option v-for="size in product.sizes" :key="size" :value="size">
+                                                {{ size }}
+                                            </option>
+                                        </select>
+                                        <select v-model="productSelections[product.id].color"
+                                            @change="updateColor(product.id, $event.target.value)"
+                                            class="variation-select" :disabled="!product.inStock">
+                                            <option v-for="color in product.colors" :key="color" :value="color">
+                                                {{ color }}
+                                            </option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Price -->
+                                    <div class="td-price">
+                                        <span class="price-currency">฿</span>
+                                        <span class="price-amount">{{ product.price }}</span>
+                                    </div>
+
+                                    <!-- Action Button -->
+                                    <div class="td-action">
+                                        <button class="add-to-cart-btn" :disabled="!product.inStock"
+                                            @click="addToCart(product)">
+                                            <span class="btn-icon">+</span>
+                                            Add
+                                        </button>
                                     </div>
                                 </div>
-
-                                <!-- Product Info -->
-                                <div class="td-details">
-                                    <span class="product-tag">{{ product.category }}</span>
-                                    <h3 class="product-name">{{ product.name }}</h3>
-                                    <p class="product-desc">{{ product.description }}</p>
-                                </div>
-
-                                <!-- Variations -->
-                                <div class="td-variations">
-                                    <select v-model="productSelections[product.id].size"
-                                        @change="updateSize(product.id, $event.target.value)" class="variation-select"
-                                        :disabled="!product.inStock">
-                                        <option v-for="size in product.sizes" :key="size" :value="size">
-                                            {{ size }}
-                                        </option>
-                                    </select>
-                                    <select v-model="productSelections[product.id].color"
-                                        @change="updateColor(product.id, $event.target.value)" class="variation-select"
-                                        :disabled="!product.inStock">
-                                        <option v-for="color in product.colors" :key="color" :value="color">
-                                            {{ color }}
-                                        </option>
-                                    </select>
-                                </div>
-
-                                <!-- Price -->
-                                <div class="td-price">
-                                    <span class="price-currency">฿</span>
-                                    <span class="price-amount">{{ product.price }}</span>
-                                </div>
-
-                                <!-- Action Button -->
-                                <div class="td-action">
-                                    <button class="add-to-cart-btn" :disabled="!product.inStock"
-                                        @click="addToCart(product)">
-                                        <span class="btn-icon">+</span>
-                                        Add
-                                    </button>
-                                </div>
-                            </div>
+                            </template>
                         </div>
                     </div>
 
                     <!-- Empty State -->
                     <div v-if="filteredProducts.length === 0" class="empty-state">
-                        <div style="display: flex; justify-content: center; margin: 20px 0 0 0;">
-                            <div class="empty-icon" style="margin: auto 0;">🔍</div>
-                            <h2 style="margin: 0;">No products found</h2>
-                        </div>
-                        <p style="display: flex; justify-content: center;">Try adjusting your search or filters</p>
+                        <div class="empty-icon">🔍</div>
+                        <h2>No products found</h2>
+                        <p>Try adjusting your search or filters</p>
                     </div>
                 </div>
 
@@ -638,7 +618,19 @@ const closeOrderDetails = () => {
                     </div>
 
                     <div class="orders-history-list">
-                        <div v-for="order in orders" :key="order.id" class="order-history-card">
+                        <div v-if="orders.length === 0" class="empty-orders-state">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1" style="opacity: 0.3; margin-bottom: 20px;">
+                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                                <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                            </svg>
+                            <h3>No orders found</h3>
+                            <p>You haven't placed any orders yet. Start your journey with Kitcharoen treasures today.
+                            </p>
+                            <button class="checkout-btn-modern" style="max-width: 200px; margin-top: 20px;"
+                                @click="activeTab = 'new-order'">SHOP NOW</button>
+                        </div>
+                        <div v-else v-for="order in orders" :key="order.id" class="order-history-card">
                             <div class="order-main-info">
                                 <div class="order-img-container">
                                     <img :src="order.image" :alt="order.name">
@@ -648,10 +640,13 @@ const closeOrderDetails = () => {
                                         <span class="order-id">ORDER #{{ order.id }}</span>
                                         <span v-if="order.status === 'SHIPPED'"
                                             class="status-tag shipped">SHIPPED</span>
+                                        <span v-else class="status-tag pending">{{ order.status }}</span>
                                     </div>
-                                    <h3 class="order-name">{{ order.name }}</h3>
-                                    <p class="order-meta">Placed on {{ order.date }} • {{ order.items }} Items • ฿{{
-                                        order.price.toLocaleString() }}</p>
+                                    <h3 class="order-name">{{ order.items && order.items.length > 0 ?
+                                        order.items[0].product_name : 'New Order' }}</h3>
+                                    <p class="order-meta">Placed on {{ order.date }} • {{ order.itemsCount }} Items •
+                                        ฿{{
+                                            order.price.toLocaleString() }}</p>
                                 </div>
                             </div>
 
@@ -714,7 +709,10 @@ const closeOrderDetails = () => {
                                 <p><strong>Total:</strong> ฿{{ selectedOrder.price.toLocaleString() }}</p>
                             </div>
                             <div class="order-items-mini">
-                                <!-- Could map items here if data was available -->
+                                <div v-for="item in selectedOrder.items" :key="item.id" class="mini-item">
+                                    <p><strong>{{ item.product_name }}</strong> x {{ item.quantity }}</p>
+                                    <p class="mini-meta">{{ item.size }} | {{ item.color }}</p>
+                                </div>
                             </div>
                             <button class="checkout-btn-modern">Go to Checkout</button>
                         </div>
@@ -727,7 +725,15 @@ const closeOrderDetails = () => {
     <!-- Notification Toast -->
     <transition name="slide-up">
         <div v-if="showNotification" class="notification">
-            {{ notificationMessage }}
+            <div class="notification-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+            </div>
+            <div class="notification-content">
+                {{ notificationMessage }}
+            </div>
         </div>
     </transition>
 
@@ -759,7 +765,7 @@ const closeOrderDetails = () => {
                             <div class="summary-item-info">
                                 <strong>{{ item.name }}</strong>
                                 <span class="summary-specs">{{ item.selectedSize }} • {{ item.selectedColor
-                                }}</span>
+                                    }}</span>
                             </div>
                             <div class="summary-item-calc">
                                 <span>{{ item.quantity }}</span>
@@ -785,6 +791,12 @@ const closeOrderDetails = () => {
                         </div>
                     </div>
                 </div>
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input v-model="customerName" type="text" placeholder="Enter your name..." class="form-input"
+                        required />
+                </div>
+
                 <div class="form-group">
                     <label>Order Note (Optional)</label>
                     <textarea v-model="orderNote" placeholder="Special requests or delivery instructions..."
@@ -1063,6 +1075,72 @@ const closeOrderDetails = () => {
 .add-to-cart-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+/* Loading State */
+.loading-products {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 100px 0;
+    width: 100%;
+}
+
+.loader {
+    width: 48px;
+    height: 48px;
+    border: 5px solid #E6E0D9;
+    border-bottom-color: #3D2B1F;
+    border-radius: 50%;
+    display: inline-block;
+    box-sizing: border-box;
+    animation: rotation 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes rotation {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-products p {
+    color: #8C7B6E;
+    font-style: italic;
+}
+
+/* Empty State */
+.empty-state {
+    padding: 60px 40px;
+    text-align: center;
+    background: white;
+    border-radius: 20px;
+    border: 1px dashed #E6E0D9;
+    margin-top: 20px;
+}
+
+.empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.empty-state h2 {
+    font-family: 'Crimson Pro', serif;
+    font-size: 28px;
+    color: #3D2B1F;
+    margin: 0 0 12px 0 !important;
+}
+
+.empty-state p {
+    color: #8C7B6E;
+    font-size: 16px;
+    margin: 0 !important;
 }
 
 /* Cart Sidebar Modern */
@@ -1371,6 +1449,32 @@ const closeOrderDetails = () => {
     border-radius: 16px;
     padding: 24px;
     transition: all 0.3s ease;
+}
+
+.order-history-card:hover {
+    box-shadow: 0 4px 12px rgba(61, 43, 31, 0.08);
+    border-color: #D1C7BD;
+}
+
+@media (max-width: 600px) {
+    .order-main-info {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .order-img-container {
+        width: 140px;
+        height: 140px;
+    }
+
+    .order-card-actions {
+        flex-direction: column;
+    }
+
+    .order-card-actions button {
+        width: 100%;
+    }
 }
 
 .order-main-info {
@@ -1706,31 +1810,6 @@ const closeOrderDetails = () => {
     }
 }
 
-/* font-weight: 700;
-font-size: 14px;
-text-transform: uppercase;
-letter-spacing: 0.5px;
-} */
-
-.table-body {
-    max-height: calc(100vh - 100px);
-    overflow-y: auto;
-}
-
-.table-row {
-    display: grid;
-    grid-template-columns: 100px 2fr 1fr 120px 120px 100px 180px;
-    gap: 16px;
-    padding: 20px 24px;
-    border-bottom: 2px solid #f5ebe0;
-    align-items: center;
-    transition: all 0.3s ease;
-}
-
-.product-row.out-of-stock {
-    opacity: 0.5;
-}
-
 /* Checkout Popup Modern */
 .checkout-overlay {
     position: fixed;
@@ -1749,8 +1828,8 @@ letter-spacing: 0.5px;
 
 .checkout-popup {
     background: white;
-    border-radius: 24px;
-    max-width: 600px;
+    border-radius: 5px;
+    max-width: 1200px;
     width: 100%;
     max-height: 90vh;
     overflow-y: auto;
@@ -1879,5 +1958,117 @@ letter-spacing: 0.5px;
 
 ::-webkit-scrollbar-thumb:hover {
     background: #D1C7BD;
+}
+
+.mini-item {
+    padding: 10px 0;
+    border-bottom: 1px solid #F0ECE7;
+}
+
+.mini-item:last-child {
+    border-bottom: none;
+}
+
+.mini-meta {
+    font-size: 11px;
+    opacity: 0.7;
+    margin-top: 2px;
+}
+
+.empty-orders-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    text-align: center;
+    background: white;
+    border-radius: 12px;
+    border: 1px dashed #E6E0D9;
+}
+
+.empty-orders-state h3 {
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 24px;
+    color: #3D2B1F;
+    margin-bottom: 10px;
+}
+
+.empty-orders-state p {
+    color: #8C7E71;
+    max-width: 400px;
+    line-height: 1.6;
+}
+
+.status-tag.pending {
+    background: #FFF9E6;
+    color: #B28900;
+}
+
+@media (max-width: 768px) {
+    .history-sidebar {
+        display: none;
+    }
+}
+
+/* Notification Popup Modern */
+.notification {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    color: #3D2B1F;
+    padding: 30px 40px;
+    border-radius: 20px;
+    box-shadow: 0 25px 60px rgba(61, 43, 31, 0.25);
+    z-index: 100000; /* Extremely high z-index to stay on top */
+    font-weight: 700;
+    font-size: 18px;
+    text-align: center;
+    border: 1px solid #E6E0D9;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    min-width: 340px;
+    max-width: 90%;
+    pointer-events: auto; /* Allow interactions if needed, though mostly for display */
+}
+
+.notification-icon {
+    width: 56px;
+    height: 56px;
+    background: #E0F7F9;
+    color: #4DB6C1;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 4px;
+}
+
+.notification-content {
+    line-height: 1.4;
+}
+
+/* Slide Up Transition for Notification */
+.slide-up-enter-active {
+    animation: notification-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.slide-up-leave-active {
+    animation: notification-pop 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) reverse forwards;
+}
+
+@keyframes notification-pop {
+    0% {
+        transform: translate(-50%, -40%) scale(0.85);
+        opacity: 0;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
 }
 </style>

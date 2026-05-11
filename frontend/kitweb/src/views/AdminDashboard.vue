@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-import { api } from '../services/api';
+import { api, API_URL } from '../services/api';
 
 const products = ref([]);
 const categories = ref([]);
@@ -12,7 +12,7 @@ const editingId = ref(null);
 const showCategoryManager = ref(false);
 
 // New Category form
-const newCat = ref({ name: '', path: '' });
+const newCat = ref({ name: '', path: '', default_usage: '', default_use_for: '' });
 
 // Filtering
 const activeFilter = ref('all');
@@ -33,11 +33,28 @@ const newProduct = ref({
   price_2: 0,
   price_3: 0,
   price_4: 0,
-  price_5: 0
+  price_5: 0,
+  stock: 0
 });
 const selectedFile = ref(null);
 const imagePreview = ref(null);
 const uploading = ref(false);
+const stockAdjustment = ref(0);
+
+const updateStockAdjustment = (amount) => {
+  stockAdjustment.value += amount;
+  validateStockAdjustment();
+};
+
+const validateStockAdjustment = () => {
+  const currentStock = newProduct.value.stock || 0;
+  if (currentStock + stockAdjustment.value < 0) {
+    stockAdjustment.value = -currentStock;
+  }
+};
+
+const galleryImages = ref([]); // Array of { key, file, preview, attribute_type, attribute_value, is_new: boolean }
+const galleryFileInput = ref(null);
 
 const showFormulaPopup = ref(false);
 const formulaInput = ref("200, 180, 160, 130");
@@ -97,16 +114,41 @@ const handleFileUpload = (event) => {
   }
 };
 
+const handleGalleryUpload = (event) => {
+  const files = Array.from(event.target.files);
+  files.forEach(file => {
+    galleryImages.value.push({
+      file,
+      preview: URL.createObjectURL(file),
+      attribute_type: 'gallery',
+      attribute_value: '',
+      is_new: true
+    });
+  });
+  // Reset input
+  event.target.value = '';
+};
+
+const removeGalleryImage = (index) => {
+  galleryImages.value.splice(index, 1);
+};
+
+const triggerGalleryUpload = () => {
+  galleryFileInput.value?.click();
+};
+
 const resetForm = () => {
   newProduct.value = {
     name: '', description: '', price: 0, category: '', image_key: '',
     usage: '', use_for: '', varieties: '', sizes: '', colors: '',
-    price_1: 0, price_2: 0, price_3: 0, price_4: 0, price_5: 0
+    price_1: 0, price_2: 0, price_3: 0, price_4: 0, price_5: 0, stock: 0
   };
   selectedFile.value = null;
   imagePreview.value = null;
+  galleryImages.value = [];
   isEditing.value = false;
   editingId.value = null;
+  stockAdjustment.value = 0;
 };
 
 const editProduct = (product) => {
@@ -114,7 +156,20 @@ const editProduct = (product) => {
   editingId.value = product.id;
   newProduct.value = { ...product };
   imagePreview.value = null; // Clear local preview to show saved image
+
+  // Load gallery images
+  if (product.images) {
+    galleryImages.value = product.images.map(img => ({
+      ...img,
+      preview: getImageUrl(img.image_key),
+      is_new: false
+    }));
+  } else {
+    galleryImages.value = [];
+  }
+
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  stockAdjustment.value = 0;
 };
 
 const deleteProduct = async (id) => {
@@ -132,7 +187,7 @@ const handleAddCategory = async () => {
   if (!newCat.value.name || !newCat.value.path) return;
   try {
     await api.addCategory(newCat.value);
-    newCat.value = { name: '', path: '' };
+    newCat.value = { name: '', path: '', default_usage: '', default_use_for: '' };
     loadCategories();
   } catch (error) {
     alert('Failed to add category');
@@ -153,12 +208,39 @@ const deleteCategory = async (id) => {
 const handleSubmit = async () => {
   try {
     uploading.value = true;
+
+    // 1. Upload Main Image if changed
     if (selectedFile.value) {
       const uploadResult = await api.uploadImage(selectedFile.value);
       newProduct.value.image_key = uploadResult.key;
     }
 
+    // 2. Upload Gallery Images if new
+    const finalImages = [];
+    for (const img of galleryImages.value) {
+      if (img.is_new) {
+        const uploadResult = await api.uploadImage(img.file);
+        finalImages.push({
+          image_key: uploadResult.key,
+          attribute_type: img.attribute_type,
+          attribute_value: img.attribute_value,
+          is_main: false
+        });
+      } else {
+        finalImages.push({
+          image_key: img.image_key,
+          attribute_type: img.attribute_type,
+          attribute_value: img.attribute_value,
+          is_main: img.is_main
+        });
+      }
+    }
+
+    // Add images to payload
+    newProduct.value.images = finalImages;
+
     if (isEditing.value) {
+      newProduct.value.stock = Math.max(0, (newProduct.value.stock || 0) + stockAdjustment.value);
       await api.updateProduct(editingId.value, newProduct.value);
       alert('Updated!');
     } else {
@@ -181,7 +263,7 @@ const logout = () => {
 
 const getImageUrl = (key) => {
   if (!key) return 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg';
-  return `http://127.0.0.1:8787/images/${key}`;
+  return `${API_URL}/images/${key}`;
 };
 
 const applyPriceFormula = () => {
@@ -203,6 +285,31 @@ const applyPriceFormula = () => {
   newProduct.value.price_4 = Number((p5 * percentages[3] / 100).toFixed(2));
 
   showFormulaPopup.value = false;
+};
+
+const onCategoryChange = () => {
+  if (isEditing.value) return; // Don't overwrite existing product data when editing
+  
+  const selectedCat = categories.value.find(c => c.path === newProduct.value.category);
+  if (selectedCat) {
+    if (selectedCat.default_usage) {
+      newProduct.value.usage = selectedCat.default_usage;
+    }
+    if (selectedCat.default_use_for) {
+      newProduct.value.use_for = selectedCat.default_use_for;
+    }
+  }
+};
+
+const adjustStock = async (product, change) => {
+  try {
+    const result = await api.adjustStock(product.id, change);
+    if (result.success) {
+      product.stock = result.newStock;
+    }
+  } catch (error) {
+    alert('Failed to adjust stock');
+  }
 };
 </script>
 
@@ -237,11 +344,21 @@ const applyPriceFormula = () => {
             <div class="cat-add-row">
               <input v-model="newCat.name" placeholder="Category Name (e.g. Beads)" />
               <input v-model="newCat.path" placeholder="Path (e.g. beads)" />
+            </div>
+            <div class="cat-add-row">
+              <input v-model="newCat.default_usage" placeholder="Default Usage Placeholder" />
+              <input v-model="newCat.default_use_for" placeholder="Default Use For Placeholder" />
               <button @click="handleAddCategory">Add</button>
             </div>
             <div class="cat-list">
               <div v-for="cat in categories" :key="cat.id" class="cat-tag">
-                {{ cat.name }} ({{ cat.path }})
+                <div class="cat-tag-info">
+                  <strong>{{ cat.name }}</strong> ({{ cat.path }})
+                  <div class="cat-defaults" v-if="cat.default_usage || cat.default_use_for">
+                    <span v-if="cat.default_usage">U: {{ cat.default_usage }}</span>
+                    <span v-if="cat.default_use_for">F: {{ cat.default_use_for }}</span>
+                  </div>
+                </div>
                 <button @click="deleteCategory(cat.id)">&times;</button>
               </div>
             </div>
@@ -300,7 +417,7 @@ const applyPriceFormula = () => {
               <div>
                 <div class="form-group">
                   <label>Category</label>
-                  <select v-model="newProduct.category" required>
+                  <select v-model="newProduct.category" required @change="onCategoryChange">
                     <option value="" disabled>Select a category</option>
                     <option v-for="cat in categories" :key="cat.id" :value="cat.path">
                       {{ cat.name }}
@@ -309,7 +426,7 @@ const applyPriceFormula = () => {
                 </div>
                 <div class="form-group">
                   <label>Description</label>
-                  <textarea v-model="newProduct.description" rows="2"
+                  <textarea v-model="newProduct.description" rows="8"
                     placeholder="Describe the quality, material, or source..."></textarea>
                 </div>
               </div>
@@ -334,13 +451,64 @@ const applyPriceFormula = () => {
 
             <div class="form-row">
               <div class="form-group">
-                <label>Sizes</label>
+                <label>Sizes (Comma separated)</label>
                 <input v-model="newProduct.sizes" placeholder="e.g. 50g, 100m, Small" />
               </div>
               <div class="form-group">
-                <label>Colors</label>
+                <label>Colors (Comma separated)</label>
                 <input v-model="newProduct.colors" placeholder="e.g. Red, Sky Blue, Green" />
               </div>
+              <div class="form-group" v-if="!isEditing">
+                <label>Initial Stock</label>
+                <input v-model.number="newProduct.stock" type="number" min="0" placeholder="0" />
+              </div>
+              <div class="form-group stock-form-group" v-else>
+                <label>Update Stock (Current: {{ newProduct.stock || 0 }})</label>
+                <div class="stock-control edit-stock-control">
+                  <button type="button" @click="updateStockAdjustment(-2)" class="stock-btn minus">-2</button>
+                  <button type="button" @click="updateStockAdjustment(-1)" class="stock-btn minus">-1</button>
+                  
+                  <input type="number" v-model.number="stockAdjustment" @input="validateStockAdjustment" class="stock-adjust-input" />
+                  
+                  <button type="button" @click="updateStockAdjustment(1)" class="stock-btn plus">+1</button>
+                  <button type="button" @click="updateStockAdjustment(2)" class="stock-btn plus">+2</button>
+                </div>
+                <div class="stock-preview" :class="{ 'low': (newProduct.stock + stockAdjustment) <= 5 }">
+                  Resulting Stock: <strong>{{ Math.max(0, (newProduct.stock || 0) + stockAdjustment) }}</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Gallery Section -->
+            <div class="gallery-section">
+              <div class="gallery-header">
+                <label>Product Gallery & Variations</label>
+                <button type="button" class="add-gallery-btn" @click="triggerGalleryUpload">
+                  <ion-icon name="add-circle-outline"></ion-icon> Add Images
+                </button>
+                <input type="file" ref="galleryFileInput" class="hidden-input" @change="handleGalleryUpload"
+                  accept="image/*" multiple />
+              </div>
+
+              <div class="gallery-grid" v-if="galleryImages.length > 0">
+                <div v-for="(img, index) in galleryImages" :key="index" class="gallery-item">
+                  <div class="gallery-thumb">
+                    <img :src="img.preview" />
+                    <button type="button" class="remove-thumb" @click="removeGalleryImage(index)">&times;</button>
+                  </div>
+                  <div class="gallery-meta">
+                    <select v-model="img.attribute_type">
+                      <option value="gallery">General Gallery</option>
+                      <option value="color">Color Variant</option>
+                      <option value="size">Size Variant</option>
+                      <option value="variety">Variety Variant</option>
+                    </select>
+                    <input v-if="img.attribute_type !== 'gallery'" v-model="img.attribute_value"
+                      :placeholder="'Enter ' + img.attribute_type" />
+                  </div>
+                </div>
+              </div>
+              <p v-else class="gallery-empty">No gallery images added yet.</p>
             </div>
 
             <button type="submit" :disabled="uploading" :class="['submit-btn', isEditing ? 'update' : '']">
@@ -396,6 +564,9 @@ const applyPriceFormula = () => {
               <div class="item-info">
                 <strong>{{ product.name }}</strong>
                 <span class="p-meta">{{ product.category }} | ${{ product.price_1 || product.price }}</span>
+                <div class="stock-control">
+                  <span :class="['stock-count', product.stock <= 5 ? 'low' : '']">{{ product.stock || 0 }} in stock</span>
+                </div>
               </div>
               <div class="item-actions">
                 <button class="action-btn edit" @click="editProduct(product)"><ion-icon
@@ -640,6 +811,108 @@ header {
   display: none;
 }
 
+/* Gallery Styles */
+.gallery-section {
+  background: #fdfcfb;
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid #f1ece7;
+  margin-bottom: 25px;
+}
+
+.gallery-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.add-gallery-btn {
+  background: #008080;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.add-gallery-btn:hover {
+  background: #006666;
+  transform: translateY(-1px);
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 15px;
+}
+
+.gallery-item {
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+}
+
+.gallery-thumb {
+  position: relative;
+  height: 120px;
+}
+
+.gallery-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remove-thumb {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: rgba(255, 118, 117, 0.9);
+  color: white;
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.gallery-meta {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.gallery-meta select,
+.gallery-meta input {
+  font-size: 11px;
+  padding: 6px;
+  border-radius: 4px;
+}
+
+.gallery-empty {
+  text-align: center;
+  color: #a5b1c2;
+  font-size: 13px;
+  padding: 20px;
+  border: 2px dashed #eee;
+  border-radius: 10px;
+}
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -805,7 +1078,6 @@ select {
 }
 
 .inventory-scroll {
-  max-height: 600px;
   overflow-y: auto;
 }
 
@@ -847,6 +1119,78 @@ select {
 .p-meta {
   font-size: 11px;
   color: #636e72;
+}
+
+.stock-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+}
+
+.stock-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  color: #666;
+  transition: all 0.2s;
+}
+
+.stock-btn:hover {
+  border-color: #8b6f47;
+  color: #8b6f47;
+}
+
+.stock-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: #2d3436;
+}
+
+.stock-count.low {
+  color: #d63031;
+}
+
+.edit-stock-control {
+  margin-top: 5px;
+  gap: 5px;
+}
+
+.stock-adjust-input {
+  width: 50px;
+  text-align: center;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 2px;
+  font-size: 13px;
+  color: #2d3436;
+}
+
+.stock-adjust-input::-webkit-outer-spin-button,
+.stock-adjust-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.stock-adjust-input[type=number] {
+  appearance: textfield;
+}
+
+.stock-preview {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #636e72;
+}
+
+.stock-preview.low {
+  color: #d63031;
 }
 
 .item-actions {
@@ -1031,5 +1375,23 @@ select {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.cat-tag-info {
+  flex: 1;
+}
+
+.cat-defaults {
+  font-size: 10px;
+  color: #00b894;
+  margin-top: 4px;
+  display: flex;
+  gap: 10px;
+}
+
+.cat-defaults span {
+  background: rgba(0, 184, 148, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 </style>

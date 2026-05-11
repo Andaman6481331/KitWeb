@@ -37,10 +37,16 @@ const videos = ref([
   }
 ])
 
-const currentIndex = ref(0)
+const currentIndex = ref(Math.floor(videos.value.length / 2))
 const isPlaying = ref(false)
-const videoElement = ref(null)
+const videoElements = ref([])
 const containerElement = ref(null)
+
+// Helper to calculate card position (1-5) based on currentIndex
+const getPosition = (index) => {
+  const offset = index - currentIndex.value
+  return 3 + offset
+}
 
 // Touch/Swipe handling
 let touchStartX = 0
@@ -69,37 +75,41 @@ const handleTouchEnd = () => {
 
 const nextVideo = () => {
   if (currentIndex.value < videos.value.length - 1) {
-    currentIndex.value++
     pauseVideo()
+    currentIndex.value++
   }
 }
 
 const prevVideo = () => {
   if (currentIndex.value > 0) {
-    currentIndex.value--
     pauseVideo()
+    currentIndex.value--
   }
 }
 
 const goToVideo = (index) => {
-  currentIndex.value = index
-  pauseVideo()
+  if (index !== currentIndex.value) {
+    pauseVideo()
+    currentIndex.value = index
+  }
 }
 
 const togglePlay = () => {
-  if (!videoElement.value) return
+  const currentVideo = videoElements.value[currentIndex.value]
+  if (!currentVideo) return
 
   if (isPlaying.value) {
-    videoElement.value.pause()
+    currentVideo.pause()
   } else {
-    videoElement.value.play()
+    currentVideo.play()
   }
   isPlaying.value = !isPlaying.value
 }
 
 const pauseVideo = () => {
-  if (videoElement.value) {
-    videoElement.value.pause()
+  const currentVideo = videoElements.value[currentIndex.value]
+  if (currentVideo) {
+    currentVideo.pause()
     isPlaying.value = false
   }
 }
@@ -144,10 +154,11 @@ onUnmounted(() => {
   </div>
   <div class="video-card-container">
     <div v-reveal class="section-header">
-      <h2>✨ Discover Our Story</h2>
+      <h2 style="margin: 0;">Our Story In Motion</h2>
+      <p style="margin: 0;">Witness the artisanal processes behind our materials.</p>
     </div>
 
-    <div v-reveal class="video-card delay4" ref="containerElement" @touchstart="handleTouchStart"
+    <div v-reveal class="carousel-container delay4" ref="containerElement" @touchstart="handleTouchStart"
       @touchmove="handleTouchMove" @touchend="handleTouchEnd">
       <!-- Navigation Arrows -->
       <button class="nav-arrow nav-arrow-left" @click="prevVideo" :disabled="currentIndex === 0"
@@ -164,15 +175,21 @@ onUnmounted(() => {
         </svg>
       </button>
 
-      <!-- Video Display -->
-      <div class="video-wrapper">
-        <transition name="fade" mode="out-in">
-          <div :key="currentIndex" class="video-content">
-            <video ref="videoElement" :src="videos[currentIndex].src" :poster="videos[currentIndex].poster"
-              @ended="handleVideoEnd" class="video-player" preload="metadata" />
+      <!-- Video Cards Stack -->
+      <div class="cards-stack">
+        <div v-for="(video, index) in videos" :key="video.id" class="video-card-item"
+          :data-position="getPosition(index)"
+          :style="{ display: getPosition(index) < 1 || getPosition(index) > 5 ? 'none' : 'block' }">
 
-            <!-- Play/Pause Overlay -->
-            <div class="video-overlay" @click="togglePlay">
+          <!-- Click overlay to select non-center cards -->
+          <div class="click-overlay" @click.stop="goToVideo(index)" v-if="getPosition(index) !== 3"></div>
+
+          <div class="video-wrapper">
+            <video ref="videoElements" :src="video.src" :poster="video.poster" @ended="handleVideoEnd"
+              class="video-player" preload="metadata" />
+
+            <!-- Play/Pause Overlay (only for center card) -->
+            <div class="video-overlay" @click="togglePlay" v-if="getPosition(index) === 3">
               <transition name="scale-fade">
                 <div v-if="!isPlaying" class="play-button">
                   <svg width="64" height="64" viewBox="0 0 64 64">
@@ -186,13 +203,13 @@ onUnmounted(() => {
             <!-- Video Info -->
             <div class="video-info">
               <div class="video-details">
-                <h3>{{ videos[currentIndex].title }}</h3>
-                <p>{{ videos[currentIndex].description }}</p>
+                <h3>{{ video.title }}</h3>
+                <p>{{ video.description }}</p>
               </div>
-              <div class="video-duration">{{ videos[currentIndex].duration }}</div>
+              <div class="video-duration">{{ video.duration }}</div>
             </div>
           </div>
-        </transition>
+        </div>
       </div>
 
       <!-- Indicator Dots -->
@@ -204,12 +221,12 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <!-- Progress Indicator -->
+      <!-- Progress Indicator
       <div class="video-counter">
         <span class="current">{{ currentIndex + 1 }}</span>
         <span class="separator">/</span>
         <span class="total">{{ videos.length }}</span>
-      </div>
+      </div> -->
     </div>
     <p style="margin: 10px auto 0; text-align: center; font-size: 18px; color: #93735E; opacity: 0.8;">
       Swipe through our culinary journey</p>
@@ -242,7 +259,7 @@ onUnmounted(() => {
 
 /* Using clip-path */
 .diagonal-border {
-  background: #fff;
+  /* background: #fff; */
   clip-path: polygon(0 10%, 100% 0, 100% 90%, 0 100%);
 }
 
@@ -256,7 +273,6 @@ onUnmounted(() => {
 
 .section-header {
   text-align: center;
-  margin-bottom: 40px;
 }
 
 .section-header h2 {
@@ -267,36 +283,105 @@ onUnmounted(() => {
   letter-spacing: -0.5px;
 }
 
-.video-card {
+.carousel-container {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  max-width: 900px;
+  max-width: 1400px;
   margin: 0 auto;
-  background: linear-gradient(135deg, rgba(94, 69, 53, 0.05), rgba(147, 115, 94, 0.05));
-  border-radius: 24px;
-  overflow: hidden;
-  box-shadow: 0 10px 40px rgba(94, 69, 53, 0.15);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  min-height: 600px;
+  perspective: 1500px;
 }
 
-.video-card:hover {
-  transform: translateY(-5px);
-  transform: scale(1.1);
-  box-shadow: 0 15px 50px rgba(94, 69, 53, 0.25);
+.cards-stack {
+  position: relative;
+  width: 100%;
+  height: 500px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.video-card-item {
+  position: absolute;
+  width: 800px;
+  max-width: 90vw;
+  aspect-ratio: 16 / 9;
+  background: #1a1a1a;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(94, 69, 53, 0.3);
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, opacity;
+}
+
+/* Position States */
+.video-card-item[data-position="1"] {
+  transform: translateX(-40rem) scale(0.7);
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.video-card-item[data-position="2"] {
+  transform: translateX(-20rem) scale(0.85);
+  z-index: 2;
+  opacity: 0.6;
+}
+
+.video-card-item[data-position="3"] {
+  transform: translateX(0) scale(1);
+  z-index: 3;
+  opacity: 1;
+  box-shadow: 0 30px 60px rgba(94, 69, 53, 0.4);
+}
+
+.video-card-item[data-position="4"] {
+  transform: translateX(20rem) scale(0.85);
+  z-index: 2;
+  opacity: 0.6;
+}
+
+.video-card-item[data-position="5"] {
+  transform: translateX(40rem) scale(0.7);
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* If there are more than 5, hide them */
+.video-card-item[data-position^="-"],
+.video-card-item[data-position="6"],
+.video-card-item[data-position="7"],
+.video-card-item[data-position="8"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.click-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.2);
+  transition: background 0.3s ease;
+}
+
+.click-overlay:hover {
+  background: rgba(0, 0, 0, 0.1);
 }
 
 .video-wrapper {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  height: 100%;
   background: #1a1a1a;
   overflow: hidden;
-}
-
-.video-content {
-  position: relative;
-  width: 100%;
-  height: 100%;
 }
 
 .video-player {
@@ -315,7 +400,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 10;
+  z-index: 15;
 }
 
 .play-button {
@@ -337,6 +422,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
+  pointer-events: none;
 }
 
 .video-details h3 {
@@ -368,8 +454,8 @@ onUnmounted(() => {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 50px;
-  height: 50px;
+  width: 60px;
+  height: 60px;
   background: rgba(255, 255, 255, 0.95);
   border: none;
   border-radius: 50%;
@@ -377,29 +463,29 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 20;
+  z-index: 40;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
   color: #5E4535;
 }
 
 .nav-arrow:hover {
   background: white;
   transform: translateY(-50%) scale(1.1);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
 }
 
 .nav-arrow:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .nav-arrow-left {
-  left: 20px;
+  left: 40px;
 }
 
 .nav-arrow-right {
-  right: 20px;
+  right: 40px;
 }
 
 /* Indicators */
@@ -410,7 +496,7 @@ onUnmounted(() => {
   transform: translateX(-50%);
   display: flex;
   gap: 12px;
-  z-index: 15;
+  z-index: 40;
 }
 
 .indicator-dot {
@@ -431,11 +517,6 @@ onUnmounted(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-.indicator-dot:hover .dot-inner {
-  background: rgba(255, 255, 255, 0.8);
-  transform: scale(1.2);
-}
-
 .indicator-dot.active .dot-inner {
   background: white;
   width: 30px;
@@ -446,7 +527,7 @@ onUnmounted(() => {
 .video-counter {
   position: absolute;
   top: 20px;
-  right: 20px;
+  right: 40px;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(10px);
   padding: 10px 20px;
@@ -454,7 +535,7 @@ onUnmounted(() => {
   color: white;
   font-weight: 600;
   font-size: 16px;
-  z-index: 15;
+  z-index: 40;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
@@ -468,10 +549,6 @@ onUnmounted(() => {
   opacity: 0.6;
 }
 
-.total {
-  opacity: 0.8;
-}
-
 /* Swipe Hint */
 .swipe-hint {
   text-align: center;
@@ -479,16 +556,6 @@ onUnmounted(() => {
   color: #93735E;
   opacity: 0.6;
   animation: fadeInOut 3s ease-in-out infinite;
-}
-
-.swipe-hint svg {
-  margin-bottom: 10px;
-}
-
-.swipe-hint p {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 500;
 }
 
 /* Animations */
@@ -504,16 +571,6 @@ onUnmounted(() => {
   }
 }
 
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.4s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
 .scale-fade-enter-active,
 .scale-fade-leave-active {
   transition: all 0.3s ease;
@@ -526,22 +583,53 @@ onUnmounted(() => {
 }
 
 /* Responsive Design */
+@media (max-width: 1200px) {
+  .carousel-container {
+    min-height: 500px;
+  }
+
+  .video-card-item {
+    width: 600px;
+  }
+
+  .video-card-item[data-position="2"] {
+    transform: translateX(-15rem) scale(0.8);
+  }
+
+  .video-card-item[data-position="4"] {
+    transform: translateX(15rem) scale(0.8);
+  }
+}
+
 @media (max-width: 768px) {
   .section-header h2 {
     font-size: 32px;
   }
 
-  .section-header p {
-    font-size: 16px;
+  .carousel-container {
+    min-height: 400px;
   }
 
-  .video-card {
-    border-radius: 16px;
+  .video-card-item {
+    width: 90%;
+    aspect-ratio: 4 / 5;
+    /* More vertical on mobile */
+  }
+
+  .video-card-item[data-position="1"],
+  .video-card-item[data-position="2"],
+  .video-card-item[data-position="4"],
+  .video-card-item[data-position="5"] {
+    display: none !important;
+  }
+
+  .video-card-item[data-position="3"] {
+    transform: translateX(0) scale(1);
   }
 
   .nav-arrow {
-    width: 40px;
-    height: 40px;
+    width: 45px;
+    height: 45px;
   }
 
   .nav-arrow-left {
@@ -560,28 +648,9 @@ onUnmounted(() => {
     font-size: 20px;
   }
 
-  .video-details p {
-    font-size: 14px;
-  }
-
-  .video-duration {
-    font-size: 14px;
-    padding: 6px 12px;
-  }
-
   .video-counter {
     top: 10px;
     right: 10px;
-    padding: 8px 16px;
-    font-size: 14px;
-  }
-
-  .current {
-    font-size: 18px;
-  }
-
-  .swipe-hint {
-    display: block;
   }
 }
 

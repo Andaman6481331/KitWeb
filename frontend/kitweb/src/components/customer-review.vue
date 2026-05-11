@@ -193,14 +193,9 @@ const getStars = (rating) => {
 </template>
 
 <style scoped>
-.review-section {
-    padding: 20px 0;
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-}
-
 .container {
-    max-width: 1200px;
-    margin: 0 auto;
+    max-width: 1600px;
+    margin: 5rem auto;
     padding: 0 40px;
 }
 
@@ -212,7 +207,7 @@ const getStars = (rating) => {
 /* Review Card */
 .review-card {
     background: white;
-    border-radius: 24px;
+    /* border-radius: 24px; */
     overflow: hidden;
     box-shadow: 0 10px 50px rgba(0, 0, 0, 0.1);
     animation: fadeSlideIn 0.5s ease;

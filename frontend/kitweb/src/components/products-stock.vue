@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { api } from '../services/api';
+import { api, API_URL } from '../services/api';
 
 const router = useRouter();
 
@@ -41,7 +41,7 @@ const categories = computed(() => {
             categoryMap.set(p.category, {
                 name: p.category,
                 count: 1,
-                image: p.image_key ? `http://127.0.0.1:8787/images/${p.image_key}` : 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg',
+                image: p.image_key ? `${API_URL}/images/${p.image_key}` : 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg',
                 description: categoryDescriptions[p.category] || 'Explore our curated selection of high-quality craft materials.'
             });
         }
@@ -58,8 +58,7 @@ const selectCategory = (categoryName) => {
 // Helper for image URLs
 const getImageUrl = (key) => {
     if (!key) return 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg';
-    if (key.startsWith('http')) return key;
-    return `http://127.0.0.1:8787/images/${key}`;
+    return `${API_URL}/images/${key}`;
 };
 
 </script>
@@ -241,15 +240,6 @@ const getImageUrl = (key) => {
     object-fit: cover;
     /* This ensures the image fills the area without distortion */
     transition: transform 0.4s ease;
-}
-
-.popup-price {
-    font-size: 24px;
-    font-weight: 700;
-    color: #2d2d2d;
-    background: #fdf2e9;
-    padding: 4px 12px;
-    border-radius: 8px;
 }
 
 .item:hover .item-image img {
