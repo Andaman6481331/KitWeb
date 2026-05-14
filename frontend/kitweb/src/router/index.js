@@ -10,12 +10,15 @@ import DIYProductPage from '../views/DIYProductPage.vue';
 import PartnerPage from '../views/PartnerPage.vue';
 import AdminDashboard from '../views/AdminDashboard.vue';
 
+import { authStore } from '../stores/authStore';
+
 // Define routes
 const routes = [
     {
         path: '/admin',
         name: 'admin',
-        component: AdminDashboard
+        component: AdminDashboard,
+        meta: { requiresAuth: true }
     },
     {
         path: '/',
@@ -35,7 +38,8 @@ const routes = [
     {
         path: '/orderpage',
         name: 'orderpage',
-        component: OrderPage
+        component: OrderPage,
+        meta: { requiresAuth: true }
     },
     {
         path: '/contactus',
@@ -78,77 +82,21 @@ const router = createRouter({
     }
 });
 
+// Navigation Guard
+router.beforeEach((to, from, next) => {
+    const isAuthenticated = authStore.isAuthenticated;
+    const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
+
+    if (requiresAuth && !isAuthenticated) {
+        // Redirect to login if trying to access a protected route without being logged in
+        next({ name: 'login' });
+    } else if (to.name === 'login' && isAuthenticated) {
+        // Redirect to orderpage if already logged in and trying to access login page
+        next({ name: 'orderpage' });
+    } else {
+        next();
+    }
+});
+
 // Export the router instance as default
 export default router;
-
-
-// import { createRouter, createWebHistory } from 'vue-router';
-// import Home from '../views/Home.vue';
-// import Login from '../views/Login.vue';
-// import Signup from '../views/Signup.vue';
-// import Songs from '../views/Songs.vue';
-// import Artistpage from '../views/Artistpage.vue';
-// import ArtistList from '../views/Artistlist.vue';
-// import temp from '../views/temp.vue';
-
-// import {getAuth, onAuthStateChanged} from 'firebase/auth'
-
-// const routerHistory = createWebHistory()
-
-// const routes = [
-//   {
-//     path: '/',
-//     redirect: '/login'
-//   },
-//   {
-//     path: '/:catchAll(.*)',
-//     redirect: '/login'
-//   },
-//   {
-//     path: '/home',
-//     name: 'home',
-//     component: Home,
-//     meta: {
-//       requiresAuth: true
-//     }
-//   },
-//   {
-//     path: '/songs',
-//     name: 'songs',
-//     component: Songs,
-//     meta: {
-//       requiresAuth: true
-//   }
-//   },
-//   {
-//     path: '/login',
-//     name: 'login',
-//     component: Login,
-//   },
-//   {
-//     path:'/temp',
-//     name:'temp',
-//     component: temp,
-//   },
-//   {
-//     path: '/signup',
-//     name: 'signup',
-//     component: Signup,
-//   },
-//   {
-//     path: '/artist/:artistName',
-//     name: 'artist',
-//     component: Artistpage,
-//     meta: {
-//       requiresAuth: true
-//   }
-//   },
-//   {
-//     path: '/artist',
-//     name: 'artistlist',
-//     component: ArtistList,
-//     meta: {
-//       requiresAuth: true
-//   }
-//   }
-// ];

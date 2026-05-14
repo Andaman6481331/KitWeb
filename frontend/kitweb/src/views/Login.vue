@@ -1,9 +1,27 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
+import { api } from '../services/api';
+import { authStore } from '../stores/authStore';
 
+const router = useRouter();
+const { t } = useI18n();
+
+onMounted(() => {
+    if (authStore.isAuthenticated) {
+        router.push('/orderpage');
+    }
+});
 const isLogin = ref(true);
+const isLoading = ref(false);
 const showPassword = ref(false);
 const showConfirmPassword = ref(false);
+const showTermsModal = ref(false);
+
+const toggleTermsModal = () => {
+    showTermsModal.value = !showTermsModal.value;
+};
 
 const loginForm = ref({
     email: '',
@@ -26,22 +44,55 @@ const toggleAuthMode = () => {
     isLogin.value = !isLogin.value;
 };
 
-const handleLogin = () => {
-    console.log('Login:', loginForm.value);
-    alert('Login functionality would be implemented here');
+const handleLogin = async () => {
+    isLoading.value = true;
+    try {
+        const response = await api.login({
+            email: loginForm.value.email,
+            password: loginForm.value.password
+        });
+
+        if (response.success) {
+            authStore.login(response.user, response.token);
+            router.push('/orderpage');
+        }
+    } catch (error) {
+        alert(error.message || t('auth.loginFailed'));
+    } finally {
+        isLoading.value = false;
+    }
 };
 
-const handleSignup = () => {
+const handleSignup = async () => {
     if (signupForm.value.password !== signupForm.value.confirmPassword) {
-        alert('Passwords do not match!');
+        alert(t('auth.passwordsDoNotMatch'));
         return;
     }
     if (!signupForm.value.agreeToTerms) {
-        alert('Please agree to the terms and conditions');
+        alert(t('auth.agreeTermsError'));
         return;
     }
-    console.log('Signup:', signupForm.value);
-    alert('Signup functionality would be implemented here');
+
+    isLoading.value = true;
+    try {
+        const response = await api.signup({
+            email: signupForm.value.email,
+            password: signupForm.value.password,
+            businessName: signupForm.value.businessName,
+            ownerName: signupForm.value.ownerName,
+            phone: signupForm.value.phone,
+            taxId: signupForm.value.taxId
+        });
+
+        if (response.success) {
+            alert(t('auth.accountCreated'));
+            isLogin.value = true;
+        }
+    } catch (error) {
+        alert(error.message || t('auth.signupFailed'));
+    } finally {
+        isLoading.value = false;
+    }
 };
 </script>
 
@@ -51,11 +102,10 @@ const handleSignup = () => {
         <div class="branding-section">
             <div class="branding-overlay"></div>
             <div class="branding-content">
-                <p class="since">SINCE 1984</p>
-                <h1 class="brand-name">Kitcharoen<br>Haberdashery</h1>
+                <p class="since">{{ t('auth.since') }}</p>
+                <h1 class="brand-name" v-html="t('auth.brandName')"></h1>
                 <p class="brand-description">
-                    A legacy of artisanal quality and traditional Thai craftsmanship,
-                    preserved for the modern maker. Welcome back to the house of Heritage Craft & Stitch.
+                    {{ t('auth.brandDesc') }}
                 </p>
             </div>
         </div>
@@ -65,27 +115,28 @@ const handleSignup = () => {
             <div class="form-container">
                 <!-- Login Form -->
                 <div v-if="isLogin" class="auth-form">
-                    <h2 class="form-title">Sign In</h2>
-                    <p class="form-subtitle">Enter your details to access your account.</p>
+                    <h2 class="form-title">{{ t('auth.signIn') }}</h2>
+                    <p class="form-subtitle">{{ t('auth.signInSubtitle') }}</p>
 
                     <form @submit.prevent="handleLogin">
                         <div class="form-group">
-                            <label for="login-email">Email Address</label>
+                            <label for="login-email">{{ t('auth.emailLabel') }}</label>
                             <div class="input-wrapper">
                                 <input type="email" id="login-email" v-model="loginForm.email"
-                                    placeholder="weaver@heritage.com" required />
+                                    :placeholder="t('auth.emailPlaceholder')" required />
                                 <ion-icon name="mail-outline" class="input-icon"></ion-icon>
                             </div>
                         </div>
 
                         <div class="form-group">
                             <div class="label-row">
-                                <label for="login-password">Password</label>
-                                <a href="#" class="forgot-link">Forgot Password?</a>
+                                <label for="login-password">{{ t('auth.passwordLabel') }}</label>
+                                <a href="#" class="forgot-link">{{ t('auth.forgotPassword') }}</a>
                             </div>
                             <div class="input-wrapper">
                                 <input :type="showPassword ? 'text' : 'password'" id="login-password"
-                                    v-model="loginForm.password" placeholder="••••••••" required />
+                                    v-model="loginForm.password" :placeholder="t('auth.passwordPlaceholder')"
+                                    required />
                                 <ion-icon :name="showPassword ? 'eye-outline' : 'eye-off-outline'"
                                     class="input-icon clickable" @click="showPassword = !showPassword"></ion-icon>
                             </div>
@@ -95,22 +146,24 @@ const handleSignup = () => {
                             <label class="checkbox-container">
                                 <input type="checkbox" v-model="loginForm.rememberMe" />
                                 <span class="checkmark"></span>
-                                Remember Me
+                                {{ t('auth.rememberMe') }}
                             </label>
                         </div>
 
-                        <button type="submit" class="submit-btn">
-                            Sign In <ion-icon name="arrow-forward-outline"></ion-icon>
+                        <button type="submit" class="submit-btn" :disabled="isLoading">
+                            <span v-if="isLoading" class="loader-small"></span>
+                            <span v-else>{{ t('auth.signIn') }} <ion-icon
+                                    name="arrow-forward-outline"></ion-icon></span>
                         </button>
 
                         <div class="divider">
-                            <span>OR</span>
+                            <span>{{ t('auth.or') }}</span>
                         </div>
 
                         <div class="signup-prompt">
-                            <p>New to our community?</p>
+                            <p>{{ t('auth.newToCommunity') }}</p>
                             <button type="button" class="join-btn" @click="toggleAuthMode">
-                                Join the Heritage <ion-icon name="ribbon-outline"></ion-icon>
+                                {{ t('auth.joinHeritage') }} <ion-icon name="ribbon-outline"></ion-icon>
                             </button>
                         </div>
                     </form>
@@ -118,24 +171,24 @@ const handleSignup = () => {
 
                 <!-- Signup Form -->
                 <div v-else class="auth-form">
-                    <h2 class="form-title compact">Join us</h2>
-                    <p class="form-subtitle compact">Apply for a wholesale account.</p>
+                    <h2 class="form-title compact">{{ t('auth.joinUs') }}</h2>
+                    <p class="form-subtitle compact">{{ t('auth.wholesaleSubtitle') }}</p>
 
                     <form @submit.prevent="handleSignup">
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="business-name">Business Name</label>
+                                <label for="business-name">{{ t('auth.businessName') }}</label>
                                 <div class="input-wrapper">
                                     <input type="text" id="business-name" v-model="signupForm.businessName"
-                                        placeholder="Shop Name" required />
+                                        :placeholder="t('auth.businessPlaceholder')" required />
                                     <ion-icon name="business-outline" class="input-icon"></ion-icon>
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label for="owner-name">Owner Name</label>
+                                <label for="owner-name">{{ t('auth.ownerName') }}</label>
                                 <div class="input-wrapper">
-                                    <input type="text" id="owner-name" v-model="signupForm.ownerName" placeholder="Name"
-                                        required />
+                                    <input type="text" id="owner-name" v-model="signupForm.ownerName"
+                                        :placeholder="t('auth.ownerPlaceholder')" required />
                                     <ion-icon name="person-outline" class="input-icon"></ion-icon>
                                 </div>
                             </div>
@@ -143,46 +196,49 @@ const handleSignup = () => {
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="signup-email">Email</label>
+                                <label for="signup-email">{{ t('auth.email') }}</label>
                                 <div class="input-wrapper">
                                     <input type="email" id="signup-email" v-model="signupForm.email"
-                                        placeholder="email@com" required />
+                                        :placeholder="t('auth.emailPlaceholder')" required />
                                     <ion-icon name="mail-outline" class="input-icon"></ion-icon>
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label for="phone">Phone</label>
+                                <label for="phone">{{ t('auth.phone') }}</label>
                                 <div class="input-wrapper">
-                                    <input type="tel" id="phone" v-model="signupForm.phone" placeholder="+66 XX"
-                                        required />
+                                    <input type="tel" id="phone" v-model="signupForm.phone"
+                                        :placeholder="t('auth.phonePlaceholder')" required />
                                     <ion-icon name="call-outline" class="input-icon"></ion-icon>
                                 </div>
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label for="tax-id">Tax ID (Optional)</label>
+                            <label for="tax-id">{{ t('auth.taxId') }}</label>
                             <div class="input-wrapper">
-                                <input type="text" id="tax-id" v-model="signupForm.taxId" placeholder="Reg. Number" />
+                                <input type="text" id="tax-id" v-model="signupForm.taxId"
+                                    :placeholder="t('auth.taxIdPlaceholder')" />
                                 <ion-icon name="document-text-outline" class="input-icon"></ion-icon>
                             </div>
                         </div>
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="signup-password">Password</label>
+                                <label for="signup-password">{{ t('auth.passwordLabel') }}</label>
                                 <div class="input-wrapper">
                                     <input :type="showPassword ? 'text' : 'password'" id="signup-password"
-                                        v-model="signupForm.password" placeholder="••••" required />
+                                        v-model="signupForm.password" :placeholder="t('auth.passwordPlaceholder')"
+                                        required />
                                     <ion-icon :name="showPassword ? 'eye-outline' : 'eye-off-outline'"
                                         class="input-icon clickable" @click="showPassword = !showPassword"></ion-icon>
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label for="confirm-password">Confirm</label>
+                                <label for="confirm-password">{{ t('auth.confirmPassword') }}</label>
                                 <div class="input-wrapper">
                                     <input :type="showConfirmPassword ? 'text' : 'password'" id="confirm-password"
-                                        v-model="signupForm.confirmPassword" placeholder="••••" required />
+                                        v-model="signupForm.confirmPassword"
+                                        :placeholder="t('auth.passwordPlaceholder')" required />
                                     <ion-icon :name="showConfirmPassword ? 'eye-outline' : 'eye-off-outline'"
                                         class="input-icon clickable"
                                         @click="showConfirmPassword = !showConfirmPassword"></ion-icon>
@@ -192,23 +248,25 @@ const handleSignup = () => {
 
                         <div class="form-options compact">
                             <label class="checkbox-container terms">
-                                <input type="checkbox" v-model="signupForm.agreeToTerms" required />
+                                <input type="checkbox" v-model="signupForm.agreeToTerms" />
                                 <span class="checkmark"></span>
-                                <span class="terms-text">I agree to the <a href="#">Terms</a></span>
+                                <span class="terms-text">{{ t('auth.agreeToTerms') }} <a href="#"
+                                        @click.prevent="toggleTermsModal">{{ t('auth.terms') }}</a></span>
                             </label>
                         </div>
 
-                        <button type="submit" class="submit-btn compact">
-                            Create Account
+                        <button type="submit" class="submit-btn compact" :disabled="isLoading">
+                            <span v-if="isLoading" class="loader-small"></span>
+                            <span v-else>{{ t('auth.createAccount') }}</span>
                         </button>
 
                         <div class="divider compact">
-                            <span>OR</span>
+                            <span>{{ t('auth.or') }}</span>
                         </div>
 
                         <div class="signup-prompt">
                             <button type="button" class="join-btn compact" @click="toggleAuthMode">
-                                Sign In
+                                {{ t('auth.signIn') }}
                             </button>
                         </div>
                     </form>
@@ -220,20 +278,46 @@ const handleSignup = () => {
             </div>
 
             <footer class="form-footer">
-                © 1984 Kitcharoen Haberdashery. Artisanal quality for generations.
+                {{ t('auth.footer') }}
             </footer>
         </div>
+
+        <!-- Terms Modal -->
+        <transition name="fade">
+            <div v-if="showTermsModal" class="modal-overlay" @click="toggleTermsModal">
+                <div class="terms-modal" @click.stop>
+                    <div class="modal-header">
+                        <h3>{{ t('auth.termsTitle') }}</h3>
+                        <button class="close-btn" @click="toggleTermsModal">
+                            <ion-icon name="close-outline"></ion-icon>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <p>{{ t('auth.termsContent') }}</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="modal-submit" @click="toggleTermsModal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </transition>
     </div>
 </template>
 
 <style scoped>
 .auth-page {
-    height: 100vh;
+    min-height: 100vh;
     display: grid;
     grid-template-columns: 45% 55%;
     background: #fff;
     font-family: 'Inter', sans-serif;
-    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.auth-page *,
+.auth-page *::before,
+.auth-page *::after {
+    box-sizing: border-box;
 }
 
 /* Left Side - Branding */
@@ -265,6 +349,7 @@ const handleSignup = () => {
     position: relative;
     z-index: 2;
     max-width: 500px;
+    padding-bottom: 5rem;
 }
 
 .since {
@@ -299,13 +384,15 @@ const handleSignup = () => {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    padding: 15px 30px;
+    padding: 60px 30px;
+    min-height: 100vh;
 }
 
 .form-container {
     width: 100%;
     max-width: 530px;
     z-index: 2;
+    margin: auto 0;
 }
 
 .auth-form {
@@ -596,12 +683,28 @@ input:focus {
 }
 
 .form-footer {
-    position: absolute;
-    bottom: 30px;
+    position: relative;
+    margin-top: 40px;
     font-size: 12px;
     color: #A0948C;
     text-align: center;
     width: 100%;
+    padding-bottom: 20px;
+}
+
+.loader-small {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Responsive */
@@ -621,22 +724,112 @@ input:focus {
     }
 
     .form-section {
-        padding: 40px 20px;
+        padding: 60px 20px;
+    }
+
+    .watermark {
+        display: none;
     }
 }
 
 @media (max-width: 640px) {
+    .form-section {
+        padding: 40px 15px;
+    }
+
+    .form-container {
+        padding: 0 5px;
+    }
+
     .form-row {
         grid-template-columns: 1fr;
+        gap: 0;
     }
 
     .form-title {
-        font-size: 32px;
+        font-size: 28px;
+    }
+
+    .form-title.compact {
+        font-size: 24px;
     }
 
     .submit-btn,
     .join-btn {
-        padding: 14px;
+        padding: 12px;
     }
+}
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.terms-modal {
+    background: white;
+    width: 90%;
+    max-width: 500px;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 24px;
+    color: #2D241E;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #A0948C;
+}
+
+.modal-body {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 25px;
+    line-height: 1.6;
+    color: #6B5D54;
+}
+
+.modal-submit {
+    width: 100%;
+    padding: 12px;
+    background: #006666;
+    color: white;
+    border: none;
+    border-radius: 50px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.3s;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
 }
 </style>

@@ -5,7 +5,8 @@
         "contactUs": "お問い合わせ",
         "login": "ログイン",
         "events": "イベント",
-        "partners": "パートナー"
+        "partners": "パートナー",
+        "account": "アカウント"
     },
     "footer": {
         "companyName": "キッチャルーン",
@@ -63,7 +64,39 @@
         "communityFocus": "コミュニティ重視",
         "communityFocusDesc": "地元の職人とクラフトコミュニティを支援",
         "qualityAssured": "品質保証",
-        "qualityAssuredDesc": "全製品100%満足保証"
+        "qualityAssuredDesc": "全製品100%満足保証",
+        "headerTitle": "一緒に手作りを楽しみましょう",
+        "headerDefinition": "特定の材料について質問がある、または次のDIYの傑作に向けたアドバイスが必要ですか？私たちの作り手仲間がお手伝いします。お問い合わせいただければ、あなたのビジョンを形にするお手伝いをいたします！",
+        "hub": {
+            "title": "ヘリテージハブ",
+            "address": "住所",
+            "phone": "電話番号",
+            "email": "メールアドレス",
+            "emailValue": "hello{'@'}kitcharoen.com",
+            "connect": "ソーシャルメディア",
+            "quote": "世代を繋ぐ糸を大切に。"
+        },
+        "form": {
+            "title": "お問い合わせフォーム",
+            "subtitle": "プロジェクトについて、または当店のヘリテージコレクションについてお聞かせください。",
+            "name": "氏名",
+            "namePlaceholder": "アルン・キッチャルーン",
+            "email": "メールアドレス",
+            "emailPlaceholder": "arun{'@'}example.com",
+            "subject": "件名",
+            "subjects": {
+                "wholesale": "卸売についてのお問い合わせ",
+                "product": "商品に関する質問",
+                "shipping": "配送サポート",
+                "other": "その他"
+            },
+            "message": "メッセージ",
+            "messagePlaceholder": "あなたのクラフトをどのようにお手伝いできるか教えてください...",
+            "sending": "送信中...",
+            "send": "メッセージを送信",
+            "successMessage": "お問い合わせありがとうございます！まもなく返信いたします。",
+            "responseTime": "24時間以内に返信いたします。"
+        }
     },
     "events": {
         "heroTagline": "創造する。学ぶ。つながる。",
@@ -106,5 +139,294 @@
     },
     "common": {
         "address": "バンコク サンパンタウォン区 チャックラワット ワニット1通り 376番地"
+    },
+    "partner": {
+        "heroTitle": "タイ全土および海外で信頼されるパートナー",
+        "heroSubtitle": "バンコクからタイの隅々まで、そして国境を越えて、信頼できる小売パートナーシップを構築しています"
+    },
+    "admin": {
+        "loginTitle": "管理者ログイン",
+        "passwordPlaceholder": "パスワード",
+        "signIn": "サインイン",
+        "incorrectPassword": "パスワードが違います。もう一度お試しください。",
+        "dashboard": "管理ダッシュボード",
+        "statsItems": "{count} アイテム",
+        "statsCategories": "{count} カテゴリ",
+        "editCategories": "カテゴリを編集",
+        "logout": "ログアウト",
+        "manageCategories": "カテゴリ管理",
+        "categoryName": "カテゴリ名",
+        "path": "パス",
+        "defaultUsage": "デフォルト用途プレースホルダー",
+        "defaultUseFor": "デフォルト使用対象プレースホルダー",
+        "add": "追加",
+        "editProduct": "商品を編集",
+        "addProduct": "新しい商品を追加",
+        "cancelEdit": "編集をキャンセル",
+        "productNameEn": "商品名 (英語)",
+        "productNameTh": "商品名 (タイ語)",
+        "pricesHeader": "価格（レベル1を表示）",
+        "config": "設定",
+        "level": "L",
+        "addImage": "画像を追加",
+        "clickToUpload": "クリックして画像をアップロード",
+        "category": "カテゴリ",
+        "selectCategory": "カテゴリを選択",
+        "description": "説明",
+        "descriptionPlaceholder": "品質、素材、産地などを説明してください...",
+        "autoTranslateHint": "タイ語、中国語、日本語に自動翻訳されます",
+        "usage": "用途",
+        "useFor": "使用対象",
+        "varieties": "バリエーション（カンマ区切り）",
+        "sizes": "サイズ",
+        "colors": "色",
+        "initialStock": "初期在庫",
+        "updateStock": "在庫を更新（現在：{stock}）",
+        "resultingStock": "更新後の在庫",
+        "galleryTitle": "商品ギャラリーとバリエーション",
+        "addImages": "画像を追加",
+        "galleryOption": "一般ギャラリー",
+        "colorOption": "色バリエーション",
+        "sizeOption": "サイズバリエーション",
+        "varietyOption": "種類バリエーション",
+        "processing": "処理中...",
+        "submitUpdate": "商品を更新",
+        "submitAdd": "商品を追加",
+        "priceFormula": "価格計算式",
+        "formulaDesc": "L5価格の%に基づいてL1-L4を計算します。",
+        "currentL5": "現在のL5: {price}",
+        "percentages": "パーセンテージ (L1, L2, L3, L4)",
+        "formulaHint": "例：「200, 180, 160, 130」は、L1がL5の200%、L2が180%などを意味します。",
+        "cancel": "キャンセル",
+        "applyFormula": "式を適用",
+        "inventory": "在庫一覧",
+        "all": "すべて",
+        "inStock": "在庫 {count} 個",
+        "alertUpdated": "更新しました！",
+        "alertAdded": "追加しました！",
+        "confirmDeleteCategory": "このカテゴリを削除しますか？",
+        "errorDeleteCategory": "カテゴリの削除に失敗しました",
+        "confirmDeleteProduct": "この商品を削除してもよろしいですか？",
+        "errorDeleteProduct": "削除に失敗しました: {message}",
+        "galleryEmpty": "ギャラリー画像はまだ追加されていません。",
+        "enterAttribute": "{type} を入力",
+        "placeholderUsage": "例：手編み、機械刺繍",
+        "placeholderUseFor": "例：衣類、ホームデコレーション",
+        "placeholderVarieties": "例：綿、絹、ウール",
+        "placeholderSizes": "例：50g、100m、小",
+        "placeholderColors": "例：赤、スカイブルー、緑"
+    },
+    "featuredCategories": {
+        "title": "職人コレクション",
+        "subtitle": "次の傑作に最適な素材を見つけましょう。",
+        "explore": "コレクションを見る",
+        "items": {
+            "needles": {
+                "name": "針",
+                "description": "手磨きの精密工具。快適さと耐久性を追求して設計されています。"
+            },
+            "yarn": {
+                "name": "毛糸",
+                "description": "厳選された職人技のトーン。プレミアムオーガニック繊維。"
+            },
+            "accessories": {
+                "name": "アクセサリー",
+                "description": "細心の注意を払う職人のためのプロ仕様のハサミ、テープ、道具。"
+            },
+            "beads": {
+                "name": "ビーズ",
+                "description": "あらゆるプロジェクトに輝きを添える、精巧なガラスとクリスタルビーズ。"
+            }
+        }
+    },
+    "kitcraft": {
+        "eyebrow": "ハンドメイドクラフト",
+        "title": "毛糸とビーズをアートに変える",
+        "subtitle": "シンプルなDIYチュートリアルで、美しいハンドメイドのアクセサリー、デコレーション、ギフトを作る癒しの喜びを発見しましょう。",
+        "benefits": {
+            "beginner": {
+                "title": "初心者歓迎",
+                "desc": "あらゆるスキルレベルに最適なステップバイステップガイド"
+            },
+            "affordable": {
+                "title": "手頃な素材",
+                "desc": "家計を圧迫することなく、素晴らしい作品を作ることができます"
+            },
+            "creative": {
+                "title": "無限の創造性",
+                "desc": "自分のスタイルに合わせて、すべてのプロジェクトをパーソナライズ"
+            }
+        },
+        "startCrafting": "制作を始める",
+        "learnMore": "詳細を見る"
+    },
+    "videoSection": {
+        "title": "私たちのストーリーを動画で",
+        "subtitle": "私たちの素材の背後にある職人技のプロセスをご覧ください。",
+        "controls": {
+            "restart": "最初から再生",
+            "seekBack": "-10秒",
+            "seekForward": "+10秒"
+        },
+        "videos": {
+            "clip1": {
+                "title": "職人による糸染め",
+                "description": "鮮やかな色彩を生み出す伝統技法"
+            },
+            "clip2": {
+                "title": "プレミアム生絹",
+                "description": "タイ北部の地元の職人から調達"
+            },
+            "clip3": {
+                "title": "手織りのテクスチャ",
+                "description": "世代を超えて受け継がれた技術"
+            },
+            "clip4": {
+                "title": "精密ツール",
+                "description": "高品質な針と手芸用アクセサリー"
+            }
+        },
+        "indicatorLabel": "ビデオ {index} に移動"
+    },
+    "catalog": {
+        "since": "1984年創業",
+        "title": "コレクションを見る",
+        "subtitle": "40年にわたる職人技の品質。現代の作り手と伝統的な仕立て屋のために、カテゴリー別に厳選しました。",
+        "shopCategory": "カテゴリーで探す",
+        "backToCatalog": "カテゴリーに戻る",
+        "collection": "{category} コレクション",
+        "showing": "{count} 個の商品を表示中",
+        "sortBy": "並べ替え：",
+        "sortPopular": "人気順",
+        "sortPriceAsc": "価格：安い順",
+        "sortPriceDesc": "価格：高い順",
+        "sortName": "名前順",
+        "artisanChoice": "キッチャルーン厳選",
+        "addToOrder": "注文に追加",
+        "confirmAddToCart": "注文に追加しますか？",
+        "confirmMessage": "この商品を注文リストに追加しますか？",
+        "cancel": "キャンセル",
+        "confirm": "はい、追加します",
+        "howItsUsed": "使用方法",
+        "whatItsFor": "用途",
+        "varieties": "種類",
+        "availableSizes": "利用可能なサイズ",
+        "availableColors": "利用可能な色",
+        "categoryDescriptions": {
+            "Default": "あなたの創造的なプロジェクトのために厳選された高品質の素材です。"
+        }
+    },
+    "auth": {
+        "since": "1984年創業",
+        "brandName": "キッチャルーン<br>Haberdashery",
+        "brandDesc": "三世代にわたる職人の品質とタイの伝統工芸を、現代の作り手のために大切に守り続けています。Heritage Craft & Stitch へようこそ。",
+        "signIn": "サインイン",
+        "signInSubtitle": "アカウントにアクセスするには詳細を入力してください。",
+        "emailLabel": "メールアドレス",
+        "emailPlaceholder": "weaver@heritage.com",
+        "passwordLabel": "パスワード",
+        "forgotPassword": "パスワードをお忘れですか？",
+        "passwordPlaceholder": "••••••••",
+        "rememberMe": "ログイン状態を保持する",
+        "or": "または",
+        "newToCommunity": "初めてご利用ですか？",
+        "joinHeritage": "ヘリテージに参加する",
+        "joinUs": "アカウント作成",
+        "wholesaleSubtitle": "卸売アカウントを申請する。",
+        "businessName": "ビジネス名",
+        "businessPlaceholder": "店名",
+        "ownerName": "代表者名",
+        "ownerPlaceholder": "お名前",
+        "email": "メールアドレス",
+        "phone": "電話番号",
+        "taxId": "納税者番号（任意）",
+        "taxIdPlaceholder": "登録番号",
+        "confirmPassword": "パスワード（確認）",
+        "agreeToTerms": "規約に同意する",
+        "terms": "利用規約",
+        "createAccount": "アカウントを作成する",
+        "footer": "© 1984 キッチャルーン Haberdashery。世代を超えて受け継がれる職人の品質。",
+        "loginFailed": "ログインに失敗しました。資格情報を確認してください。",
+        "passwordsDoNotMatch": "パスワードが一致しません！",
+        "agreeTermsError": "利用規約に同意してください",
+        "accountCreated": "アカウントが作成されました！サインインしてください。",
+        "signupFailed": "サインアップに失敗しました。もう一度お試しください。",
+        "logoutConfirmTitle": "ログアウトの確認",
+        "logoutConfirmMessage": "本当にアカウントからログアウトしますか？",
+        "logoutConfirmBtn": "はい、ログアウトします",
+        "cancelLogoutBtn": "ログインを継続する"
+    },
+    "termsTitle": "利用規約",
+    "termsContent": "キッチャルーン Haberdasheryへようこそ。アカウントを作成することで、当社の卸売規約に同意したことになります：1. すべての卸売アカウントは確認の対象となります。2. 最小注文数量が適用される場合があります。3. 価格は機密事項です。4. 伝統的な職人技を最優先しています。",
+    "order": {
+        "title": "商品を注文する",
+        "welcomeBack": "おかえりなさい、{name}様",
+        "heroSubtitle": "キッチャルーンからの最新の逸品と厳選されたインスピレーションの注文と追跡。",
+        "logout": "ログアウト",
+        "newOrder": "新規注文",
+        "trackOrders": "注文を追跡",
+        "searchPlaceholder": "商品を検索...",
+        "all": "すべて",
+        "tableHeader": {
+            "image": "画像",
+            "details": "商品詳細",
+            "variations": "バリエーション",
+            "price": "価格",
+            "action": "アクション"
+        },
+        "loadingProducts": "プレミアムな備品を厳選中...",
+        "outOfStock": "在庫切れ",
+        "add": "追加",
+        "noProductsFound": "商品が見つかりません",
+        "adjustFilters": "検索またはフィルターを調整してください",
+        "yourCart": "カート",
+        "items": "アイテム",
+        "clearAll": "すべてクリア",
+        "cartEmpty": "カートは空です",
+        "cartEmptySubtitle": "プロジェクトリストにプレミアムな備品がまだ追加されていないようです。",
+        "browseCollections": "コレクションを見る",
+        "subtotal": "小計",
+        "delivery": "配送料",
+        "total": "合計",
+        "grandTotal": "総合計",
+        "secureCheckout": "安全にチェックアウト",
+        "globalShipping": "世界発送",
+        "orderHistory": "注文履歴",
+        "downloadStatements": "明細書をダウンロード",
+        "noOrdersFound": "注文が見つかりません",
+        "noOrdersSubtitle": "まだ注文がありません。今日からキッチャルーンの宝物の旅を始めましょう。",
+        "shopNow": "今すぐショッピング",
+        "orderNumber": "注文番号 #",
+        "shipped": "発送済み",
+        "itemsCount": "アイテム",
+        "trackShipment": "配送を追跡",
+        "orderDetails": "注文詳細",
+        "buyAgain": "もう一度買う",
+        "recommendedForYou": "おすすめの商品",
+        "viewRecommendations": "おすすめを見る",
+        "completeOrder": "注文を完了する",
+        "completeOrderSubtitle": "注文内容を確認し、詳細を入力してください",
+        "fullName": "氏名",
+        "fullNamePlaceholder": "氏名を入力してください...",
+        "orderNote": "注文メモ（任意）",
+        "orderNotePlaceholder": "特別なリクエストや配送指示...",
+        "cancel": "キャンセル",
+        "sendToLine": "LINEに注文を送信",
+        "sending": "送信中...",
+        "clearCartConfirm": "カートをクリアしますか？",
+        "clearCartSubtitle": "プロジェクト用に選択したすべてのプレミアムアイテムが削除されます。この操作は取り消せません。",
+        "keepItems": "アイテムを保持",
+        "yesClearCart": "はい、カートをクリアします",
+        "addedToCart": "{name} をカートに追加しました！ 🛒",
+        "removedFromCart": "{name} をカートから削除しました",
+        "cartCleared": "カートをクリアしました 🗑️",
+        "cartEmptyError": "カートが空です！",
+        "pleaseEnterName": "氏名を入力してください",
+        "orderSuccess": "注文が正常に送信されました！ 🎉",
+        "orderFailed": "注文の送信に失敗しました。もう一度お試しください。",
+        "placedOn": "注文日",
+        "status": "ステータス",
+        "qty": "数量",
+        "goCheckout": "チェックアウトへ進む"
     }
 }

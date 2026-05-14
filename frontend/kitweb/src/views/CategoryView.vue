@@ -2,9 +2,39 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, API_URL } from '../services/api';
+import { categoryHeroImages } from '../services/categoryImages';
+import { useI18n } from 'vue-i18n';
+import translationStore from '../stores/translationStore';
+import { cartStore } from '../stores/cartStore';
 
+const { t, locale } = useI18n();
 const route = useRoute();
 const router = useRouter();
+
+// Helper to translate product fields
+const tProduct = (item, field) => {
+    if (!item) return '';
+    const lang = locale.value.toLowerCase();
+
+    // 1. Manual Thai Name Priority (as requested: "add only thai product name field in product table")
+    if (field === 'name' && lang === 'th' && item.name_th) {
+        return item.name_th;
+    }
+
+    // 2. Auto-translation for metadata fields
+    const autoFields = ['description', 'usage', 'use_for', 'varieties', 'sizes', 'colors'];
+    if (autoFields.includes(field) && lang !== 'en') {
+        const text = item[field];
+        if (text) {
+            translationStore.getTranslation(item.id, field, text, lang);
+            const key = `${item.id}-${field}-${lang}`;
+            return translationStore.translations[key] || text; // Show original while loading
+        }
+    }
+
+    // Default fallback
+    return item[field] || '';
+};
 
 const products = ref([]);
 const loading = ref(true);
@@ -12,19 +42,21 @@ const showPopup = ref(false);
 const selectedProduct = ref(null);
 const sortBy = ref('popular');
 
+// Cart & Confirmation Modal
+const showConfirmModal = ref(false);
+const selectedProductForCart = ref(null);
+const showNotification = ref(false);
+const notificationMessage = ref('');
+
 const currentCategory = computed(() => route.params.category);
 
-const categoryDescriptions = {
-    'Yarns': 'Sourced directly from the vibrant heart of Sampeng Market, our curated selection represents four decades of haberdashery excellence. Every spool is hand-picked for quality and character.',
-    'Ribbons': 'Sourced directly from the vibrant heart of Sampeng Market, our curated selection represents four decades of haberdashery excellence. Every ribbon is hand-picked for quality and character.',
-    'Threads': 'Sourced directly from the vibrant heart of Sampeng Market, our curated selection represents four decades of haberdashery excellence. Every thread is hand-picked for quality and character.',
-    'Needles': 'Precision tools sourced directly from the vibrant heart of Sampeng Market, curated for the modern maker and traditional tailor.',
-    'Fabrics': 'Premium materials sourced directly from the vibrant heart of Sampeng Market, hand-picked for quality and character.'
-};
-
-const defaultDescription = 'Sourced directly from the vibrant heart of Sampeng Market, our curated selection represents four decades of haberdashery excellence. Every item is hand-picked for quality and character.';
-
 const heroImage = computed(() => {
+    const catKey = currentCategory.value?.toLowerCase();
+    if (catKey && categoryHeroImages[catKey]) {
+        return categoryHeroImages[catKey];
+    }
+
+    // Fallback to first product image if no manual mapping found
     if (products.value.length > 0 && products.value[0].image_key) {
         return getImageUrl(products.value[0].image_key);
     }
@@ -65,24 +97,67 @@ const setMainImage = (key) => {
     currentImageKey.value = key;
 };
 
+// Cart Logic
+const handleAddToCartClick = (item) => {
+    selectedProductForCart.value = item;
+    showConfirmModal.value = true;
+};
+
+const closeConfirmModal = () => {
+    showConfirmModal.value = false;
+    selectedProductForCart.value = null;
+};
+
+const confirmAddToCart = () => {
+    if (!selectedProductForCart.value) return;
+
+    const product = selectedProductForCart.value;
+
+    // Default variations (like in OrderPage)
+    const sizes = product.sizes ? (typeof product.sizes === 'string' ? product.sizes.split(',').map(s => s.trim()) : product.sizes) : ['Standard'];
+    const colors = product.colors ? (typeof product.colors === 'string' ? product.colors.split(',').map(c => c.trim()) : product.colors) : ['Default'];
+
+    const selection = {
+        size: sizes[0],
+        color: colors[0]
+    };
+
+    cartStore.addToCart(product, selection);
+
+    showNotificationMsg(`${tProduct(product, 'name')} added to cart! 🛒`);
+    closeConfirmModal();
+};
+
+const showNotificationMsg = (msg) => {
+    notificationMessage.value = msg;
+    showNotification.value = true;
+    setTimeout(() => {
+        showNotification.value = false;
+    }, 2000);
+};
+
+
 // Logic to find an image matching a specific attribute value
 const handleAttributeClick = (type, value) => {
     if (!selectedProduct.value || !selectedProduct.value.images) return;
-    
+
     // Find image that matches this attribute value
-    const match = selectedProduct.value.images.find(img => 
-        img.attribute_type === type && 
+    const match = selectedProduct.value.images.find(img =>
+        img.attribute_type === type &&
         img.attribute_value?.trim().toLowerCase() === value.trim().toLowerCase()
     );
-    
+
     if (match) {
         currentImageKey.value = match.image_key;
     }
 };
 
-const getImageUrl = (key) => {
+const getImageUrl = (key, variant = 'thumb') => {
     if (!key) return 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg';
-    return `${API_URL}/images/${key}`;
+    const keyStr = String(key);
+    if (keyStr.startsWith('http')) return keyStr;
+    if (keyStr.includes('.')) return `${API_URL}/images/${keyStr}`;
+    return `${API_URL}/images/${keyStr}-${variant}.webp`;
 };
 
 const backToCatalog = () => {
@@ -108,7 +183,7 @@ const sortedProducts = computed(() => {
             <!-- Back Navigation -->
             <div class="nav-container">
                 <button class="back-link" @click="backToCatalog">
-                    <ion-icon name="arrow-back-outline"></ion-icon> Back to Categories
+                    <ion-icon name="arrow-back-outline"></ion-icon> {{ $t('catalog.backToCatalog') }}
                 </button>
             </div>
 
@@ -116,10 +191,11 @@ const sortedProducts = computed(() => {
             <div class="hero-section">
                 <div class="hero-text">
                     <div class="since-badge">
-                        <ion-icon name="star"></ion-icon> SINCE 1984
+                        <ion-icon name="star"></ion-icon> {{ $t('catalog.since') }}
                     </div>
-                    <h1 class="hero-title">{{ currentCategory }} Collection</h1>
-                    <p class="hero-desc">{{ categoryDescriptions[currentCategory] || defaultDescription }}</p>
+                    <h1 class="hero-title">{{ $t('catalog.collection', { category: currentCategory }) }}</h1>
+                    <p class="hero-desc">{{ $t(`catalog.categoryDescriptions.${currentCategory}`,
+                        $t('catalog.categoryDescriptions.Default')) }}</p>
                 </div>
                 <div class="hero-image-container">
                     <img v-if="heroImage" :src="heroImage" alt="Category Hero" />
@@ -128,18 +204,17 @@ const sortedProducts = computed(() => {
             </div>
         </div>
 
-        <!-- Controls Section -->
         <div class="controls-section">
             <div class="product-count">
-                Showing {{ products.length }} products
+                {{ $t('catalog.showing', { count: products.length }) }}
             </div>
             <div class="sort-control">
-                <label>Sort by:</label>
+                <label>{{ $t('catalog.sortBy') }}</label>
                 <select v-model="sortBy">
-                    <option value="popular">Most Popular</option>
-                    <option value="price_asc">Price: Low to High</option>
-                    <option value="price_desc">Price: High to Low</option>
-                    <option value="name">Name</option>
+                    <option value="popular">{{ $t('catalog.sortPopular') }}</option>
+                    <option value="price_asc">{{ $t('catalog.sortPriceAsc') }}</option>
+                    <option value="price_desc">{{ $t('catalog.sortPriceDesc') }}</option>
+                    <option value="name">{{ $t('catalog.sortName') }}</option>
                 </select>
             </div>
         </div>
@@ -148,16 +223,16 @@ const sortedProducts = computed(() => {
         <div class="product-grid">
             <div v-for="item in sortedProducts" :key="item.id" class="product-card" @click="handleQuickView(item)">
                 <div class="card-image">
-                    <div class="badge" v-if="item.price_1">ARTISAN CHOICE</div>
-                    <img :src="getImageUrl(item.image_key)" :alt="item.name">
+                    <div class="badge" v-if="item.price_1">{{ $t('catalog.artisanChoice') }}</div>
+                    <img :src="getImageUrl(item.image_key)" :alt="tProduct(item, 'name')">
                 </div>
                 <div class="card-content">
-                    <h3 class="card-title">{{ item.name }}</h3>
-                    <p class="card-desc">{{ item.description || 'Premium quality material sourced for the modern maker.'
-                        }}</p>
+                    <h3 class="card-title">{{ tProduct(item, 'name') }}</h3>
+                    <p class="card-desc">{{ tProduct(item, 'description') || $t('catalog.categoryDescriptions.Default')
+                    }}</p>
                     <div class="card-footer">
-                        <button class="add-btn" @click.stop="handleQuickView(item)">
-                            <ion-icon name="cart"></ion-icon> Add to Order
+                        <button class="add-btn" @click.stop="handleAddToCartClick(item)">
+                            <ion-icon name="cart"></ion-icon> {{ $t('catalog.addToOrder') }}
                         </button>
                     </div>
                 </div>
@@ -174,20 +249,21 @@ const sortedProducts = computed(() => {
                 <div class="popup-body">
                     <div class="popup-image">
                         <div class="main-image-display">
-                            <img :src="getImageUrl(currentImageKey || selectedProduct.image_key)" :alt="selectedProduct.name">
+                            <img :src="getImageUrl(currentImageKey || selectedProduct.image_key)"
+                                :alt="tProduct(selectedProduct, 'name')">
                         </div>
 
                         <!-- Gallery Thumbnails -->
-                        <div class="gallery-thumbnails" v-if="selectedProduct.images && selectedProduct.images.length > 0">
-                            <div class="thumb" 
-                                 :class="{ active: currentImageKey === selectedProduct.image_key || !currentImageKey }"
-                                 @click="setMainImage(selectedProduct.image_key)">
+                        <div class="gallery-thumbnails"
+                            v-if="selectedProduct.images && selectedProduct.images.length > 0">
+                            <div class="thumb"
+                                :class="{ active: currentImageKey === selectedProduct.image_key || !currentImageKey }"
+                                @click="setMainImage(selectedProduct.image_key)">
                                 <img :src="getImageUrl(selectedProduct.image_key)" alt="Main">
                             </div>
-                            <div v-for="img in selectedProduct.images" :key="img.id" 
-                                 class="thumb"
-                                 :class="{ active: currentImageKey === img.image_key }"
-                                 @click="setMainImage(img.image_key)">
+                            <div v-for="img in selectedProduct.images" :key="img.id" class="thumb"
+                                :class="{ active: currentImageKey === img.image_key }"
+                                @click="setMainImage(img.image_key)">
                                 <img :src="getImageUrl(img.image_key)" :alt="img.attribute_value || 'Gallery'">
                             </div>
                         </div>
@@ -196,59 +272,59 @@ const sortedProducts = computed(() => {
                     <div class="popup-details">
                         <div class="popup-info-header">
                             <span class="popup-category">{{ selectedProduct.category }}</span>
-                            <h2 class="popup-title">{{ selectedProduct.name }}</h2>
+                            <h2 class="popup-title">{{ tProduct(selectedProduct, 'name') }}</h2>
                         </div>
-                        <p class="popup-description">{{ selectedProduct.description }}</p>
+                        <p class="popup-description">{{ tProduct(selectedProduct, 'description') }}</p>
 
-                        <div class="detail-section" v-if="selectedProduct.usage">
+                        <div class="detail-section" v-if="tProduct(selectedProduct, 'usage')">
                             <h3 class="detail-heading">
                                 <ion-icon name="hammer-outline"></ion-icon>
-                                How It's Used
+                                {{ $t('catalog.howItsUsed') }}
                             </h3>
-                            <p class="detail-text">{{ selectedProduct.usage }}</p>
+                            <p class="detail-text">{{ tProduct(selectedProduct, 'usage') }}</p>
                         </div>
 
-                        <div class="detail-section" v-if="selectedProduct.use_for">
+                        <div class="detail-section" v-if="tProduct(selectedProduct, 'use_for')">
                             <h3 class="detail-heading">
                                 <ion-icon name="checkmark-circle-outline"></ion-icon>
-                                What It's For
+                                {{ $t('catalog.whatItsFor') }}
                             </h3>
-                            <p class="detail-text">{{ selectedProduct.use_for }}</p>
+                            <p class="detail-text">{{ tProduct(selectedProduct, 'use_for') }}</p>
                         </div>
 
-                        <div class="detail-section" v-if="selectedProduct.varieties">
+                        <div class="detail-section" v-if="tProduct(selectedProduct, 'varieties')">
                             <h3 class="detail-heading">
                                 <ion-icon name="grid-outline"></ion-icon>
-                                Varieties
+                                {{ $t('catalog.varieties') }}
                             </h3>
                             <div class="tags-container">
-                                <span v-for="variety in selectedProduct.varieties.split(',')" :key="variety"
-                                    class="tag" @click="handleAttributeClick('variety', variety)">
+                                <span v-for="variety in tProduct(selectedProduct, 'varieties').split(',')"
+                                    :key="variety" class="tag" @click="handleAttributeClick('variety', variety)">
                                     {{ variety.trim() }}
                                 </span>
                             </div>
                         </div>
 
-                        <div class="detail-section" v-if="selectedProduct.sizes">
+                        <div class="detail-section" v-if="tProduct(selectedProduct, 'sizes')">
                             <h3 class="detail-heading">
                                 <ion-icon name="resize-outline"></ion-icon>
-                                Available Sizes
+                                {{ $t('catalog.availableSizes') }}
                             </h3>
                             <div class="tags-container">
-                                <span v-for="size in selectedProduct.sizes.split(',')" :key="size" class="tag size-tag"
-                                    @click="handleAttributeClick('size', size)">
+                                <span v-for="size in tProduct(selectedProduct, 'sizes').split(',')" :key="size"
+                                    class="tag size-tag" @click="handleAttributeClick('size', size)">
                                     {{ size.trim() }}
                                 </span>
                             </div>
                         </div>
 
-                        <div class="detail-section" v-if="selectedProduct.colors">
+                        <div class="detail-section" v-if="tProduct(selectedProduct, 'colors')">
                             <h3 class="detail-heading">
                                 <ion-icon name="color-palette-outline"></ion-icon>
-                                Available Colors
+                                {{ $t('catalog.availableColors') }}
                             </h3>
                             <div class="tags-container">
-                                <span v-for="color in selectedProduct.colors.split(',')" :key="color"
+                                <span v-for="color in tProduct(selectedProduct, 'colors').split(',')" :key="color"
                                     class="tag color-tag" @click="handleAttributeClick('color', color)">
                                     {{ color.trim() }}
                                 </span>
@@ -258,6 +334,51 @@ const sortedProducts = computed(() => {
                 </div>
             </div>
         </div>
+
+        <!-- Confirmation Modal -->
+        <div v-if="showConfirmModal" class="popup-overlay" @click="closeConfirmModal">
+            <div class="confirm-modal" @click.stop v-if="selectedProductForCart">
+                <div class="confirm-header">
+                    <div class="confirm-icon">🛒</div>
+                    <h2>{{ $t('catalog.confirmAddToCart') || 'Add to Order?' }}</h2>
+                </div>
+                <div class="confirm-body">
+                    <div class="confirm-product-info">
+                        <img :src="getImageUrl(selectedProductForCart.image_key)"
+                            :alt="tProduct(selectedProductForCart, 'name')">
+                        <div class="confirm-text">
+                            <h3>{{ tProduct(selectedProductForCart, 'name') }}</h3>
+                            <p class="category-tag">{{ selectedProductForCart.category }}</p>
+                        </div>
+                    </div>
+                    <p class="confirm-message">
+                        {{ $t('catalog.confirmMessage') || 'Would you like to add this item to your order list ? ' }}
+                    </p>
+                </div>
+                <div class="confirm-footer">
+                    <button class="btn-cancel" @click="closeConfirmModal">{{ $t('catalog.cancel') || 'Cancel'
+                        }}</button>
+                    <button class="btn-confirm" @click="confirmAddToCart">
+                        {{ $t('catalog.confirm') || 'Yes, Add to Order' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notification Toast -->
+        <transition name="slide-up">
+            <div v-if="showNotification" class="notification">
+                <div class="notification-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                </div>
+                <div class="notification-content">
+                    {{ notificationMessage }}
+                </div>
+            </div>
+        </transition>
     </div>
 </template>
 
@@ -765,7 +886,147 @@ const sortedProducts = computed(() => {
 }
 
 /* RESPONSIVE */
+/* CONFIRMATION MODAL */
+.confirm-modal {
+    background: white;
+    border-radius: 24px;
+    max-width: 450px;
+    width: 90%;
+    padding: 30px;
+    animation: slideUp 0.3s ease;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+    text-align: center;
+}
+
+.confirm-header {
+    margin-bottom: 25px;
+}
+
+.confirm-icon {
+    font-size: 40px;
+    margin-bottom: 15px;
+}
+
+.confirm-header h2 {
+    font-size: 24px;
+    color: #2d3436;
+    margin: 0;
+    font-family: 'ZCOOL XiaoWei', serif;
+}
+
+.confirm-product-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 16px;
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.confirm-product-info img {
+    width: 70px;
+    height: 70px;
+    object-fit: cover;
+    border-radius: 12px;
+}
+
+.confirm-text h3 {
+    font-size: 16px;
+    margin: 0 0 4px 0;
+    color: #2d3436;
+}
+
+.category-tag {
+    font-size: 12px;
+    color: #8b6f47;
+    margin: 0;
+    font-weight: 600;
+}
+
+.confirm-message {
+    font-size: 15px;
+    color: #636e72;
+    line-height: 1.6;
+    margin-bottom: 30px;
+}
+
+.confirm-footer {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 15px;
+}
+
+.btn-cancel {
+    background: #f1f2f6;
+    color: #2d3436;
+    border: none;
+    padding: 12px;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-confirm {
+    background: #008080;
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-confirm:hover {
+    background: #006666;
+    transform: translateY(-2px);
+}
+
+.btn-cancel:hover {
+    background: #dfe4ea;
+}
+
+/* NOTIFICATION TOAST */
+.notification {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #35231d;
+    color: white;
+    padding: 16px 24px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 2000;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.notification-icon {
+    color: #b89968;
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+    transition: all 0.3s ease;
+}
+
+.slide-up-enter-from {
+    transform: translate(-50%, 100%);
+    opacity: 0;
+}
+
+.slide-up-leave-to {
+    transform: translate(-50%, 100%);
+    opacity: 0;
+}
+
 @media (max-width: 900px) {
+
     .product-grid {
         grid-template-columns: repeat(2, 1fr);
     }

@@ -128,16 +128,15 @@ onMounted(async () => {
 
 /* ===== HERO SECTION ===== */
 .hero-section {
-  /* background: linear-gradient(135deg, #8b6f47 0%, #b89968 50%, #d4a574 100%); */
   background: url('../assets/shop02.jpg');
   background-size: contain;
+  background-repeat: repeat;
   background-position: center;
-  min-height: 600px;
+  height: 600px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  /* overflow: hidden; */
 }
 
 .hero-section::before {
@@ -169,16 +168,13 @@ onMounted(async () => {
 
 .hero-title {
   font-family: 'Crimson Pro', serif;
-  font-size: 3.5rem;
-  /* Reduced from 5rem to fit 2 lines */
+  font-size: clamp(2.5rem, 8vw, 4.5rem);
   font-weight: 600;
   line-height: 1.1;
-  /* Slightly more room for the serifs */
-  margin: 0 0 20px 0;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+  margin: 0 0 24px 0;
+  text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
   animation: fadeInUp 0.8s ease;
   max-width: 900px;
-  /* Ensuring it has enough width to spread out */
 }
 
 .hero-subtitle {
@@ -469,27 +465,72 @@ onMounted(async () => {
 }
 
 /* ===== RESPONSIVE ===== */
+@media (max-width: 1200px) {
+  .hero-content {
+    padding: 0 40px;
+    gap: 20px;
+  }
+}
+
+@media (max-width: 992px) {
+  .hero-section {
+    height: 500px;
+  }
+
+  .hero-decoration {
+    transform: scale(0.8);
+    flex: 0.8;
+  }
+}
+
 @media (max-width: 768px) {
+  .hero-section {
+    height: 450px;
+  }
+
   .hero-content {
     flex-direction: column;
     text-align: center;
+    padding: 0 20px;
   }
 
   .hero-title {
-    font-size: 36px;
+    font-size: 2.5rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1.1rem;
+    margin-bottom: 30px;
   }
 
   .hero-decoration {
     display: none;
   }
 
-  .section-header-wrapper {
-    flex-direction: column;
-    gap: 20px;
+  .hero-buttons {
+    justify-content: center;
   }
 
-  .search-bar input {
-    width: 200px;
+  .cta-primary,
+  .cta-secondary {
+    padding: 12px 30px;
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 2rem;
+  }
+
+  .hero-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .cta-primary,
+  .cta-secondary {
+    width: 100%;
   }
 }
 </style>

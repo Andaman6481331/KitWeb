@@ -5,7 +5,8 @@
         "contactUs": "联系我们",
         "login": "登录",
         "events": "活动",
-        "partners": "合作伙伴"
+        "partners": "合作伙伴",
+        "account": "账户"
     },
     "footer": {
         "companyName": "吉祥隆",
@@ -63,7 +64,39 @@
         "communityFocus": "社区关注",
         "communityFocusDesc": "支持当地工匠和手工艺社区",
         "qualityAssured": "质量保证",
-        "qualityAssuredDesc": "所有产品100%满意保证"
+        "qualityAssuredDesc": "所有产品100%满意保证",
+        "headerTitle": "让我们一起动手创作",
+        "headerDefinition": "对特定材料有疑问，或者需要下一次 DIY 杰作的建议吗？我们的创作者们随时为您提供帮助。联系我们，让我们一起实现您的愿景！",
+        "hub": {
+            "title": "传承中心",
+            "address": "实际地址",
+            "phone": "电话号码",
+            "email": "电子邮件地址",
+            "emailValue": "hello{'@'}kitcharoen.com",
+            "connect": "与我们联系",
+            "quote": "传承连接世代的丝线。"
+        },
+        "form": {
+            "title": "咨询表",
+            "subtitle": "告诉我们您的项目或询问有关我们传承系列的问题。",
+            "name": "全名",
+            "namePlaceholder": "阿伦·吉祥隆",
+            "email": "电子邮件地址",
+            "emailPlaceholder": "arun{'@'}example.com",
+            "subject": "主题",
+            "subjects": {
+                "wholesale": "批发咨询",
+                "product": "产品问题",
+                "shipping": "物流支持",
+                "other": "其他"
+            },
+            "message": "留言",
+            "messagePlaceholder": "告诉我们我们可以如何帮助您的创作...",
+            "sending": "发送中...",
+            "send": "发送留言",
+            "successMessage": "感谢您的咨询！我们将尽快回复您。",
+            "responseTime": "预计在 24 小时内回复。"
+        }
     },
     "events": {
         "heroTagline": "创造。学习。连接。",
@@ -106,5 +139,294 @@
     },
     "common": {
         "address": "曼谷三攀他旺区 乍甲拉瓦 瓦尼奇1路 376号"
+    },
+    "partner": {
+        "heroTitle": "遍布泰国及海外的诚信合作伙伴",
+        "heroSubtitle": "建立可靠的零售伙伴关系，从曼谷延伸至泰国的每个角落以及跨国边界"
+    },
+    "admin": {
+        "loginTitle": "管理员登录",
+        "passwordPlaceholder": "密码",
+        "signIn": "登录",
+        "incorrectPassword": "密码错误，请重试。",
+        "dashboard": "管理面板",
+        "statsItems": "{count} 个项目",
+        "statsCategories": "{count} 个类别",
+        "editCategories": "编辑类别",
+        "logout": "退出登录",
+        "manageCategories": "管理类别",
+        "categoryName": "类别名称",
+        "path": "路径",
+        "defaultUsage": "默认用途占位符",
+        "defaultUseFor": "默认使用对象占位符",
+        "add": "添加",
+        "editProduct": "编辑产品",
+        "addProduct": "添加新产品",
+        "cancelEdit": "取消编辑",
+        "productNameEn": "产品名称 (英文)",
+        "productNameTh": "产品名称 (泰文)",
+        "pricesHeader": "价格（显示第一级）",
+        "config": "配置",
+        "level": "级别",
+        "addImage": "添加图片",
+        "clickToUpload": "点击上传图片",
+        "category": "类别",
+        "selectCategory": "选择类别",
+        "description": "描述",
+        "descriptionPlaceholder": "描述质量、材料或来源...",
+        "autoTranslateHint": "自动翻译为泰语、中文和日语",
+        "usage": "用途",
+        "useFor": "使用对象",
+        "varieties": "品种（用逗号隔开）",
+        "sizes": "尺寸",
+        "colors": "颜色",
+        "initialStock": "初始库存",
+        "updateStock": "更新库存（当前：{stock}）",
+        "resultingStock": "最终库存",
+        "galleryTitle": "产品图库和变体",
+        "addImages": "添加图片",
+        "galleryOption": "普通图库",
+        "colorOption": "颜色变体",
+        "sizeOption": "尺寸变体",
+        "varietyOption": "品种变体",
+        "processing": "处理中...",
+        "submitUpdate": "更新产品",
+        "submitAdd": "添加产品",
+        "priceFormula": "价格公式",
+        "formulaDesc": "根据 L5 价格的百分比计算 L1-L4",
+        "currentL5": "当前 L5: {price}",
+        "percentages": "百分比 (L1, L2, L3, L4)",
+        "formulaHint": "例如：“200, 180, 160, 130”表示 L1 是 L5 的 200%，L2 是 L5 的 180%，依此类推。",
+        "cancel": "取消",
+        "applyFormula": "应用公式",
+        "inventory": "库存",
+        "all": "全部",
+        "inStock": "{count} 件库存",
+        "alertUpdated": "已更新！",
+        "alertAdded": "已添加！",
+        "confirmDeleteCategory": "删除此类别？",
+        "errorDeleteCategory": "删除类别失败",
+        "confirmDeleteProduct": "您确定要删除此产品吗？",
+        "errorDeleteProduct": "删除失败: {message}",
+        "galleryEmpty": "尚未添加图库图片。",
+        "enterAttribute": "输入 {type}",
+        "placeholderUsage": "例如：手工编织、机器绣花",
+        "placeholderUseFor": "例如：服装、家居装饰",
+        "placeholderVarieties": "例如：棉、丝、羊毛",
+        "placeholderSizes": "例如：50克、100米、小号",
+        "placeholderColors": "例如：红色、天蓝色、绿色"
+    },
+    "featuredCategories": {
+        "title": "匠心系列",
+        "subtitle": "为您下一个杰作发现最优质的材料。",
+        "explore": "探索系列",
+        "items": {
+            "needles": {
+                "name": "针",
+                "description": "手工抛光的精密工具，专为舒适和耐用而设计。"
+            },
+            "yarn": {
+                "name": "纱线",
+                "description": "优质有机纤维，提供精心挑选的艺术色调。"
+            },
+            "accessories": {
+                "name": "配件",
+                "description": "专业级剪刀、卷尺和工具，适合一丝不苟的匠人。"
+            },
+            "beads": {
+                "name": "珠子",
+                "description": "精美的玻璃和水晶珠，为任何项目增添一抹亮色。"
+            }
+        }
+    },
+    "kitcraft": {
+        "eyebrow": "手工艺术",
+        "title": "将纱线和珠子转化为艺术品",
+        "subtitle": "通过我们简单的 DIY 教程，发现创作精美手工配件、装饰品和礼品的治愈快乐。",
+        "benefits": {
+            "beginner": {
+                "title": "新手友好",
+                "desc": "循序渐进的指南，适合所有技能水平"
+            },
+            "affordable": {
+                "title": "实惠材料",
+                "desc": "创作精美作品，无需花费巨额资金"
+            },
+            "creative": {
+                "title": "无限创意",
+                "desc": "个性化每个项目以匹配您的风格"
+            }
+        },
+        "startCrafting": "开始创作",
+        "learnMore": "了解更多"
+    },
+    "videoSection": {
+        "title": "我们的动态故事",
+        "subtitle": "见证我们材料背后的手工工艺流程。",
+        "controls": {
+            "restart": "重新开始",
+            "seekBack": "-10秒",
+            "seekForward": "+10秒"
+        },
+        "videos": {
+            "clip1": {
+                "title": "手工纱线染色",
+                "description": "传统染色技术，色彩鲜艳"
+            },
+            "clip2": {
+                "title": "优质生丝",
+                "description": "源自泰国北部当地工匠"
+            },
+            "clip3": {
+                "title": "手工编织纹理",
+                "description": "世代相传的技艺打造"
+            },
+            "clip4": {
+                "title": "精密工具",
+                "description": "高品质针具及手工艺配件"
+            }
+        },
+        "indicatorLabel": "前往视频 {index}"
+    },
+    "catalog": {
+        "since": "始于 1984 年",
+        "title": "浏览我们的收藏",
+        "subtitle": "四十年的精湛工艺，为现代制作者和传统裁缝精心策划。",
+        "shopCategory": "按类别购物",
+        "backToCatalog": "返回类别",
+        "collection": "{category} 系列",
+        "showing": "正在显示 {count} 个产品",
+        "sortBy": "排序方式：",
+        "sortPopular": "最受欢迎",
+        "sortPriceAsc": "价格：从低到高",
+        "sortPriceDesc": "价格：从高到低",
+        "sortName": "名称",
+        "artisanChoice": "吉祥隆精选",
+        "addToOrder": "加入订单",
+        "confirmAddToCart": "加入订单？",
+        "confirmMessage": "您想将此项目添加到您的订单列表中吗？",
+        "cancel": "取消",
+        "confirm": "是的，加入订单",
+        "howItsUsed": "如何使用",
+        "whatItsFor": "用途",
+        "varieties": "种类",
+        "availableSizes": "可选尺寸",
+        "availableColors": "可选颜色",
+        "categoryDescriptions": {
+            "Default": "我们为您的创意项目精心挑选的优质材料。"
+        }
+    },
+    "auth": {
+        "since": "始于 1984 年",
+        "brandName": "吉祥隆<br>Haberdashery",
+        "brandDesc": "传承自三代的手工艺术与泰国传统工艺，为现代创作者精心保留。欢迎回到 Heritage Craft & Stitch 之家。",
+        "signIn": "登录",
+        "signInSubtitle": "输入您的详细信息以访问您的帐户。",
+        "emailLabel": "电子邮件地址",
+        "emailPlaceholder": "weaver@heritage.com",
+        "passwordLabel": "密码",
+        "forgotPassword": "忘记密码？",
+        "passwordPlaceholder": "••••••••",
+        "rememberMe": "记住我",
+        "or": "或",
+        "newToCommunity": "新加入我们的社区？",
+        "joinHeritage": "加入传承",
+        "joinUs": "加入我们",
+        "wholesaleSubtitle": "申请批发账户。",
+        "businessName": "企业名称",
+        "businessPlaceholder": "店铺名称",
+        "ownerName": "店主姓名",
+        "ownerPlaceholder": "姓名",
+        "email": "电子邮件",
+        "phone": "电话",
+        "taxId": "税号（可选）",
+        "taxIdPlaceholder": "注册号",
+        "confirmPassword": "确认密码",
+        "agreeToTerms": "我同意",
+        "terms": "条款",
+        "createAccount": "创建账户",
+        "footer": "© 1984 吉祥隆 Haberdashery。世代传承的匠心品质。",
+        "loginFailed": "登录失败。请检查您的凭据。",
+        "passwordsDoNotMatch": "密码不匹配！",
+        "agreeTermsError": "请同意条款和条件",
+        "accountCreated": "账户创建成功！请登录。",
+        "signupFailed": "注册失败。请再试一次。",
+        "logoutConfirmTitle": "确认登出",
+        "logoutConfirmMessage": "您确定要退出账户吗？",
+        "logoutConfirmBtn": "是的，登出",
+        "cancelLogoutBtn": "保持登录"
+    },
+    "termsTitle": "条款与条件",
+    "termsContent": "欢迎来到 Kitcharoen Haberdashery。通过创建账户，您同意我们的批发条款：1. 所有批发账户均需经过验证。2. 可能适用最低订购量。3. 价格保密。4. 传统工艺是我们的首要任务。",
+    "order": {
+        "title": "订购产品",
+        "welcomeBack": "欢迎回来，{name}",
+        "heroSubtitle": "订购并追踪来自 Kitcharoen 的最新精品和策展灵感。",
+        "logout": "登出",
+        "newOrder": "新订单",
+        "trackOrders": "追踪订单",
+        "searchPlaceholder": "搜索产品...",
+        "all": "全部",
+        "tableHeader": {
+            "image": "图片",
+            "details": "产品详情",
+            "variations": "规格",
+            "price": "价格",
+            "action": "操作"
+        },
+        "loadingProducts": "正在策划优质供应...",
+        "outOfStock": "缺货",
+        "add": "添加",
+        "noProductsFound": "未找到产品",
+        "adjustFilters": "尝试调整您的搜索或筛选条件",
+        "yourCart": "您的购物车",
+        "items": "项目",
+        "clearAll": "全部清除",
+        "cartEmpty": "购物车是空的",
+        "cartEmptySubtitle": "看来您还没有为您的项目添加任何优质供应。",
+        "browseCollections": "浏览系列",
+        "subtotal": "小计",
+        "delivery": "送货费",
+        "total": "总计",
+        "grandTotal": "累计总额",
+        "secureCheckout": "安全结账",
+        "globalShipping": "全球航运",
+        "orderHistory": "订单历史",
+        "downloadStatements": "下载对账单",
+        "noOrdersFound": "未找到订单",
+        "noOrdersSubtitle": "您尚未下单。今天就开始您的 Kitcharoen 之旅吧。",
+        "shopNow": "立即购物",
+        "orderNumber": "订单号 #",
+        "shipped": "已发货",
+        "itemsCount": "项目",
+        "trackShipment": "追踪货运",
+        "orderDetails": "订单详情",
+        "buyAgain": "再次购买",
+        "recommendedForYou": "为您推荐",
+        "viewRecommendations": "查看推荐",
+        "completeOrder": "完成订单",
+        "completeOrderSubtitle": "查看您的订单并提供详情",
+        "fullName": "全名",
+        "fullNamePlaceholder": "输入您的姓名...",
+        "orderNote": "订单备注 (可选)",
+        "orderNotePlaceholder": "特殊要求或送货说明...",
+        "cancel": "取消",
+        "sendToLine": "发送订单到 LINE",
+        "sending": "正在发送...",
+        "clearCartConfirm": "清除购物车？",
+        "clearCartSubtitle": "这将删除您为项目选择的所有优质项目。此操作无法撤销。",
+        "keepItems": "保留项目",
+        "yesClearCart": "是的，清除购物车",
+        "addedToCart": "{name} 已添加到购物车！ 🛒",
+        "removedFromCart": "{name} 已从购物车中移除",
+        "cartCleared": "购物车已清除 🗑️",
+        "cartEmptyError": "您的购物车是空的！",
+        "pleaseEnterName": "请输入您的姓名",
+        "orderSuccess": "订单发送成功！ 🎉",
+        "orderFailed": "订单发送失败。请重试。",
+        "placedOn": "下单时间",
+        "status": "状态",
+        "qty": "数量",
+        "goCheckout": "前往结账"
     }
 }

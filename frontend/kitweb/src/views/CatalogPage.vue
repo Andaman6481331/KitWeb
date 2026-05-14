@@ -10,12 +10,12 @@ const toggleCart = () => {
 <template>
     <!-- Page Header -->
     <div class="catalog-header">
+        <div class="overlay"></div>
         <div class="header-content">
-            <span class="since-badge" v-reveal delay="0.2s">SINCE 1984</span>
-            <h1 class="catalog-title" v-reveal>Browse Our Collection</h1>
+            <span class="since-badge" v-reveal delay="0.2s">{{ $t('catalog.since') }}</span>
+            <h1 class="catalog-title" v-reveal>{{ $t('catalog.title') }}</h1>
             <p class="catalog-subtitle" v-reveal delay="0.6s">
-                Four decades of artisanal quality, curated by category for the modern <br class="desktop-only">
-                maker and the traditional tailor.
+                {{ $t('catalog.subtitle') }}
             </p>
         </div>
     </div>
@@ -30,9 +30,31 @@ const toggleCart = () => {
 <style scoped>
 /* Catalog Header */
 .catalog-header {
-    padding: 80px 5% 60px 5%;
-    background-color: #FBF7F2;
+    padding: 120px 5% 100px 5%;
+    background-image: url('../assets/shop06.png');
+    background-size: cover;
+    background-position: center;
     text-align: center;
+    position: relative;
+    color: white;
+    overflow: hidden;
+}
+
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1;
+}
+
+.header-content {
+    position: relative;
+    z-index: 2;
+    max-width: 1000px;
+    margin: 0 auto;
 }
 
 .since-badge {
@@ -40,7 +62,7 @@ const toggleCart = () => {
     font-family: 'Work Sans', sans-serif;
     font-size: 14px;
     font-weight: 700;
-    color: #8b6f47;
+    color: #e8dcc8;
     letter-spacing: 4px;
     margin-bottom: 15px;
     text-transform: uppercase;
@@ -48,8 +70,8 @@ const toggleCart = () => {
 
 .catalog-title {
     font-family: 'ZCOOL XiaoWei', serif;
-    font-size: 4rem;
-    color: #3d2b1f;
+    font-size: 4.5rem;
+    color: white;
     margin: 0 auto 25px;
     line-height: 1.1;
     font-weight: 500;
@@ -57,12 +79,11 @@ const toggleCart = () => {
 
 .catalog-subtitle {
     font-family: 'Work Sans', sans-serif;
-    font-size: 1.25rem;
-    color: #5d4037;
+    font-size: 1.35rem;
+    color: rgba(255, 255, 255, 0.9);
     max-width: 800px;
     margin: 0 auto;
     line-height: 1.6;
-    opacity: 0.9;
 }
 
 .desktop-only {

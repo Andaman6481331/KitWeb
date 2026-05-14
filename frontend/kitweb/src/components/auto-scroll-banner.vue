@@ -13,12 +13,6 @@ const togglePause = () => {
         <div class="scroll-banner reverse" :class="{ paused: isPaused }">
             <div class="scroll-track">
                 <!-- First set -->
-                <!-- <div v-for="image in bannerImages" :key="`reverse-first-${image.id}`" class="banner-item">
-                    <img :src="image.url" :alt="image.alt" />
-                    <div class="overlay">
-                        <span class="label">{{ image.alt }}</span>
-                    </div>
-                </div> -->
 
                 <!-- Duplicate set -->
                 <div class="banner-item">
@@ -66,6 +60,10 @@ const togglePause = () => {
 /* Scrolling Banner Container */
 * {
     user-select: none;
+}
+
+.banner-section {
+    padding: 2rem 0;
 }
 
 .scroll-banner {

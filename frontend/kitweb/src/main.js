@@ -3,6 +3,8 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import i18n from './i18n'
+import VueVirtualScroller from 'vue-virtual-scroller'
+import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
 
 
 //UI import
@@ -30,6 +32,7 @@ const app = createApp(App)
 
 app.use(router)
 app.use(i18n)
+app.use(VueVirtualScroller)
 
 app.directive('reveal', {
   mounted(el) {

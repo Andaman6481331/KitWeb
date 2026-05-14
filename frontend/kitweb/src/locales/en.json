@@ -6,7 +6,8 @@
     "contactUs": "Contact Us",
     "login": "Login",
     "events": "Events",
-    "partners": "Partners"
+    "partners": "Partners",
+    "account": "Account"
   },
   "footer": {
     "companyName": "Kitcharoen",
@@ -66,7 +67,37 @@
     "qualityAssured": "Quality Assured",
     "qualityAssuredDesc": "100% satisfaction guarantee on all products",
     "headerTitle": "Let's Get Crafty Together",
-    "headerDefinition": "Have a question about a specific material or need advice for your next DIY masterpiece? Our fellow makers are here to help. Reach out and let’s bring your vision to life!"
+    "headerDefinition": "Have a question about a specific material or need advice for your next DIY masterpiece? Our fellow makers are here to help. Reach out and let’s bring your vision to life!",
+    "hub": {
+      "title": "Heritage Hub",
+      "address": "Physical Address",
+      "phone": "Phone Number",
+      "email": "Email Address",
+      "emailValue": "hello{'@'}kitcharoen.com",
+      "connect": "Connect With Us",
+      "quote": "Honoring the thread that binds generations together."
+    },
+    "form": {
+      "title": "Inquiry Form",
+      "subtitle": "Tell us about your project or ask a question about our heritage collections.",
+      "name": "FULL NAME",
+      "namePlaceholder": "Arun Kitcharoen",
+      "email": "EMAIL ADDRESS",
+      "emailPlaceholder": "arun{'@'}example.com",
+      "subject": "SUBJECT",
+      "subjects": {
+        "wholesale": "Wholesale Inquiry",
+        "product": "Product Question",
+        "shipping": "Shipping Support",
+        "other": "Other"
+      },
+      "message": "MESSAGE",
+      "messagePlaceholder": "Tell us how we can help your craft...",
+      "sending": "Sending...",
+      "send": "Send Message",
+      "successMessage": "Thank you for your inquiry! We will get back to you shortly.",
+      "responseTime": "Expect a response within 24 hours."
+    }
   },
   "events": {
     "heroTagline": "Create. Learn. Connect.",
@@ -107,8 +138,312 @@
     "whatsIncluded": "What's Included:",
     "addToCart": "Add to Cart"
   },
+  "catalog": {
+    "since": "SINCE 1984",
+    "title": "Browse Our Collection",
+    "subtitle": "Four decades of artisanal quality, curated by category for the modern maker and the traditional tailor.",
+    "shopCategory": "Shop Category",
+    "backToCatalog": "Back to Categories",
+    "collection": "{category} Collection",
+    "showing": "Showing {count} products",
+    "sortBy": "Sort by:",
+    "sortPopular": "Most Popular",
+    "sortPriceAsc": "Price: Low to High",
+    "sortPriceDesc": "Price: High to Low",
+    "sortName": "Name",
+    "artisanChoice": "Kitcharoen's Selected",
+    "addToOrder": "Add to Order",
+    "confirmAddToCart": "Add to Order?",
+    "confirmMessage": "Would you like to add this item to your order list?",
+    "cancel": "Cancel",
+    "confirm": "Yes, Add to Order",
+    "howItsUsed": "How It's Used",
+    "whatItsFor": "What It's For",
+    "varieties": "Varieties",
+    "availableSizes": "Available Sizes",
+    "availableColors": "Available Colors",
+    "categoryDescriptions": {
+      "Yarns": "Hand-dyed cotton and northern Thai silk, perfect for weaving stories into every stitch.",
+      "Ribbons": "Bespoke satin and velvet trims, gathered from the finest looms across Southeast Asia.",
+      "Threads": "Industrial strength and artisanal color palettes, crafted for longevity and vibrant detail.",
+      "Needles": "Precision-engineered tools for the traditional tailor and the modern craft enthusiast.",
+      "Fabrics": "Premium materials sourced directly from the vibrant heart of Sampeng Market, hand-picked for quality and character.",
+      "Buttons": "Hand-carved wood, mother-of-pearl, and signature metal closures for distinct finishes.",
+      "Tools": "Professional-grade shears, needles, and measuring tools for the serious craftsperson.",
+      "Default": "Sourced directly from the vibrant heart of Sampeng Market, our curated selection represents four decades of excellence. Every item is hand-picked for quality and character."
+    }
+  },
+  "videoSection": {
+    "title": "Our Story In Motion",
+    "subtitle": "Witness the artisanal processes behind our materials.",
+    "controls": {
+      "restart": "Restart",
+      "seekBack": "-10s",
+      "seekForward": "+10s"
+    },
+    "videos": {
+      "clip1": {
+        "title": "Artisanal Yarn Dyeing",
+        "description": "Traditional techniques for vibrant colors"
+      },
+      "clip2": {
+        "title": "Premium Raw Silk",
+        "description": "Sourced from local northern artisans"
+      },
+      "clip3": {
+        "title": "Hand-Woven Textures",
+        "description": "Crafted with generations of skill"
+      },
+      "clip4": {
+        "title": "Precision Tools",
+        "description": "Quality needles and craft accessories"
+      }
+    },
+    "indicatorLabel": "Go to video {index}"
+  },
+  "diyKits": {
+    "tag": "CURATED KITS",
+    "title": "The Maker's Atelier",
+    "description": "Everything you need to begin your next masterpiece, thoughtfully assembled for the modern artisan.",
+    "essentialItems": "Essential Items",
+    "exploreDetails": "Explore Kit Details"
+  },
+  "partner": {
+    "heroTitle": "Trusted Partners Across Thailand & Beyond",
+    "heroSubtitle": "Building reliable retail partnerships from Bangkok to every corner of Thailand and across international borders"
+  },
   "common": {
     "address": "376 Wanich 1 Chakkrawat Samphantawong Bangkok",
     "name": "Kitcharoen"
+  },
+  "admin": {
+    "loginTitle": "Admin Login",
+    "passwordPlaceholder": "Password",
+    "signIn": "Sign In",
+    "incorrectPassword": "Incorrect password. Please try again.",
+    "dashboard": "Admin Dashboard",
+    "statsItems": "{count} items",
+    "statsCategories": "{count} categories",
+    "editCategories": "Edit Categories",
+    "logout": "Logout",
+    "manageCategories": "Manage Categories",
+    "categoryName": "Category Name",
+    "path": "Path",
+    "defaultUsage": "Default Usage Placeholder",
+    "defaultUseFor": "Default Use For Placeholder",
+    "add": "Add",
+    "editProduct": "Edit Product",
+    "addProduct": "Add New Product",
+    "cancelEdit": "Cancel Edit",
+    "productNameEn": "Product Name (EN)",
+    "productNameTh": "Product Name (TH)",
+    "pricesHeader": "Prices (Level 1 is Displayed)",
+    "config": "Config",
+    "level": "L",
+    "addImage": "Add Image",
+    "clickToUpload": "Click to upload image",
+    "category": "Category",
+    "selectCategory": "Select a category",
+    "description": "Description",
+    "descriptionPlaceholder": "Describe the quality, material, or source...",
+    "autoTranslateHint": "Auto-translated for Thai, Chinese, and Japanese",
+    "usage": "Usage",
+    "useFor": "Use For",
+    "varieties": "Varieties (comma separated)",
+    "sizes": "Sizes",
+    "colors": "Colors",
+    "initialStock": "Initial Stock",
+    "updateStock": "Update Stock (Current: {stock})",
+    "resultingStock": "Resulting Stock",
+    "galleryTitle": "Product Gallery & Variations",
+    "addImages": "Add Images",
+    "galleryOption": "General Gallery",
+    "colorOption": "Color Variant",
+    "sizeOption": "Size Variant",
+    "varietyOption": "Variety Variant",
+    "processing": "Processing...",
+    "submitUpdate": "Update Product",
+    "submitAdd": "Add Product",
+    "priceFormula": "Price Formula",
+    "formulaDesc": "Calculate L1-L4 based on a % of L5 price.",
+    "currentL5": "Current L5: {price}",
+    "percentages": "Percentages (L1, L2, L3, L4)",
+    "formulaHint": "Example: \"200, 180, 160, 130\" means L1 is 200% of L5, L2 is 180% of L5, etc.",
+    "cancel": "Cancel",
+    "applyFormula": "Apply Formula",
+    "inventory": "Inventory",
+    "all": "All",
+    "inStock": "{count} in stock",
+    "alertUpdated": "Updated!",
+    "alertAdded": "Added!",
+    "confirmDeleteCategory": "Delete this category?",
+    "errorDeleteCategory": "Failed to delete category",
+    "confirmDeleteProduct": "Are you sure you want to delete this product?",
+    "errorDeleteProduct": "Delete failed: {message}",
+    "galleryEmpty": "No gallery images added yet.",
+    "enterAttribute": "Enter {type}",
+    "placeholderUsage": "e.g. Hand knitting, Machine embroidery",
+    "placeholderUseFor": "e.g. Clothing, Home decor",
+    "placeholderVarieties": "e.g. Cotton, Silk, Wool",
+    "placeholderSizes": "e.g. 50g, 100m, Small",
+    "placeholderColors": "e.g. Red, Sky Blue, Green"
+  },
+  "featuredCategories": {
+    "title": "Artisan Collections",
+    "subtitle": "Discover the finest materials for your next masterpiece.",
+    "explore": "Explore Collection",
+    "items": {
+      "needles": {
+        "name": "Needles",
+        "description": "Hand-polished precision tools designed for comfort and durability."
+      },
+      "yarn": {
+        "name": "Yarn",
+        "description": "Premium organic fibers available in a curated palette of artisanal tones."
+      },
+      "accessories": {
+        "name": "Accessories",
+        "description": "Professional-grade scissors, tapes, and tools for the meticulous crafter."
+      },
+      "beads": {
+        "name": "Beads",
+        "description": "Exquisite glass and crystal beads to add a touch of brilliance to any project."
+      }
+    }
+  },
+  "kitcraft": {
+    "eyebrow": "Handmade Crafts",
+    "title": "Transform Yarn & Beads Into Art",
+    "subtitle": "Discover the therapeutic joy of creating beautiful handmade accessories, décor, and gifts with our simple DIY tutorials.",
+    "benefits": {
+      "beginner": {
+        "title": "Beginner Friendly",
+        "desc": "Step-by-step guides perfect for all skill levels"
+      },
+      "affordable": {
+        "title": "Affordable Materials",
+        "desc": "Create stunning pieces without breaking the bank"
+      },
+      "creative": {
+        "title": "Endless Creativity",
+        "desc": "Personalize every project to match your style"
+      }
+    },
+    "startCrafting": "Start Crafting",
+    "learnMore": "Learn More"
+  },
+  "auth": {
+    "since": "SINCE 1984",
+    "brandName": "Kitcharoen376",
+    "brandDesc": "A legacy of artisanal quality and traditional Thai craftsmanship, preserved for the modern maker. Welcome back to the house of Heritage Craft & Stitch.",
+    "signIn": "Sign In",
+    "signInSubtitle": "Enter your details to access your account.",
+    "emailLabel": "Email Address",
+    "emailPlaceholder": "weaver@heritage.com",
+    "passwordLabel": "Password",
+    "forgotPassword": "Forgot Password?",
+    "passwordPlaceholder": "••••••••",
+    "rememberMe": "Remember Me",
+    "or": "OR",
+    "newToCommunity": "New to our community?",
+    "joinHeritage": "Sign Up Now",
+    "joinUs": "Join us",
+    "wholesaleSubtitle": "Apply for a wholesale account.",
+    "businessName": "Business Name",
+    "businessPlaceholder": "Shop Name",
+    "ownerName": "Owner Name",
+    "ownerPlaceholder": "Name",
+    "email": "Email",
+    "phone": "Phone",
+    "phonePlaceholder": "+66 XX XXX XXXX",
+    "taxId": "Tax ID (Optional)",
+    "taxIdPlaceholder": "Reg. Number",
+    "confirmPassword": "Confirm",
+    "agreeToTerms": "I agree to the",
+    "terms": "Terms",
+    "createAccount": "Create Account",
+    "footer": "© 1984 Kitcharoen376. Artisanal quality for generations.",
+    "loginFailed": "Login failed. Please check your credentials.",
+    "passwordsDoNotMatch": "Passwords do not match!",
+    "agreeTermsError": "Please agree to the terms and conditions",
+    "accountCreated": "Account created successfully! Please sign in.",
+    "signupFailed": "Signup failed. Please try again.",
+    "logoutConfirmTitle": "Confirm Logout",
+    "logoutConfirmMessage": "Are you sure you want to sign out of your account?",
+    "logoutConfirmBtn": "Yes, Logout",
+    "cancelLogoutBtn": "Stay Logged In"
+  },
+  "termsTitle": "Terms & Conditions",
+  "termsContent": "Welcome to Kitcharoen376. By creating an account, you agree to our wholesale terms: 1. All wholesale accounts are subject to verification. 2. Minimum order quantities may apply. 3. Prices are confidential. 4. Traditional craftsmanship is our priority.",
+  "order": {
+    "title": "Order Products",
+    "welcomeBack": "Welcome back, {name}",
+    "heroSubtitle": "Ordering & Tracking your latest treasures and curated inspirations from Kitcharoen.",
+    "logout": "Logout",
+    "newOrder": "NEW ORDER",
+    "trackOrders": "TRACK ORDERS",
+    "searchPlaceholder": "Search products...",
+    "all": "All",
+    "tableHeader": {
+      "image": "IMAGE",
+      "details": "PRODUCT DETAILS",
+      "variations": "VARIATIONS",
+      "price": "PRICE",
+      "action": "ACTION"
+    },
+    "loadingProducts": "Curating premium supplies...",
+    "outOfStock": "Out of Stock",
+    "add": "Add",
+    "noProductsFound": "No products found",
+    "adjustFilters": "Try adjusting your search or filters",
+    "yourCart": "Your Cart",
+    "items": "ITEMS",
+    "clearAll": "CLEAR ALL",
+    "cartEmpty": "Cart is empty",
+    "cartEmptySubtitle": "It looks like you haven't added any premium supplies to your project list yet.",
+    "browseCollections": "Browse Collections",
+    "subtotal": "Subtotal",
+    "delivery": "Delivery",
+    "total": "Total",
+    "grandTotal": "Grand Total",
+    "secureCheckout": "Secure Checkout",
+    "globalShipping": "GLOBAL SHIPPING",
+    "orderHistory": "Order History",
+    "downloadStatements": "Download Statements",
+    "noOrdersFound": "No orders found",
+    "noOrdersSubtitle": "You haven't placed any orders yet. Start your journey with Kitcharoen treasures today.",
+    "shopNow": "SHOP NOW",
+    "orderNumber": "ORDER #",
+    "shipped": "SHIPPED",
+    "itemsCount": "Items",
+    "trackShipment": "TRACK SHIPMENT",
+    "orderDetails": "ORDER DETAILS",
+    "buyAgain": "BUY AGAIN",
+    "recommendedForYou": "RECOMMENDED FOR YOU",
+    "viewRecommendations": "VIEW RECOMMENDATIONS",
+    "completeOrder": "Complete Your Order",
+    "completeOrderSubtitle": "Review your order and provide details",
+    "fullName": "Full Name",
+    "fullNamePlaceholder": "Enter your name...",
+    "orderNote": "Order Note (Optional)",
+    "orderNotePlaceholder": "Special requests or delivery instructions...",
+    "cancel": "Cancel",
+    "sendToLine": "Send Order to LINE",
+    "sending": "Sending...",
+    "clearCartConfirm": "Clear your cart?",
+    "clearCartSubtitle": "This will remove all premium items you've selected for your project. This action cannot be undone.",
+    "keepItems": "Keep Items",
+    "yesClearCart": "Yes, Clear Cart",
+    "addedToCart": "{name} added to cart! 🛒",
+    "removedFromCart": "{name} removed from cart",
+    "cartCleared": "Cart cleared 🗑️",
+    "cartEmptyError": "Your cart is empty!",
+    "pleaseEnterName": "Please enter your name",
+    "orderSuccess": "Order sent successfully! 🎉",
+    "orderFailed": "Failed to send order. Please try again.",
+    "placedOn": "Placed on",
+    "status": "Status",
+    "qty": "Qty",
+    "goCheckout": "Go to Checkout"
   }
 }

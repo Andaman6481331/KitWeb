@@ -39,10 +39,10 @@ const diyProducts = ref([
     <section class="diy-kits-section">
         <div class="container">
             <div class="section-header" v-reveal>
-                <span class="section-tag">CURATED KITS</span>
-                <h2 class="section-title">The Maker's Atelier</h2>
+                <span class="section-tag">{{ $t('diyKits.tag') }}</span>
+                <h2 class="section-title">{{ $t('diyKits.title') }}</h2>
                 <p class="section-description">
-                    Everything you need to begin your next masterpiece, thoughtfully assembled for the modern artisan.
+                    {{ $t('diyKits.description') }}
                 </p>
             </div>
 
@@ -71,12 +71,12 @@ const diyProducts = ref([
                             </div>
                             <div class="feature">
                                 <ion-icon name="layers-outline"></ion-icon>
-                                <span>{{ product.includes.length }} Essential Items</span>
+                                <span>{{ product.includes.length }} {{ $t('diyKits.essentialItems') }}</span>
                             </div>
                         </div>
 
                         <button class="kit-btn">
-                            Explore Kit Details
+                            {{ $t('diyKits.exploreDetails') }}
                             <ion-icon name="chevron-forward-outline"></ion-icon>
                         </button>
                     </div>

@@ -2,7 +2,10 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { api, API_URL } from '../services/api';
+import { categoryHeroImages } from '../services/categoryImages';
+import { useI18n } from 'vue-i18n';
 
+const { t } = useI18n();
 const router = useRouter();
 
 const products = ref([]);
@@ -21,15 +24,6 @@ async function loadData() {
     }
 }
 
-const categoryDescriptions = {
-    'Yarns': 'Hand-dyed cotton and northern Thai silk, perfect for weaving stories into every stitch.',
-    'Ribbons': 'Bespoke satin and velvet trims, gathered from the finest looms across Southeast Asia.',
-    'Threads': 'Industrial strength and artisanal color palettes, crafted for longevity and vibrant detail.',
-    'Needles': 'Precision-engineered tools for the traditional tailor and the modern craft enthusiast.',
-    'Fabrics': 'Premium linens and heritage weaves, sourced from independent looms and master weavers.',
-    'Buttons': 'Hand-carved wood, mother-of-pearl, and signature metal closures for distinct finishes.',
-    'Tools': 'Professional-grade shears, needles, and measuring tools for the serious craftsperson.'
-};
 
 const categories = computed(() => {
     const categoryMap = new Map();
@@ -38,11 +32,14 @@ const categories = computed(() => {
         if (categoryMap.has(p.category)) {
             categoryMap.get(p.category).count++;
         } else {
+            const catKey = p.category.toLowerCase();
+            const mappedImage = categoryHeroImages[catKey];
+
             categoryMap.set(p.category, {
                 name: p.category,
                 count: 1,
-                image: p.image_key ? `${API_URL}/images/${p.image_key}` : 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg',
-                description: categoryDescriptions[p.category] || 'Explore our curated selection of high-quality craft materials.'
+                image: mappedImage || (p.image_key ? (p.image_key.includes('.') ? `${API_URL}/images/${p.image_key}` : `${API_URL}/images/${p.image_key}-thumb.webp`) : 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg'),
+                description: t(`catalog.categoryDescriptions.${p.category}`, t('catalog.categoryDescriptions.Default'))
             });
         }
     });
@@ -53,12 +50,6 @@ const categories = computed(() => {
 
 const selectCategory = (categoryName) => {
     router.push(`/catalog/${categoryName}`);
-};
-
-// Helper for image URLs
-const getImageUrl = (key) => {
-    if (!key) return 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg';
-    return `${API_URL}/images/${key}`;
 };
 
 </script>
@@ -77,7 +68,7 @@ const getImageUrl = (key) => {
                         <h3 class="category-title-text">{{ category.name }}</h3>
                         <p class="category-description-text">{{ category.description }}</p>
                         <div class="category-action">
-                            <span class="shop-now-link">Shop Category <ion-icon
+                            <span class="shop-now-link">{{ $t('catalog.shopCategory') }} <ion-icon
                                     name="arrow-forward-outline"></ion-icon></span>
                         </div>
                     </div>
@@ -102,7 +93,7 @@ const getImageUrl = (key) => {
 
 .category-list {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 40px;
 }
 
@@ -187,13 +178,19 @@ const getImageUrl = (key) => {
 
 @media (max-width: 992px) {
     .category-list {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
         max-width: 700px;
         margin: 0 auto;
     }
 
     .category-title-text {
         font-size: 1.8rem;
+    }
+}
+
+@media (max-width: 600px) {
+    .category-list {
+        grid-template-columns: 1fr;
     }
 }
 

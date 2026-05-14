@@ -3,8 +3,8 @@
         <!-- Hero Section -->
         <section class="hero">
             <div class="hero-content">
-                <h1 v-reveal>{{ hero.title }}</h1>
-                <p class="subtitle" v-reveal delay="0.5s">{{ hero.subtitle }}</p>
+                <h1 v-reveal>{{ $t('partner.heroTitle') }}</h1>
+                <p class="subtitle" v-reveal delay="0.5s">{{ $t('partner.heroSubtitle') }}</p>
             </div>
         </section>
 
@@ -20,37 +20,43 @@
             </div>
         </section>
 
-        <!-- Map Section -->
-        <section class="map-section">
-            <div class="container">
-                <h2 class="section-title">{{ mapSection.title }}</h2>
-                <p class="section-subtitle">{{ mapSection.subtitle }}</p>
-                <div class="map-container">
-                    <div class="map-placeholder">
-                        [Interactive Network Map - Bangkok Hub with Connection Lines to Thai Regions & International
-                        Destinations]
+        <!-- Customer Image Wall -->
+        <section class="image-wall-section">
+            <div class="container-fluid">
+                <h2 class="section-title">{{ wallSection.title }}</h2>
+                <p class="section-subtitle">{{ wallSection.subtitle }}</p>
+                <div class="image-wall-container">
+                    <!-- Row 1: Primary Row -->
+                    <div class="image-wall-row row-1">
+                        <div class="image-wall">
+                            <div v-for="(img, index) in [...wallImages, ...wallImages]" :key="'r1-' + index"
+                                class="wall-item">
+                                <img :src="img" :alt="'Partner ' + index" loading="lazy" />
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Row 2: Reversed, different speed -->
+                    <div class="image-wall-row row-2">
+                        <div class="image-wall">
+                            <div v-for="(img, index) in [...wallImages.slice().reverse(), ...wallImages.slice().reverse()]"
+                                :key="'r2-' + index" class="wall-item">
+                                <img :src="img" :alt="'Partner ' + index" loading="lazy" />
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Row 3: Slower, primary direction -->
+                    <div class="image-wall-row row-3">
+                        <div class="image-wall">
+                            <div v-for="(img, index) in [...wallImages.slice(5), ...wallImages.slice(0, 5), ...wallImages.slice(5), ...wallImages.slice(0, 5)]"
+                                :key="'r3-' + index" class="wall-item">
+                                <img :src="img" :alt="'Partner ' + index" loading="lazy" />
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Partners by Region -->
-        <section class="partners-section">
-            <div class="container">
-                <h2 class="section-title">Our Partner Network</h2>
-                <p class="section-subtitle">Working with trusted retailers and distributors across key regions</p>
-                <div class="partner-regions">
-                    <div v-for="(region, index) in regions" :key="index" class="region-card">
-                        <h3 class="region-name">{{ region.name }}</h3>
-                        <ul class="partner-list">
-                            <li v-for="(partner, pIndex) in region.partners" :key="pIndex">
-                                {{ partner }}
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </section>
 
         <!-- Operations Photos -->
         <section class="operations-section">
@@ -118,10 +124,7 @@
 <script setup>
 import { ref } from 'vue';
 
-const hero = ref({
-    title: 'Trusted Partners Across Thailand & Beyond',
-    subtitle: 'Building reliable retail partnerships from Bangkok to every corner of Thailand and across international borders'
-});
+// Hero text is now handled via i18n in the template
 
 const stats = ref([
     { number: '180+', label: 'Retail Partners' },
@@ -130,67 +133,31 @@ const stats = ref([
     { number: '8', label: 'Countries Served' }
 ]);
 
-const mapSection = ref({
-    title: 'Our Network Reaches Far & Wide',
-    subtitle: `From our hub in Bangkok, we connect with partners across Thailand's regions and select international markets`
+const wallSection = ref({
+    title: 'Our Thriving Community',
+    subtitle: 'Celebrating the success of our partners and the creativity of our customers across the globe'
 });
 
-const regions = ref([
-    {
-        name: 'Central Thailand',
-        partners: [
-            'Bangkok Metropolitan Partners (38)',
-            'Nonthaburi & Pathum Thani (12)',
-            'Ayutthaya Distributors (8)',
-            'Samut Prakan Retailers (6)'
-        ]
-    },
-    {
-        name: 'Northern Region',
-        partners: [
-            'Chiang Mai Partners (15)',
-            'Chiang Rai Retailers (9)',
-            'Lampang Distributors (7)',
-            'Phitsanulok Network (6)'
-        ]
-    },
-    {
-        name: 'Northeastern (Isan)',
-        partners: [
-            'Nakhon Ratchasima Partners (11)',
-            'Khon Kaen Retailers (10)',
-            'Udon Thani Distributors (8)',
-            'Ubon Ratchathani Network (5)'
-        ]
-    },
-    {
-        name: 'Southern Region',
-        partners: [
-            'Phuket & Krabi Partners (13)',
-            'Hat Yai Distributors (9)',
-            'Surat Thani Retailers (7)',
-            'Songkhla Network (6)'
-        ]
-    },
-    {
-        name: 'Eastern Seaboard',
-        partners: [
-            'Chonburi & Pattaya Partners (14)',
-            'Rayong Distributors (8)',
-            'Chanthaburi Retailers (5)',
-            'Trat Network (3)'
-        ]
-    },
-    {
-        name: 'International Markets',
-        partners: [
-            'Singapore Partners (3)',
-            'Malaysia Distributors (2)',
-            'Vietnam Retailers (2)',
-            'Laos Network (1)'
-        ]
-    }
-]);
+import front01 from '@/assets/customer/front01.jpg';
+import front02 from '@/assets/customer/front02.jpg';
+import front03 from '@/assets/customer/front03.jpg';
+import front04 from '@/assets/customer/front04.jpg';
+import front05 from '@/assets/customer/front05.jpg';
+import front06 from '@/assets/customer/front06.jpg';
+import front07 from '@/assets/customer/front07.jpg';
+import front08 from '@/assets/customer/front08.jpg';
+import front09 from '@/assets/customer/front09.jpg';
+import front10 from '@/assets/customer/front10.jpg';
+import front11 from '@/assets/customer/front11.jpg';
+import front12 from '@/assets/customer/front12.jpg';
+import front13 from '@/assets/customer/front13.jpg';
+import front14 from '@/assets/customer/front14.jpg';
+import res01 from '@/assets/customer/res01.jpg';
+
+const wallImages = [
+    front01, front02, front03, front04, front05, front06, front07, front08, front09, front10, front11, front12, front13, front14
+];
+
 
 const operations = ref([
     {
@@ -415,101 +382,108 @@ h1 {
     font-weight: 500;
 }
 
-.map-section {
-    padding: 5rem 2rem;
+.image-wall-section {
+    padding: 5rem 0;
     background: var(--earth-pale);
+    overflow: hidden;
 }
 
-.section-title {
-    font-family: 'Crimson Pro', serif;
-    font-size: 2.5rem;
-    font-weight: 600;
-    text-align: center;
-    margin-bottom: 1rem;
-    color: var(--earth-dark);
-}
-
-.section-subtitle {
-    text-align: center;
-    color: var(--text-medium);
-    font-size: 1.1rem;
-    margin-bottom: 3rem;
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.map-container {
-    max-width: 900px;
-    margin: 0 auto;
-    background: white;
-    padding: 2rem;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(74, 63, 53, 0.1);
-    text-align: center;
-}
-
-.map-placeholder {
+.image-wall-container {
     width: 100%;
-    height: 500px;
-    background: linear-gradient(135deg, var(--earth-pale) 0%, var(--earth-cream) 100%);
-    border-radius: 6px;
+    overflow: hidden;
+    padding: 3rem 0;
+    position: relative;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--earth-medium);
-    font-style: italic;
-    border: 2px dashed var(--earth-light);
+    flex-direction: column;
+    gap: 24px;
+    object-fit: contain;
 }
 
-.partners-section {
-    padding: 5rem 2rem;
-    background: white;
+.image-wall-container::before,
+.image-wall-container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    width: 20px;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
 }
 
-.partner-regions {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 2rem;
-    margin-top: 3rem;
+.image-wall-container::before {
+    left: 0;
+    background: linear-gradient(to right, var(--earth-pale), transparent);
 }
 
-.region-card {
-    background: var(--earth-cream);
-    padding: 2rem;
-    border-radius: 6px;
-    border-left: 4px solid var(--earth-light);
-    transition: all 0.3s ease;
+.image-wall-container::after {
+    right: 0;
+    background: linear-gradient(to left, var(--earth-pale), transparent);
 }
 
-.region-card:hover {
-    border-left-color: var(--accent-warm);
-    transform: translateX(5px);
-    box-shadow: 0 4px 20px rgba(74, 63, 53, 0.08);
+.image-wall-row {
+    width: 100%;
 }
 
-.region-name {
-    font-family: 'Crimson Pro', serif;
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--earth-dark);
-    margin-bottom: 1rem;
+.image-wall {
+    display: flex;
+    gap: 24px;
+    width: max-content;
+    padding-right: 24px;
 }
 
-.partner-list {
-    list-style: none;
-    font-size: 0.95rem;
-    color: var(--text-medium);
+.row-1 .image-wall {
+    animation: scroll 65s linear infinite;
 }
 
-.partner-list li {
-    padding: 0.4rem 0;
-    border-bottom: 1px solid rgba(139, 115, 85, 0.15);
+.row-2 .image-wall {
+    animation: scroll 55s linear infinite reverse;
 }
 
-.partner-list li:last-child {
-    border-bottom: none;
+.row-3 .image-wall {
+    animation: scroll 70s linear infinite;
 }
+
+.wall-item {
+    position: relative;
+    overflow: hidden;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(74, 63, 53, 0.1);
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+}
+
+/* Different heights per row to create Masonry effect */
+.row-1 .wall-item {
+    height: 220px;
+}
+
+.row-2 .wall-item {
+    height: 200px;
+}
+
+.row-3 .wall-item {
+    height: 280px;
+}
+
+
+.wall-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transition: transform 1s ease;
+}
+
+
+@keyframes scroll {
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
 
 .operations-section {
     padding: 5rem 2rem;
@@ -750,8 +724,47 @@ h1 {
         gap: 2rem;
     }
 
-    .map-placeholder {
-        height: 350px;
+    .image-wall-container {
+        gap: 12px;
+        padding: 2rem 0;
+    }
+
+    .image-wall {
+        gap: 12px;
+        padding-right: 12px;
+    }
+
+    /* Reduce to 2 rows on mobile or just smaller rows */
+    .row-3 {
+        display: none;
+    }
+
+    .row-1 .wall-item {
+        height: 180px;
+    }
+
+    .row-2 .wall-item {
+        height: 150px;
+    }
+
+    .wall-item:nth-child(5n+1) {
+        width: 150px;
+    }
+
+    .wall-item:nth-child(5n+2) {
+        width: 220px;
+    }
+
+    .wall-item:nth-child(5n+3) {
+        width: 190px;
+    }
+
+    .wall-item:nth-child(5n+4) {
+        width: 260px;
+    }
+
+    .wall-item:nth-child(5n+5) {
+        width: 210px;
     }
 
     .cta-buttons {

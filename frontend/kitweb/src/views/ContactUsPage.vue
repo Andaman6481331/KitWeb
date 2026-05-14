@@ -53,11 +53,11 @@ const handleSubmit = () => {
     isSubmitting.value = true;
     // Simulate API call
     setTimeout(() => {
-        alert('Thank you for your inquiry! We will get back to you shortly.');
+        alert(t('contact.form.successMessage'));
         form.value = {
             name: '',
             email: '',
-            subject: 'Wholesale Inquiry',
+            subject: t('contact.form.subjects.wholesale'),
             message: ''
         };
         isSubmitting.value = false;
@@ -116,7 +116,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
                 <!-- Left: Heritage Hub -->
                 <div class="heritage-hub">
                     <div class="info-card">
-                        <h2 class="hub-title">Heritage Hub</h2>
+                        <h2 class="hub-title">{{ $t('contact.hub.title') }}</h2>
 
                         <div class="hub-item">
                             <div class="hub-icon">
@@ -127,7 +127,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
                                 </svg>
                             </div>
                             <div class="hub-text">
-                                <strong>Physical Address</strong>
+                                <strong>{{ $t('contact.hub.address') }}</strong>
                                 <p>{{ aboutInfo.contact.address }}</p>
                             </div>
                         </div>
@@ -142,7 +142,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
                                 </svg>
                             </div>
                             <div class="hub-text">
-                                <strong>Phone Number</strong>
+                                <strong>{{ $t('contact.hub.phone') }}</strong>
                                 <p>{{ aboutInfo.contact.phone }}</p>
                             </div>
                         </div>
@@ -158,13 +158,13 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
                                 </svg>
                             </div>
                             <div class="hub-text">
-                                <strong>Email Address</strong>
-                                <p>hello@kitcharoen.com</p>
+                                <strong>{{ $t('contact.hub.email') }}</strong>
+                                <p>{{ $t('contact.hub.emailValue') }}</p>
                             </div>
                         </div>
 
                         <div class="social-connect">
-                            <strong>Connect With Us</strong>
+                            <strong>{{ $t('contact.hub.connect') }}</strong>
                             <div class="social-icons">
                                 <a href="#" class="social-btn">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -197,56 +197,56 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
                     <div class="quote-card">
                         <img src="../assets/shop02.jpg" alt="Heritage Store" class="quote-bg" />
                         <div class="quote-overlay">
-                            <p>"Honoring the thread that binds generations together."</p>
+                            <p>"{{ $t('contact.hub.quote') }}"</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- Right: Inquiry Form -->
                 <div class="inquiry-form-card">
-                    <h2 class="form-title">Inquiry Form</h2>
-                    <p class="form-subtitle">Tell us about your project or ask a question about our heritage
-                        collections.
-                    </p>
+                    <h2 class="form-title">{{ $t('contact.form.title') }}</h2>
+                    <p class="form-subtitle">{{ $t('contact.form.subtitle') }}</p>
 
                     <form @submit.prevent="handleSubmit" class="hub-form">
                         <div class="form-row">
                             <div class="form-group">
-                                <label>FULL NAME</label>
-                                <input type="text" v-model="form.name" placeholder="Arun Kitcharoen" required />
+                                <label>{{ $t('contact.form.name') }}</label>
+                                <input type="text" v-model="form.name" :placeholder="$t('contact.form.namePlaceholder')"
+                                    required />
                             </div>
                             <div class="form-group">
-                                <label>EMAIL ADDRESS</label>
-                                <input type="email" v-model="form.email" placeholder="arun@example.com" required />
+                                <label>{{ $t('contact.form.email') }}</label>
+                                <input type="email" v-model="form.email"
+                                    :placeholder="$t('contact.form.emailPlaceholder')" required />
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label>SUBJECT</label>
+                            <label>{{ $t('contact.form.subject') }}</label>
                             <select v-model="form.subject">
-                                <option>Wholesale Inquiry</option>
-                                <option>Product Question</option>
-                                <option>Shipping Support</option>
-                                <option>Other</option>
+                                <option>{{ $t('contact.form.subjects.wholesale') }}</option>
+                                <option>{{ $t('contact.form.subjects.product') }}</option>
+                                <option>{{ $t('contact.form.subjects.shipping') }}</option>
+                                <option>{{ $t('contact.form.subjects.other') }}</option>
                             </select>
                         </div>
 
                         <div class="form-group">
-                            <label>MESSAGE</label>
-                            <textarea v-model="form.message" placeholder="Tell us how we can help your craft..."
+                            <label>{{ $t('contact.form.message') }}</label>
+                            <textarea v-model="form.message" :placeholder="$t('contact.form.messagePlaceholder')"
                                 rows="6"></textarea>
                         </div>
 
                         <div class="form-actions">
                             <button type="submit" class="submit-btn" :disabled="isSubmitting">
-                                {{ isSubmitting ? 'Sending...' : 'Send Message' }}
+                                {{ isSubmitting ? $t('contact.form.sending') : $t('contact.form.send') }}
                                 <svg v-if="!isSubmitting" width="20" height="20" viewBox="0 0 24 24" fill="none"
                                     stroke="currentColor" stroke-width="2">
                                     <line x1="22" y1="2" x2="11" y2="13"></line>
                                     <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                                 </svg>
                             </button>
-                            <span class="response-time">Expect a response within 24 hours.</span>
+                            <span class="response-time">{{ $t('contact.form.responseTime') }}</span>
                         </div>
                     </form>
                 </div>

@@ -1,38 +1,41 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
-// Sample video data - replace with your actual videos
-const videos = ref([
+const { t } = useI18n()
+
+// Video data with localized content
+const videos = computed(() => [
   {
     id: 1,
     src: '/shop-clip01.mp4',
-    poster: '/shop-clip01-tn.png',
-    title: 'Signature Thai Dishes',
-    description: 'Authentic flavors from Bangkok',
+    poster: '/shop-clip01-tn.jpg',
+    title: t('videoSection.videos.clip1.title'),
+    description: t('videoSection.videos.clip1.description'),
     duration: '2:30'
   },
   {
     id: 2,
     src: '/shop-clip01.mp4',
     poster: '/shop-clip02-tn.png',
-    title: 'Fresh Ingredients',
-    description: 'Quality you can taste',
+    title: t('videoSection.videos.clip2.title'),
+    description: t('videoSection.videos.clip2.description'),
     duration: '1:45'
   },
   {
     id: 3,
     src: '/shop-clip01.mp4',
-    poster: '/shop-clip01-tn.png',
-    title: 'Chef\'s Special',
-    description: 'Handcrafted with love',
+    poster: '/shop-clip01-tn.jpg',
+    title: t('videoSection.videos.clip3.title'),
+    description: t('videoSection.videos.clip3.description'),
     duration: '3:00'
   },
   {
     id: 4,
     src: '/shop-clip01.mp4',
     poster: '/shop-clip02-tn.png',
-    title: 'Delivery Service',
-    description: 'Hot & fresh to your door',
+    title: t('videoSection.videos.clip4.title'),
+    description: t('videoSection.videos.clip4.description'),
     duration: '1:20'
   }
 ])
@@ -40,7 +43,36 @@ const videos = ref([
 const currentIndex = ref(Math.floor(videos.value.length / 2))
 const isPlaying = ref(false)
 const videoElements = ref([])
+const modalVideoElement = ref(null)
 const containerElement = ref(null)
+const isExpanded = ref(false)
+const currentTime = ref(0)
+const duration = ref(0)
+const progress = ref(0)
+const showControls = ref(true)
+let controlsTimeout = null
+
+let lastMouseX = 0
+let lastMouseY = 0
+
+const resetControlsTimeout = (forceShow = true, event = null) => {
+  // If it's a mousemove event, check if the mouse actually moved
+  if (event && event.type === 'mousemove') {
+    const { clientX, clientY } = event
+    if (clientX === lastMouseX && clientY === lastMouseY) return
+    lastMouseX = clientX
+    lastMouseY = clientY
+  }
+
+  if (forceShow) showControls.value = true
+  if (controlsTimeout) clearTimeout(controlsTimeout)
+
+  if (isPlaying.value) {
+    controlsTimeout = setTimeout(() => {
+      showControls.value = false
+    }, 500)
+  }
+}
 
 // Helper to calculate card position (1-5) based on currentIndex
 const getPosition = (index) => {
@@ -95,15 +127,90 @@ const goToVideo = (index) => {
 }
 
 const togglePlay = () => {
-  const currentVideo = videoElements.value[currentIndex.value]
-  if (!currentVideo) return
+  const cardVideo = videoElements.value[currentIndex.value]
+  const modalVideo = modalVideoElement.value
 
   if (isPlaying.value) {
-    currentVideo.pause()
+    if (modalVideo) modalVideo.pause()
+    if (cardVideo) cardVideo.pause()
+    isPlaying.value = false
+    showControls.value = true // Always show controls when paused
   } else {
-    currentVideo.play()
+    if (isExpanded.value && modalVideo) {
+      modalVideo.play()
+    } else if (cardVideo) {
+      // Before expanding, sync time if needed
+      cardVideo.play()
+    }
+    isPlaying.value = true
+    if (!isExpanded.value) {
+      isExpanded.value = true
+      showControls.value = false // Hide initially on expansion
+      resetControlsTimeout(false) // Start timer without showing
+    } else {
+      resetControlsTimeout(true) // Show and reset timer on normal toggle
+    }
   }
-  isPlaying.value = !isPlaying.value
+}
+
+const closeExpanded = () => {
+  const modalVideo = modalVideoElement.value
+  const cardVideo = videoElements.value[currentIndex.value]
+
+  if (modalVideo) modalVideo.pause()
+  if (cardVideo) cardVideo.pause()
+
+  isExpanded.value = false
+  isPlaying.value = false
+  showControls.value = true
+}
+
+const seek = (seconds) => {
+  const activeVideo = isExpanded.value ? modalVideoElement.value : videoElements.value[currentIndex.value]
+  if (activeVideo) {
+    activeVideo.currentTime += seconds
+    resetControlsTimeout()
+  }
+}
+
+const restartVideo = () => {
+  const activeVideo = isExpanded.value ? modalVideoElement.value : videoElements.value[currentIndex.value]
+  if (activeVideo) {
+    activeVideo.currentTime = 0
+    activeVideo.play()
+    isPlaying.value = true
+    resetControlsTimeout()
+  }
+}
+
+const handleTimelineClick = (e) => {
+  const rect = e.currentTarget.getBoundingClientRect()
+  const x = e.clientX - rect.left
+  const percentage = x / rect.width
+  const activeVideo = isExpanded.value ? modalVideoElement.value : videoElements.value[currentIndex.value]
+  if (activeVideo) {
+    activeVideo.currentTime = percentage * activeVideo.duration
+    resetControlsTimeout()
+  }
+}
+
+const handleMouseLeave = () => {
+  if (isPlaying.value) {
+    showControls.value = false
+  }
+}
+
+const handleTimeUpdate = (e) => {
+  const video = e.target
+  currentTime.value = video.currentTime
+  duration.value = video.duration
+  progress.value = (video.currentTime / video.duration) * 100
+}
+
+const formatTime = (time) => {
+  const minutes = Math.floor(time / 60)
+  const seconds = Math.floor(time % 60)
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }
 
 const pauseVideo = () => {
@@ -153,9 +260,76 @@ onUnmounted(() => {
     </svg>
   </div>
   <div class="video-card-container">
+    <!-- Teleported Modal for Expanded Video -->
+    <Teleport to="body">
+      <transition name="modal-scale">
+        <div v-if="isExpanded" class="video-modal-overlay" @click="closeExpanded">
+          <div class="video-modal-content" @mousemove.stop="resetControlsTimeout(true, $event)"
+            @mouseleave="handleMouseLeave" @click.stop>
+            <video :src="videos[currentIndex].src" :poster="videos[currentIndex].poster" autoplay
+              class="modal-video-player" @timeupdate="handleTimeUpdate" @ended="handleVideoEnd"
+              ref="modalVideoElement" />
+
+            <!-- Modal Controls -->
+            <transition name="fade">
+              <div v-if="showControls || !isPlaying" class="modal-controls">
+                <button class="modal-close-btn" @click="closeExpanded">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+
+                <div class="modal-controls-center">
+                  <button class="modal-restart-btn" @click="restartVideo" :title="t('videoSection.controls.restart')">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 4v6h6M23 20v-6h-6" />
+                      <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
+                    </svg>
+                  </button>
+
+                  <button class="modal-seek-btn" @click="seek(-10)">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" />
+                    </svg>
+                    <span>{{ t('videoSection.controls.seekBack') }}</span>
+                  </button>
+
+                  <button class="modal-play-btn" @click="togglePlay">
+                    <svg v-if="isPlaying" width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M6 4h4v16H6zm8 0h4v16h4z" />
+                    </svg>
+                    <svg v-else width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </button>
+
+                  <button class="modal-seek-btn" @click="seek(10)">
+                    <span>{{ t('videoSection.controls.seekForward') }}</span>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M13 17l5-5-5-5M6 17l5-5-5-5" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div class="modal-controls-bottom">
+                  <div class="modal-progress-container" @click="handleTimelineClick">
+                    <div class="modal-progress-bar" :style="{ width: progress + '%' }"></div>
+                  </div>
+                  <div class="modal-time-info">
+                    <span>{{ formatTime(currentTime) }}</span>
+                    <span>{{ formatTime(duration) }}</span>
+                  </div>
+                </div>
+              </div>
+            </transition>
+          </div>
+        </div>
+      </transition>
+    </Teleport>
+
     <div v-reveal class="section-header">
-      <h2 style="margin: 0;">Our Story In Motion</h2>
-      <p style="margin: 0;">Witness the artisanal processes behind our materials.</p>
+      <h2 style="margin: 0;">{{ t('videoSection.title') }}</h2>
+      <p style="margin: 0;">{{ t('videoSection.subtitle') }}</p>
     </div>
 
     <div v-reveal class="carousel-container delay4" ref="containerElement" @touchstart="handleTouchStart"
@@ -175,7 +349,6 @@ onUnmounted(() => {
         </svg>
       </button>
 
-      <!-- Video Cards Stack -->
       <div class="cards-stack">
         <div v-for="(video, index) in videos" :key="video.id" class="video-card-item"
           :data-position="getPosition(index)"
@@ -216,7 +389,7 @@ onUnmounted(() => {
       <div class="indicators">
         <button v-for="(video, index) in videos" :key="video.id" class="indicator-dot"
           :class="{ active: index === currentIndex }" @click="goToVideo(index)"
-          :aria-label="`Go to video ${index + 1}`">
+          :aria-label="$t('videoSection.indicatorLabel', { index: index + 1 })">
           <span class="dot-inner"></span>
         </button>
       </div>
@@ -227,16 +400,6 @@ onUnmounted(() => {
         <span class="separator">/</span>
         <span class="total">{{ videos.length }}</span>
       </div> -->
-    </div>
-    <p style="margin: 10px auto 0; text-align: center; font-size: 18px; color: #93735E; opacity: 0.8;">
-      Swipe through our culinary journey</p>
-
-    <!-- Swipe Hint (shows briefly on mobile) -->
-    <div class="swipe-hint">
-      <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-        <path d="M10 20 L20 10 M20 10 L30 20 M20 10 L20 30" stroke="#93735E" stroke-width="2" stroke-linecap="round" />
-      </svg>
-      <p>Swipe to explore</p>
     </div>
   </div>
 
@@ -582,6 +745,200 @@ onUnmounted(() => {
   transform: scale(0.8);
 }
 
+/* Modal Expansion */
+.video-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.95);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+}
+
+.video-modal-content {
+  position: relative;
+  width: 90vw;
+  max-width: 1200px;
+  aspect-ratio: 16 / 9;
+  background: black;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-video-player {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.modal-controls {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, transparent 20%, transparent 80%, rgba(0, 0, 0, 0.8) 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 40px;
+  z-index: 10;
+}
+
+.modal-close-btn {
+  align-self: flex-end;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: white;
+  padding: 12px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: rotate(90deg);
+}
+
+.modal-controls-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 50px;
+}
+
+.modal-seek-btn {
+  background: none;
+  border: none;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.modal-seek-btn:hover {
+  transform: scale(1.1);
+  color: #ffd4a3;
+}
+
+.modal-restart-btn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  opacity: 0.7;
+}
+
+.modal-restart-btn:hover {
+  opacity: 1;
+  transform: rotate(-30deg);
+  color: #ffd4a3;
+}
+
+.modal-play-btn {
+  background: white;
+  border: none;
+  color: #5E4535;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.modal-play-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+}
+
+.modal-controls-bottom {
+  width: 100%;
+}
+
+.modal-progress-container {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  margin-bottom: 20px;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+}
+
+.modal-progress-container::after {
+  content: '';
+  position: absolute;
+  top: -10px;
+  bottom: -10px;
+  left: 0;
+  right: 0;
+}
+
+.modal-progress-bar {
+  height: 100%;
+  background: #ffd4a3;
+}
+
+.modal-time-info {
+  display: flex;
+  justify-content: space-between;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Modal Transitions */
+.modal-scale-enter-active,
+.modal-scale-leave-active {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modal-scale-enter-from,
+.modal-scale-leave-to {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .video-modal-content {
+    width: 95vw;
+  }
+
+  .modal-controls-center {
+    gap: 25px;
+  }
+
+  .modal-play-btn {
+    width: 60px;
+    height: 60px;
+  }
+
+  .modal-controls {
+    padding: 20px;
+  }
+}
+
 /* Responsive Design */
 @media (max-width: 1200px) {
   .carousel-container {
@@ -651,6 +1008,20 @@ onUnmounted(() => {
   .video-counter {
     top: 10px;
     right: 10px;
+  }
+
+  .video-card-item.expanded {
+    width: 95vw;
+    aspect-ratio: 16 / 9;
+  }
+
+  .controls-center {
+    gap: 20px;
+  }
+
+  .play-pause-btn {
+    width: 60px;
+    height: 60px;
   }
 }
 

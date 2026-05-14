@@ -1,6 +1,10 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { api, API_URL } from '../services/api';
+import imageCompression from 'browser-image-compression';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 const products = ref([]);
 const categories = ref([]);
@@ -20,15 +24,22 @@ const activeFilter = ref('all');
 // New product form
 const newProduct = ref({
   name: '',
+  name_th: '',
   description: '',
+  description_th: '',
   price: 0,
   category: '',
   image_key: '',
   usage: '',
+  usage_th: '',
   use_for: '',
+  use_for_th: '',
   varieties: '',
+  varieties_th: '',
   sizes: '',
+  sizes_th: '',
   colors: '',
+  colors_th: '',
   price_1: 0,
   price_2: 0,
   price_3: 0,
@@ -36,6 +47,7 @@ const newProduct = ref({
   price_5: 0,
   stock: 0
 });
+
 const selectedFile = ref(null);
 const imagePreview = ref(null);
 const uploading = ref(false);
@@ -102,7 +114,7 @@ const handleLogin = async () => {
     loginError.value = false;
     loadAll();
   } else {
-    loginError.value = 'Incorrect password. Please try again.';
+    loginError.value = t('admin.incorrectPassword');
   }
 };
 
@@ -139,8 +151,8 @@ const triggerGalleryUpload = () => {
 
 const resetForm = () => {
   newProduct.value = {
-    name: '', description: '', price: 0, category: '', image_key: '',
-    usage: '', use_for: '', varieties: '', sizes: '', colors: '',
+    name: '', name_th: '', description: '', description_th: '', price: 0, category: '', image_key: '',
+    usage: '', usage_th: '', use_for: '', use_for_th: '', varieties: '', varieties_th: '', sizes: '', sizes_th: '', colors: '', colors_th: '',
     price_1: 0, price_2: 0, price_3: 0, price_4: 0, price_5: 0, stock: 0
   };
   selectedFile.value = null;
@@ -173,12 +185,12 @@ const editProduct = (product) => {
 };
 
 const deleteProduct = async (id) => {
-  if (confirm('Are you sure?')) {
+  if (confirm(t('admin.confirmDeleteProduct'))) {
     try {
       await api.deleteProduct(id);
       loadProducts();
     } catch (error) {
-      alert('Delete failed: ' + error.message);
+      alert(t('admin.errorDeleteProduct', { message: error.message }));
     }
   }
 };
@@ -190,17 +202,17 @@ const handleAddCategory = async () => {
     newCat.value = { name: '', path: '', default_usage: '', default_use_for: '' };
     loadCategories();
   } catch (error) {
-    alert('Failed to add category');
+    alert(t('admin.errorDeleteCategory'));
   }
 };
 
 const deleteCategory = async (id) => {
-  if (confirm('Delete this category?')) {
+  if (confirm(t('admin.confirmDeleteCategory'))) {
     try {
       await api.deleteCategory(id);
       loadCategories();
     } catch (error) {
-      alert('Failed to delete');
+      alert(t('admin.errorDeleteCategory'));
     }
   }
 };
@@ -209,19 +221,37 @@ const handleSubmit = async () => {
   try {
     uploading.value = true;
 
+    const prepareAndUpload = async (file) => {
+      const baseName = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+      const thumbOptions = { maxWidthOrHeight: 300, useWebWorker: true, fileType: 'image/webp' };
+      const largeOptions = { maxWidthOrHeight: 1000, useWebWorker: true, fileType: 'image/webp' };
+
+      const [thumbBlob, largeBlob] = await Promise.all([
+        imageCompression(file, thumbOptions),
+        imageCompression(file, largeOptions)
+      ]);
+
+      const thumbFile = new File([thumbBlob], `${baseName}-thumb.webp`, { type: 'image/webp' });
+      const largeFile = new File([largeBlob], `${baseName}-large.webp`, { type: 'image/webp' });
+
+      await api.uploadImage([thumbFile, largeFile]);
+      return baseName;
+    };
+
     // 1. Upload Main Image if changed
     if (selectedFile.value) {
-      const uploadResult = await api.uploadImage(selectedFile.value);
-      newProduct.value.image_key = uploadResult.key;
+      const baseKey = await prepareAndUpload(selectedFile.value);
+      newProduct.value.image_key = baseKey;
     }
 
     // 2. Upload Gallery Images if new
     const finalImages = [];
     for (const img of galleryImages.value) {
       if (img.is_new) {
-        const uploadResult = await api.uploadImage(img.file);
+        const baseKey = await prepareAndUpload(img.file);
         finalImages.push({
-          image_key: uploadResult.key,
+          image_key: baseKey,
           attribute_type: img.attribute_type,
           attribute_value: img.attribute_value,
           is_main: false
@@ -242,14 +272,15 @@ const handleSubmit = async () => {
     if (isEditing.value) {
       newProduct.value.stock = Math.max(0, (newProduct.value.stock || 0) + stockAdjustment.value);
       await api.updateProduct(editingId.value, newProduct.value);
-      alert('Updated!');
+      alert(t('admin.alertUpdated'));
     } else {
       await api.addProduct(newProduct.value);
-      alert('Added!');
+      alert(t('admin.alertAdded'));
     }
     resetForm();
     loadProducts();
   } catch (error) {
+    console.error('Submit error:', error);
     alert('Error: ' + error.message);
   } finally {
     uploading.value = false;
@@ -261,9 +292,18 @@ const logout = () => {
   isAuthenticated.value = false;
 };
 
-const getImageUrl = (key) => {
+const getImageUrl = (key, variant = 'thumb') => {
   if (!key) return 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg';
-  return `${API_URL}/images/${key}`;
+  
+  const keyStr = String(key);
+  // If it's already a full URL, return it
+  if (keyStr.startsWith('http')) return keyStr;
+  
+  // If the key already has an extension, it's likely a legacy key (e.g. .jpg) or already has a variant
+  if (keyStr.includes('.')) return `${API_URL}/images/${keyStr}`;
+  
+  // New-style base keys expect a variant suffix (e.g. 12345-thumb.webp)
+  return `${API_URL}/images/${keyStr}-${variant}.webp`;
 };
 
 const applyPriceFormula = () => {
@@ -289,7 +329,7 @@ const applyPriceFormula = () => {
 
 const onCategoryChange = () => {
   if (isEditing.value) return; // Don't overwrite existing product data when editing
-  
+
   const selectedCat = categories.value.find(c => c.path === newProduct.value.category);
   if (selectedCat) {
     if (selectedCat.default_usage) {
@@ -316,23 +356,25 @@ const adjustStock = async (product, change) => {
 <template>
   <div class="admin-container">
     <div v-if="!isAuthenticated" class="login-box">
-      <h1>Admin Login</h1>
-      <input v-model="password" type="password" placeholder="Password" @keyup.enter="handleLogin" />
-      <button @click="handleLogin">Sign In</button>
+      <h1>{{ $t('admin.loginTitle') }}</h1>
+      <input v-model="password" type="password" :placeholder="$t('admin.passwordPlaceholder')"
+        @keyup.enter="handleLogin" />
+      <button @click="handleLogin">{{ $t('admin.signIn') }}</button>
       <p v-if="loginError" class="error">{{ loginError }}</p>
     </div>
 
     <div v-else class="admin-panel">
       <header>
         <div class="header-left">
-          <h1>Admin Dashboard</h1>
-          <p class="stats">{{ products.length }} items | {{ categories.length }} categories</p>
+          <h1>{{ $t('admin.dashboard') }}</h1>
+          <p class="stats">{{ $t('admin.statsItems', { count: products.length }) }} | {{ $t('admin.statsCategories', {
+            count: categories.length }) }}</p>
         </div>
         <div class="header-actions">
           <button class="cat-btn" @click="showCategoryManager = !showCategoryManager">
-            <ion-icon name="list-outline"></ion-icon> Edit Categories
+            <ion-icon name="list-outline"></ion-icon> {{ $t('admin.editCategories') }}
           </button>
-          <button class="logout-btn" @click="logout">Logout</button>
+          <button class="logout-btn" @click="logout">{{ $t('admin.logout') }}</button>
         </div>
       </header>
 
@@ -340,15 +382,15 @@ const adjustStock = async (product, change) => {
       <transition name="slide-fade">
         <section v-if="showCategoryManager" class="category-manager">
           <div class="cat-manager-content">
-            <h3>Manage Categories</h3>
+            <h3>{{ $t('admin.manageCategories') }}</h3>
             <div class="cat-add-row">
-              <input v-model="newCat.name" placeholder="Category Name (e.g. Beads)" />
-              <input v-model="newCat.path" placeholder="Path (e.g. beads)" />
+              <input v-model="newCat.name" :placeholder="$t('admin.categoryName')" />
+              <input v-model="newCat.path" :placeholder="$t('admin.path')" />
             </div>
             <div class="cat-add-row">
-              <input v-model="newCat.default_usage" placeholder="Default Usage Placeholder" />
-              <input v-model="newCat.default_use_for" placeholder="Default Use For Placeholder" />
-              <button @click="handleAddCategory">Add</button>
+              <input v-model="newCat.default_usage" :placeholder="$t('admin.defaultUsage')" />
+              <input v-model="newCat.default_use_for" :placeholder="$t('admin.defaultUseFor')" />
+              <button @click="handleAddCategory">{{ $t('admin.add') }}</button>
             </div>
             <div class="cat-list">
               <div v-for="cat in categories" :key="cat.id" class="cat-tag">
@@ -369,65 +411,68 @@ const adjustStock = async (product, change) => {
       <div class="dashboard-grid">
         <section class="form-section">
           <div class="form-header">
-            <h2 style="padding: 0; margin: 0;">{{ isEditing ? 'Edit Product' : 'Add New Product' }}</h2>
+            <div class="header-title-group">
+              <h2 style="padding: 0; margin: 0;">{{ isEditing ? $t('admin.editProduct') : $t('admin.addProduct') }}</h2>
+            </div>
             <button v-if="isEditing" @click="resetForm" class="cancel-btn">
-              <ion-icon name="close-circle-outline"></ion-icon> Cancel Edit
+              <ion-icon name="close-circle-outline"></ion-icon> {{ $t('admin.cancelEdit') }}
             </button>
           </div>
 
           <form @submit.prevent="handleSubmit">
             <div class="product-main-row">
               <div class="form-group name-field">
-                <label>Product Name</label>
+                <label>{{ $t('admin.productNameEn') }}</label>
                 <input v-model="newProduct.name" type="text" required placeholder="e.g. Premium Cotton Thread" />
+              </div>
+              <div class="form-group name-field">
+                <label>{{ $t('admin.productNameTh') }}</label>
+                <input v-model="newProduct.name_th" type="text" placeholder="ชื่อสินค้าภาษาไทย..." />
               </div>
             </div>
 
             <div class="price-levels">
               <div class="price-header-row">
-                <label>Prices (Level 1 is Displayed)</label>
+                <label>{{ $t('admin.pricesHeader') }}</label>
                 <button type="button" class="config-btn" @click="showFormulaPopup = true">
-                  <ion-icon name="settings-outline"></ion-icon> Config
+                  <ion-icon name="settings-outline"></ion-icon> {{ $t('admin.config') }}
                 </button>
               </div>
               <div class="price-grid">
                 <div v-for="i in 5" :key="i" :class="['price-input-box', i === 1 ? 'active' : '']">
-                  <span class="label">L{{ i }}</span>
-                  <input v-model="newProduct['price_' + i]" type="number" step="0.01" placeholder="0.00" />
+                  <span class="label">{{ $t('admin.level') }}{{ i }}</span>
+                  <input v-model="newProduct['price_' + i]" type="number" step="0.01" placeholder="0.00" required />
                 </div>
               </div>
             </div>
 
             <div class="form-row">
               <div>
-                <div class="product-image-uploader" @click="triggerFileUpload" title="Click to upload image">
+                <div class="product-image-uploader" @click="triggerFileUpload" :title="$t('admin.clickToUpload')">
                   <img v-if="newProduct.image_key || imagePreview"
                     :src="imagePreview || getImageUrl(newProduct.image_key)" alt="preview" />
                   <div v-else class="upload-placeholder">
                     <ion-icon name="camera-outline"></ion-icon>
-                    <span>Add Image</span>
+                    <span>{{ $t('admin.addImage') }}</span>
                   </div>
                   <input type="file" ref="fileInput" class="hidden-input" @change="handleFileUpload" accept="image/*" />
                 </div>
-                <!-- <div class="form-group">
-                  <label>Image</label>
-                  <input type="file" @change="handleFileUpload" accept="image/*" />
-                </div> -->
               </div>
               <div>
                 <div class="form-group">
-                  <label>Category</label>
+                  <label>{{ $t('admin.category') }}</label>
                   <select v-model="newProduct.category" required @change="onCategoryChange">
-                    <option value="" disabled>Select a category</option>
+                    <option value="" disabled>{{ $t('admin.selectCategory') }}</option>
                     <option v-for="cat in categories" :key="cat.id" :value="cat.path">
                       {{ cat.name }}
                     </option>
                   </select>
                 </div>
                 <div class="form-group">
-                  <label>Description</label>
-                  <textarea v-model="newProduct.description" rows="8"
-                    placeholder="Describe the quality, material, or source..."></textarea>
+                  <label>{{ $t('admin.description') }}</label>
+                  <textarea required v-model="newProduct.description" rows="8"
+                    :placeholder="$t('admin.descriptionPlaceholder')"></textarea>
+                  <small class="auto-hint">{{ $t('admin.autoTranslateHint') }}</small>
                 </div>
               </div>
             </div>
@@ -435,46 +480,52 @@ const adjustStock = async (product, change) => {
 
             <div class="form-row">
               <div class="form-group">
-                <label>Usage</label>
-                <input v-model="newProduct.usage" placeholder="e.g. Hand knitting, Machine embroidery" />
+                <label>{{ $t('admin.usage') }}</label>
+                <input v-model="newProduct.usage" :placeholder="$t('admin.placeholderUsage')" />
               </div>
               <div class="form-group">
-                <label>Use For</label>
-                <input v-model="newProduct.use_for" placeholder="e.g. Clothing, Home decor" />
+                <label>{{ $t('admin.useFor') }}</label>
+                <input v-model="newProduct.use_for" :placeholder="$t('admin.placeholderUseFor')" />
               </div>
             </div>
 
             <div class="form-group">
-              <label>Varieties (Comma separated)</label>
-              <input v-model="newProduct.varieties" placeholder="e.g. 2-ply, 4-ply, Mercerized" />
+              <label>{{ $t('admin.varieties') }}</label>
+              <input v-model="newProduct.varieties" type="text" :placeholder="$t('admin.placeholderVarieties')"
+                class="form-input" />
             </div>
 
             <div class="form-row">
               <div class="form-group">
-                <label>Sizes (Comma separated)</label>
-                <input v-model="newProduct.sizes" placeholder="e.g. 50g, 100m, Small" />
+                <label>{{ $t('admin.sizes') }}</label>
+                <input v-model="newProduct.sizes" :placeholder="$t('admin.placeholderSizes')" />
               </div>
               <div class="form-group">
-                <label>Colors (Comma separated)</label>
-                <input v-model="newProduct.colors" placeholder="e.g. Red, Sky Blue, Green" />
+                <label>{{ $t('admin.colors') }}</label>
+                <input v-model="newProduct.colors" :placeholder="$t('admin.placeholderColors')" />
               </div>
               <div class="form-group" v-if="!isEditing">
-                <label>Initial Stock</label>
+                <label>{{ $t('admin.initialStock') }}</label>
                 <input v-model.number="newProduct.stock" type="number" min="0" placeholder="0" />
               </div>
               <div class="form-group stock-form-group" v-else>
-                <label>Update Stock (Current: {{ newProduct.stock || 0 }})</label>
+                <label>{{ $t('admin.updateStock', { stock: newProduct.stock || 0 }) }}</label>
                 <div class="stock-control edit-stock-control">
                   <button type="button" @click="updateStockAdjustment(-2)" class="stock-btn minus">-2</button>
                   <button type="button" @click="updateStockAdjustment(-1)" class="stock-btn minus">-1</button>
-                  
-                  <input type="number" v-model.number="stockAdjustment" @input="validateStockAdjustment" class="stock-adjust-input" />
-                  
+
+                  <input type="number" v-model.number="stockAdjustment" @input="validateStockAdjustment"
+                    class="stock-adjust-input" />
+
                   <button type="button" @click="updateStockAdjustment(1)" class="stock-btn plus">+1</button>
                   <button type="button" @click="updateStockAdjustment(2)" class="stock-btn plus">+2</button>
                 </div>
-                <div class="stock-preview" :class="{ 'low': (newProduct.stock + stockAdjustment) <= 5 }">
-                  Resulting Stock: <strong>{{ Math.max(0, (newProduct.stock || 0) + stockAdjustment) }}</strong>
+                <div class="stock-preview" :class="{ 
+                  'low': (Math.max(0, (newProduct.stock || 0) + stockAdjustment)) === 0,
+                  'warning': (Math.max(0, (newProduct.stock || 0) + stockAdjustment)) > 0 && (Math.max(0, (newProduct.stock || 0) + stockAdjustment)) <= 5
+                }">
+                  {{ $t('admin.resultingStock') }}: <strong>{{ Math.max(0, (newProduct.stock || 0) + stockAdjustment)
+                    }}</strong>
                 </div>
               </div>
             </div>
@@ -482,9 +533,9 @@ const adjustStock = async (product, change) => {
             <!-- Gallery Section -->
             <div class="gallery-section">
               <div class="gallery-header">
-                <label>Product Gallery & Variations</label>
+                <label>{{ $t('admin.galleryTitle') }}</label>
                 <button type="button" class="add-gallery-btn" @click="triggerGalleryUpload">
-                  <ion-icon name="add-circle-outline"></ion-icon> Add Images
+                  <ion-icon name="add-circle-outline"></ion-icon> {{ $t('admin.addImages') }}
                 </button>
                 <input type="file" ref="galleryFileInput" class="hidden-input" @change="handleGalleryUpload"
                   accept="image/*" multiple />
@@ -498,21 +549,21 @@ const adjustStock = async (product, change) => {
                   </div>
                   <div class="gallery-meta">
                     <select v-model="img.attribute_type">
-                      <option value="gallery">General Gallery</option>
-                      <option value="color">Color Variant</option>
-                      <option value="size">Size Variant</option>
-                      <option value="variety">Variety Variant</option>
+                      <option value="gallery">{{ $t('admin.galleryOption') }}</option>
+                      <option value="color">{{ $t('admin.colorOption') }}</option>
+                      <option value="size">{{ $t('admin.sizeOption') }}</option>
+                      <option value="variety">{{ $t('admin.varietyOption') }}</option>
                     </select>
                     <input v-if="img.attribute_type !== 'gallery'" v-model="img.attribute_value"
-                      :placeholder="'Enter ' + img.attribute_type" />
+                      :placeholder="$t('admin.enterAttribute', { type: $t('admin.' + img.attribute_type + 'Option').toLowerCase() })" />
                   </div>
                 </div>
               </div>
-              <p v-else class="gallery-empty">No gallery images added yet.</p>
+              <p v-else class="gallery-empty">{{ $t('admin.galleryEmpty') }}</p>
             </div>
 
             <button type="submit" :disabled="uploading" :class="['submit-btn', isEditing ? 'update' : '']">
-              {{ uploading ? 'Processing...' : (isEditing ? 'Update Product' : 'Add Product') }}
+              {{ uploading ? $t('admin.processing') : (isEditing ? $t('admin.submitUpdate') : $t('admin.submitAdd')) }}
             </button>
           </form>
 
@@ -521,24 +572,24 @@ const adjustStock = async (product, change) => {
             <div v-if="showFormulaPopup" class="modal-overlay" @click.self="showFormulaPopup = false">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h3>Price Formula</h3>
+                  <h3>{{ $t('admin.priceFormula') }}</h3>
                   <button @click="showFormulaPopup = false" class="close-modal">&times;</button>
                 </div>
                 <div class="modal-body">
-                  <p>Calculate L1-L4 based on a % of L5 price.</p>
+                  <p>{{ $t('admin.formulaDesc') }}</p>
                   <div class="formula-info">
-                    <span class="info-tag">Current L5: ${{ newProduct.price_5 || '0.00' }}</span>
+                    <span class="info-tag">{{ $t('admin.currentL5', { price: newProduct.price_5 || '0.00' }) }}</span>
                   </div>
                   <div class="input-group">
-                    <label>Percentages (L1, L2, L3, L4)</label>
+                    <label>{{ $t('admin.percentages') }}</label>
                     <input v-model="formulaInput" placeholder="200, 180, 160, 130" @keyup.enter="applyPriceFormula" />
                   </div>
-                  <p class="formula-hint">Example: "200, 180, 160, 130" means L1 is 200% of L5, L2 is 180% of L5, etc.
+                  <p class="formula-hint">{{ $t('admin.formulaHint') }}
                   </p>
                 </div>
                 <div class="modal-footer">
-                  <button @click="showFormulaPopup = false" class="btn-secondary">Cancel</button>
-                  <button @click="applyPriceFormula" class="btn-primary">Apply Formula</button>
+                  <button @click="showFormulaPopup = false" class="btn-secondary">{{ $t('admin.cancel') }}</button>
+                  <button @click="applyPriceFormula" class="btn-primary">{{ $t('admin.applyFormula') }}</button>
                 </div>
               </div>
             </div>
@@ -547,10 +598,11 @@ const adjustStock = async (product, change) => {
 
         <section class="list-section">
           <div class="list-header">
-            <h2>Inventory</h2>
+            <h2>{{ $t('admin.inventory') }}</h2>
             <!-- Filter Tabs -->
             <div class="filter-tabs">
-              <button :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'">All</button>
+              <button :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'">{{ $t('admin.all')
+                }}</button>
               <button v-for="cat in categories" :key="cat.id" :class="{ active: activeFilter === cat.path }"
                 @click="activeFilter = cat.path">
                 {{ cat.name }}
@@ -560,12 +612,18 @@ const adjustStock = async (product, change) => {
 
           <div class="inventory-scroll">
             <div v-for="product in filteredProducts" :key="product.id" class="product-item">
-              <div class="item-img"><img :src="getImageUrl(product.image_key)"></div>
+              <div class="item-img">
+                <img :src="getImageUrl(product.image_key || product.image)" :alt="product.name">
+              </div>
               <div class="item-info">
-                <strong>{{ product.name }}</strong>
+                <strong>{{ product.name_th ? `${product.name} (${product.name_th})` : product.name }}</strong>
                 <span class="p-meta">{{ product.category }} | ${{ product.price_1 || product.price }}</span>
                 <div class="stock-control">
-                  <span :class="['stock-count', product.stock <= 5 ? 'low' : '']">{{ product.stock || 0 }} in stock</span>
+                  <span :class="['stock-count', 
+                    product.stock === 0 ? 'low' : (product.stock > 0 && product.stock <= 5 ? 'warning' : '')
+                  ]">{{ $t('admin.inStock', {
+                    count:
+                    product.stock || 0 }) }}</span>
                 </div>
               </div>
               <div class="item-actions">
@@ -586,6 +644,15 @@ const adjustStock = async (product, change) => {
 /* Reset and Global component styles */
 * {
   box-sizing: border-box;
+}
+
+.auto-hint {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  color: #8b6f47;
+  font-style: italic;
+  opacity: 0.8;
 }
 
 .admin-container {
@@ -642,6 +709,39 @@ header {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+}
+
+.header-title-group {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.lang-cycle-btn {
+  background: white;
+  border: 1px solid #edf2f7;
+  padding: 8px 16px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  min-width: 60px;
+}
+
+.lang-cycle-btn:hover {
+  background: #f8f9fa;
+  border-color: #8b6f47;
+  transform: translateY(-1px);
+}
+
+.lang-label {
+  font-weight: 800;
+  font-size: 14px;
+  color: #3D2B1F;
+  letter-spacing: 0.5px;
 }
 
 .header-actions {
@@ -1158,6 +1258,10 @@ select {
   color: #d63031;
 }
 
+.stock-count.warning {
+  color: #e67e22;
+}
+
 .edit-stock-control {
   margin-top: 5px;
   gap: 5px;
@@ -1191,6 +1295,10 @@ select {
 
 .stock-preview.low {
   color: #d63031;
+}
+
+.stock-preview.warning {
+  color: #e67e22;
 }
 
 .item-actions {

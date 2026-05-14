@@ -1,32 +1,30 @@
 <script setup>
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
+const { t } = useI18n();
 const activeCat = ref(null);
 
 const categories = [
     {
         id: 1,
-        name: 'Needles',
-        description: 'Hand-polished precision tools designed for comfort and durability.',
-        image: new URL('../assets/cat-needles.png', import.meta.url).href
+        key: 'needles',
+        image: new URL('../assets/card-img06.jpg', import.meta.url).href
     },
     {
         id: 2,
-        name: 'Yarn',
-        description: 'Premium organic fibers available in a curated palette of artisanal tones.',
-        image: new URL('../assets/cat-yarn.png', import.meta.url).href
+        key: 'yarn',
+        image: new URL('../assets/card-img01.jpg', import.meta.url).href
     },
     {
         id: 3,
-        name: 'Accessories',
-        description: 'Professional-grade scissors, tapes, and tools for the meticulous crafter.',
-        image: new URL('../assets/cat-accessories.png', import.meta.url).href
+        key: 'accessories',
+        image: new URL('../assets/card-img10.png', import.meta.url).href
     },
     {
         id: 4,
-        name: 'Beads',
-        description: 'Exquisite glass and crystal beads to add a touch of brilliance to any project.',
-        image: new URL('../assets/cat-beads.png', import.meta.url).href
+        key: 'beads',
+        image: new URL('../assets/card-img04.jpg', import.meta.url).href
     }
 ];
 </script>
@@ -34,31 +32,31 @@ const categories = [
 <template>
     <section class="categories-section">
         <div v-reveal class="section-header">
-            <h2 class="section-title" style="margin: 0;">Artisan Collections</h2>
-            <p class="section-subtitle">Discover the finest materials for your next masterpiece.</p>
+            <h2 class="section-title" style="margin: 0;">{{ $t('featuredCategories.title') }}</h2>
+            <p class="section-subtitle">{{ $t('featuredCategories.subtitle') }}</p>
         </div>
 
         <div class="categories-accordion" v-reveal>
-            <div v-for="cat in categories" :key="cat.id" class="accordion-item"
+                <div v-for="cat in categories" :key="cat.id" class="accordion-item"
                 :class="{ active: activeCat === cat.id }" @mouseenter="activeCat = cat.id"
                 @mouseleave="activeCat = null">
 
                 <div class="cat-image-wrapper">
-                    <img :src="cat.image" :alt="cat.name" class="cat-bg" />
+                    <img :src="cat.image" :alt="$t(`featuredCategories.items.${cat.key}.name`)" class="cat-bg" />
                     <div class="cat-overlay"></div>
                 </div>
 
                 <div class="cat-content">
                     <div class="cat-icon-container">
                         <span class="cat-icon">{{ cat.icon }}</span>
-                        <h3 class="cat-name-vertical">{{ cat.name }}</h3>
+                        <h3 class="cat-name-vertical">{{ $t(`featuredCategories.items.${cat.key}.name`) }}</h3>
                     </div>
 
                     <div class="cat-details">
-                        <h3 class="cat-name">{{ cat.name }}</h3>
-                        <p class="cat-desc">{{ cat.description }}</p>
+                        <h3 class="cat-name">{{ $t(`featuredCategories.items.${cat.key}.name`) }}</h3>
+                        <p class="cat-desc">{{ $t(`featuredCategories.items.${cat.key}.description`) }}</p>
                         <button class="explore-btn">
-                            Explore Collection
+                            {{ $t('featuredCategories.explore') }}
                             <span class="btn-arrow">→</span>
                         </button>
                     </div>
@@ -254,26 +252,37 @@ const categories = [
 @media (max-width: 1024px) {
     .categories-accordion {
         flex-direction: column;
-        height: 1000px;
+        height: auto;
+        min-height: 800px;
         padding: 0 20px;
+        gap: 15px;
     }
 
     .accordion-item {
         width: 100%;
         flex: 1;
+        min-height: 120px;
     }
 
     .accordion-item.active {
-        flex: 3;
+        flex: 4;
     }
 
     .cat-name-vertical {
         writing-mode: horizontal-tb;
+        transform: none !important;
+        opacity: 1 !important;
     }
 
     .cat-icon-container {
         flex-direction: row;
         align-items: center;
+        top: 20px;
+        left: 20px;
+    }
+
+    .cat-content {
+        padding: 20px;
     }
 }
 
@@ -283,7 +292,7 @@ const categories = [
     }
 
     .categories-accordion {
-        height: 1200px;
+        min-height: 1000px;
     }
 
     .cat-name {
@@ -292,6 +301,15 @@ const categories = [
 
     .cat-desc {
         font-size: 1rem;
+        margin-bottom: 20px;
+    }
+
+    .cat-icon {
+        font-size: 2rem;
+    }
+
+    .cat-name-vertical {
+        font-size: 1.5rem;
     }
 }
 </style>

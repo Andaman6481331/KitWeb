@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS products (
     price_3 REAL,
     price_4 REAL,
     price_5 REAL,
+    name_th TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -59,4 +60,16 @@ CREATE TABLE IF NOT EXISTS order_items (
     price REAL,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(id)
+);
+
+-- Table for stock history
+CREATE TABLE IF NOT EXISTS stock_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    admin_id TEXT, -- user_id of the admin who made the change
+    change_amount INTEGER NOT NULL, -- positive for increment, negative for decrement
+    new_stock INTEGER NOT NULL,
+    reason TEXT, -- e.g., 'MANUAL_ADJUSTMENT', 'ORDER_CHECKOUT'
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );

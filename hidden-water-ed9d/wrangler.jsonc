@@ -26,5 +26,8 @@
 			"binding": "IMAGES",
 			"bucket_name": "product-images"
 		}
-	]
+	],
+	"ai": {
+		"binding": "AI"
+	}
 }

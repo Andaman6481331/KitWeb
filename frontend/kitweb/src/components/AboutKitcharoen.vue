@@ -71,13 +71,13 @@ const aboutInfo = computed(() => ({
 }
 
 .container {
-    max-width: 1400px;
+    max-width: 1300px;
     margin: 0 auto;
     padding: 0 40px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 80px;
-    align-items: start;
+    display: flex;
+    flex-direction: row;
+    gap: 60px;
+    align-items: center;
     position: relative;
     z-index: 1;
 }
@@ -167,19 +167,24 @@ const aboutInfo = computed(() => ({
 
 /* Right Side - Image */
 .image-content {
+    flex: 1;
     max-width: 600px;
-    max-height: 700px;
-    object-fit: contain;
+    height: 600px;
     overflow: hidden;
-    border-radius: 50px;
+    border-radius: 40px;
     position: relative;
+    box-shadow: 0 20px 40px rgba(74, 63, 53, 0.15);
 }
 
 .image-content img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transform: translateY(-100px);
+    transition: transform 0.6s ease;
+}
+
+.image-content:hover img {
+    transform: scale(1.05);
 }
 
 /* Buttons */
@@ -214,16 +219,26 @@ const aboutInfo = computed(() => ({
 /* Responsive */
 @media (max-width: 1024px) {
     .container {
-        grid-template-columns: 1fr;
-        gap: 50px;
+        flex-direction: column;
+        gap: 40px;
+        text-align: center;
+    }
+
+    .image-content {
+        width: 100%;
+        height: 500px;
+    }
+
+    .eyebrow {
+        justify-content: center;
     }
 
     .title {
         font-size: 2.5rem;
     }
 
-    .features-grid {
-        grid-template-columns: 1fr;
+    .cta-buttons {
+        justify-content: center;
     }
 }
 
@@ -232,16 +247,18 @@ const aboutInfo = computed(() => ({
         padding: 0 20px;
     }
 
+    .image-content {
+        height: 400px;
+        border-radius: 30px;
+    }
+
     .title {
         font-size: 2rem;
     }
 
-    .subtitle {
-        font-size: 1.1rem;
-    }
-
     .description p {
-        font-size: 1rem;
+        text-indent: 0;
+        text-align: center;
     }
 }
 </style>

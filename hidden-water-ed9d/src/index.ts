@@ -11,6 +11,25 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
+interface Env {
+	DB: D1Database;
+	IMAGES: R2Bucket;
+	AI: any;
+	LINE_CHANNEL_ACCESS_TOKEN?: string;
+	LINE_NOTIFY_TOKEN?: string;
+	LINE_USER_ID?: string;
+	ADMIN_PASSWORD?: string;
+	JWT_SECRET?: string;
+}
+
+// Password hashing helper using Web Crypto API
+async function hashPassword(password: string): Promise<string> {
+	const msgBuffer = new TextEncoder().encode(password);
+	const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
+	const hashArray = Array.from(new Uint8Array(hashBuffer));
+	return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
 		const url = new URL(request.url);
@@ -48,36 +67,58 @@ export default {
 
 		try {
 			// 1. PUBLIC ROUTES
+			if (url.pathname === "/translate" && request.method === "POST") {
+				const { text, sourceLang = "en", targetLang } = await request.json() as any;
+
+				if (!text || !targetLang) {
+					return corsResponse({ error: "Missing text or targetLang" }, { status: 400 });
+				}
+
+				try {
+					const ai = (env as any).AI;
+					const response = await ai.run("@cf/meta/m2m100-1.2b", {
+						text: text,
+						source_lang: sourceLang,
+						target_lang: targetLang,
+					});
+
+					return corsResponse({ translated_text: response.translated_text });
+				} catch (aiError: any) {
+					console.error("AI Translation Error:", aiError);
+					return corsResponse({ error: "Translation failed", details: aiError.message }, { status: 500 });
+				}
+			}
+
 			if (url.pathname === "/products" && request.method === "GET") {
 				const category = url.searchParams.get("category");
-				let query = "SELECT * FROM products";
+				let query = `
+					SELECT 
+						p.*,
+						(SELECT json_group_array(json_object(
+							'id', i.id,
+							'image_key', i.image_key,
+							'attribute_type', i.attribute_type,
+							'attribute_value', i.attribute_value,
+							'is_main', i.is_main
+						)) FROM product_images i WHERE i.product_id = p.id) as images
+					FROM products p
+				`;
 				let params: any[] = [];
 				if (category) {
-					query += " WHERE category = ? ORDER BY created_at DESC";
+					query += " WHERE p.category = ? ORDER BY p.created_at DESC";
 					params.push(category);
 				} else {
-					query += " ORDER BY created_at DESC";
+					query += " ORDER BY p.created_at DESC";
 				}
 				const { results: products } = await env.DB.prepare(query).bind(...params).all();
 
-				// Fetch associated images
-				const productIds = products.map((p: any) => p.id);
-				let images: any[] = [];
-				if (productIds.length > 0) {
-					const placeholders = productIds.map(() => "?").join(",");
-					const { results: imageResults } = await env.DB.prepare(
-						`SELECT * FROM product_images WHERE product_id IN (${placeholders})`
-					).bind(...productIds).all();
-					images = imageResults;
-				}
-
-				// Map images to products
-				const productsWithImages = products.map((p: any) => ({
+				// Map and parse nested JSON
+				const parsedProducts = products.map((p: any) => ({
 					...p,
-					images: images.filter((img: any) => img.product_id === p.id)
+					images: typeof p.images === 'string' ? JSON.parse(p.images) : (p.images || [])
 				}));
 
-				return corsResponse(productsWithImages);
+				return corsResponse(parsedProducts);
 			}
 
 			if (url.pathname === "/categories" && request.method === "GET") {
@@ -112,8 +153,8 @@ export default {
 
 						// Insert order metadata
 						await env.DB.prepare(
-							"INSERT INTO orders (id, customer_name, total_amount, payment_method, note) VALUES (?, ?, ?, ?, ?)"
-						).bind(id, customerName, totalAmount, paymentMethod, note).run();
+							"INSERT INTO orders (id, customer_name, total_amount, payment_method, note, customer_id) VALUES (?, ?, ?, ?, ?, ?)"
+						).bind(id, customerName, totalAmount, paymentMethod, note, orderData.customerId || null).run();
 
 						// Insert order items and update stock
 						for (const item of cartItems) {
@@ -163,6 +204,63 @@ export default {
 				return corsResponse({ success: response.ok, ...result, persisted: !!orderData }, { status: response.status });
 			}
 
+			// 2. CUSTOMER AUTH
+			if (url.pathname === "/customer/signup" && request.method === "POST") {
+				const body = await request.json() as any;
+				const { email, password, businessName, ownerName, phone, taxId } = body;
+
+				if (!email || !password) {
+					return corsResponse({ error: "Email and password are required" }, { status: 400 });
+				}
+
+				// Check if user exists
+				const existing = await env.DB.prepare("SELECT id FROM customers WHERE email = ?").bind(email).first();
+				if (existing) {
+					return corsResponse({ error: "Email already registered" }, { status: 400 });
+				}
+
+				const id = crypto.randomUUID();
+				const passwordHash = await hashPassword(password);
+
+				await env.DB.prepare(
+					"INSERT INTO customers (id, email, password_hash, business_name, owner_name, phone, tax_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
+				).bind(id, email, passwordHash, businessName, ownerName, phone, taxId).run();
+
+				return corsResponse({ success: true, user: { id, email, businessName, ownerName } });
+			}
+
+			if (url.pathname === "/customer/login" && request.method === "POST") {
+				const body = await request.json() as any;
+				const { email, password } = body;
+
+				if (!email || !password) {
+					return corsResponse({ error: "Email and password are required" }, { status: 400 });
+				}
+
+				const user = await env.DB.prepare("SELECT * FROM customers WHERE email = ?").bind(email).first() as any;
+				if (!user) {
+					return corsResponse({ error: "Invalid email or password" }, { status: 401 });
+				}
+
+				const passwordHash = await hashPassword(password);
+				if (user.password_hash !== passwordHash) {
+					return corsResponse({ error: "Invalid email or password" }, { status: 401 });
+				}
+
+				// For now, we return the user and a "token" (just the user ID for simplicity)
+				// In a real app, use a proper JWT.
+				return corsResponse({
+					success: true,
+					token: user.id,
+					user: {
+						id: user.id,
+						email: user.email,
+						businessName: user.business_name,
+						owner_name: user.owner_name
+					}
+				});
+			}
+
 			// 2. ADMIN LOGIN
 			if (url.pathname === "/admin/login" && request.method === "POST") {
 				const body = await request.json() as any;
@@ -174,6 +272,48 @@ export default {
 				return corsResponse({ success: false }, { status: 401 });
 			}
 
+			if (url.pathname === "/orders" && request.method === "GET") {
+				const customerId = url.searchParams.get("customer_id");
+				const auth = request.headers.get("Authorization");
+				
+				// Allow if admin password matches OR if customerId matches the token (which is user.id for now)
+				const isAdmin = auth === (env.ADMIN_PASSWORD || "").trim();
+				const isCustomer = customerId && auth === customerId;
+
+				if (!isAdmin && !isCustomer) {
+					return corsResponse("Unauthorized", { status: 401 });
+				}
+
+				let query = "SELECT * FROM orders";
+				let params: any[] = [];
+
+				if (customerId) {
+					query += " WHERE customer_id = ?";
+					params.push(customerId);
+				}
+
+				query += " ORDER BY created_at DESC";
+
+				const { results: orders } = await env.DB.prepare(query).bind(...params).all();
+
+				const orderIds = orders.map((o: any) => o.id);
+				let allItems: any[] = [];
+				if (orderIds.length > 0) {
+					const placeholders = orderIds.map(() => "?").join(",");
+					const { results: itemResults } = await env.DB.prepare(
+						`SELECT * FROM order_items WHERE order_id IN (${placeholders})`
+					).bind(...orderIds).all();
+					allItems = itemResults;
+				}
+
+				const ordersWithItems = orders.map((o: any) => ({
+					...o,
+					items: allItems.filter((i: any) => i.order_id === o.id)
+				}));
+
+				return corsResponse(ordersWithItems);
+			}
+
 			// 3. PROTECTED ROUTES
 			const auth = request.headers.get("Authorization");
 			if (auth !== (env.ADMIN_PASSWORD || "").trim()) {
@@ -182,13 +322,13 @@ export default {
 
 			if (url.pathname === "/products" && request.method === "POST") {
 				const body = await request.json() as any;
-				const { name, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, images, stock } = body;
+				const { name, name_th, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, images, stock } = body;
 				const activePrice = price || price_3 || 0;
 				const initialStock = stock || 0;
 
 				const { meta } = await env.DB.prepare(
-					"INSERT INTO products (name, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-				).bind(name, description, activePrice, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, initialStock).run();
+					"INSERT INTO products (name, name_th, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+				).bind(name, name_th, description, activePrice, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, initialStock).run();
 
 				const productId = meta.last_row_id;
 
@@ -206,14 +346,14 @@ export default {
 			if (url.pathname.startsWith("/products/") && request.method === "PUT") {
 				const id = url.pathname.split("/products/")[1];
 				const body = await request.json() as any;
-				const { name, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, images, stock } = body;
+				const { name, name_th, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, images, stock } = body;
 				const activePrice = price_3 || price || 0;
 
 				const currentProduct = await env.DB.prepare("SELECT stock FROM products WHERE id = ?").bind(id).first() as any;
 
 				await env.DB.prepare(
-					"UPDATE products SET name=?, description=?, price=?, category=?, image_key=?, usage=?, use_for=?, varieties=?, sizes=?, colors=?, price_1=?, price_2=?, price_3=?, price_4=?, price_5=?, stock=? WHERE id=?"
-				).bind(name, description, activePrice, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, stock, id).run();
+					"UPDATE products SET name=?, name_th=?, description=?, price=?, category=?, image_key=?, usage=?, use_for=?, varieties=?, sizes=?, colors=?, price_1=?, price_2=?, price_3=?, price_4=?, price_5=?, stock=? WHERE id=?"
+				).bind(name, name_th, description, activePrice, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, stock, id).run();
 
 				if (currentProduct && stock !== undefined && currentProduct.stock !== stock) {
 					const change = stock - currentProduct.stock;
@@ -278,12 +418,19 @@ export default {
 
 			if (url.pathname === "/upload" && request.method === "POST") {
 				const formData = await request.formData();
-				const file = formData.get("file") as File;
-				const key = `${Date.now()}-${file.name}`;
-				await env.IMAGES.put(key, await file.arrayBuffer(), {
-					httpMetadata: { contentType: file.type }
-				});
-				return corsResponse({ key, success: true });
+				const files = formData.getAll("file") as File[];
+				const results = [];
+
+				for (const file of files) {
+					// Respect the filename provided by the client (allows thumb/large suffixes)
+					const key = file.name;
+					await env.IMAGES.put(key, await file.arrayBuffer(), {
+						httpMetadata: { contentType: file.type }
+					});
+					results.push({ key, success: true });
+				}
+				
+				return corsResponse(results.length === 1 ? results[0] : results);
 			}
 
 			if (url.pathname === "/images") {
@@ -291,28 +438,6 @@ export default {
 				return corsResponse(objects);
 			}
 
-			if (url.pathname === "/orders" && request.method === "GET") {
-				const { results: orders } = await env.DB.prepare(
-					"SELECT * FROM orders ORDER BY created_at DESC"
-				).all();
-
-				const orderIds = orders.map((o: any) => o.id);
-				let allItems: any[] = [];
-				if (orderIds.length > 0) {
-					const placeholders = orderIds.map(() => "?").join(",");
-					const { results: itemResults } = await env.DB.prepare(
-						`SELECT * FROM order_items WHERE order_id IN (${placeholders})`
-					).bind(...orderIds).all();
-					allItems = itemResults;
-				}
-
-				const ordersWithItems = orders.map((o: any) => ({
-					...o,
-					items: allItems.filter((i: any) => i.order_id === o.id)
-				}));
-
-				return corsResponse(ordersWithItems);
-			}
 
 
 			return corsResponse("Not Found", { status: 404 });

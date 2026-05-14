@@ -1,45 +1,50 @@
 <script setup>
+import { useI18n } from 'vue-i18n';
 // Instagram embedding is handled in the instagram-card child component
 import instagramCard from './instragram-card.vue';
 
+const { t } = useI18n();
+
+const handleStartCrafting = () => {
+    // Basic logic for the button if needed, otherwise just keeps the @click reference
+};
 </script>
 <template>
     <section class="kitcraft-section">
         <div class="text-content">
-            <div v-reveal class="eyebrow">Handmade Crafts</div>
-            <h2 v-reveal>Transform Yarn & Beads Into Art</h2>
+            <div v-reveal class="eyebrow">{{ $t('kitcraft.eyebrow') }}</div>
+            <h2 v-reveal>{{ $t('kitcraft.title') }}</h2>
             <p v-reveal class="subtitle">
-                Discover the therapeutic joy of creating beautiful handmade accessories,
-                décor, and gifts with our simple DIY tutorials.
+                {{ $t('kitcraft.subtitle') }}
             </p>
 
             <div v-reveal class="benefits">
                 <div class="benefit-item">
                     <div class="benefit-icon">✓</div>
                     <div class="benefit-text">
-                        <div class="benefit-title">Beginner Friendly</div>
-                        <div class="benefit-desc delay2">Step-by-step guides perfect for all skill levels</div>
+                        <div class="benefit-title">{{ $t('kitcraft.benefits.beginner.title') }}</div>
+                        <div class="benefit-desc delay2">{{ $t('kitcraft.benefits.beginner.desc') }}</div>
                     </div>
                 </div>
                 <div class="benefit-item">
                     <div class="benefit-icon">✓</div>
                     <div class="benefit-text">
-                        <div class="benefit-title">Affordable Materials</div>
-                        <div class="benefit-desc delay2">Create stunning pieces without breaking the bank</div>
+                        <div class="benefit-title">{{ $t('kitcraft.benefits.affordable.title') }}</div>
+                        <div class="benefit-desc delay2">{{ $t('kitcraft.benefits.affordable.desc') }}</div>
                     </div>
                 </div>
                 <div class="benefit-item">
                     <div class="benefit-icon">✓</div>
                     <div class="benefit-text">
-                        <div class="benefit-title">Endless Creativity</div>
-                        <div class="benefit-desc delay2">Personalize every project to match your style</div>
+                        <div class="benefit-title">{{ $t('kitcraft.benefits.creative.title') }}</div>
+                        <div class="benefit-desc delay2">{{ $t('kitcraft.benefits.creative.desc') }}</div>
                     </div>
                 </div>
             </div>
 
             <div class="cta-group">
-                <button class="btn-primary" @click="handleStartCrafting">Start Crafting</button>
-                <router-link to="/event" class="btn-secondary">Learn More</router-link>
+                <router-link to="/contactus" class="btn-primary">{{ $t('kitcraft.startCrafting') }}</router-link>
+                <router-link to="/event" class="btn-secondary">{{ $t('kitcraft.learnMore') }}</router-link>
             </div>
         </div>
 
@@ -48,11 +53,13 @@ import instagramCard from './instragram-card.vue';
 </template>
 <style scoped>
 .kitcraft-section {
-    /* background: linear-gradient(135deg, #ff6b6b, #ff9f43); */
-    padding: 5rem 10rem;
-    display: grid;
-    grid-template-columns: 1fr 400px;
-    gap: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 80px 40px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 60px;
     align-items: center;
 }
 
@@ -177,19 +184,45 @@ h2 {
     color: white;
 }
 
+@media (max-width: 1200px) {
+    .kitcraft-section {
+        padding: 60px 40px;
+        gap: 40px;
+    }
+}
+
 @media (max-width: 1024px) {
-    .promo-section {
-        grid-template-columns: 1fr;
-        gap: 50px;
-        padding: 60px 30px;
+    .kitcraft-section {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .text-content {
+        max-width: 100%;
+    }
+
+    .eyebrow {
+        justify-content: center;
     }
 
     h2 {
         font-size: 2.5rem;
     }
+
+    .benefit-item {
+        text-align: left;
+    }
+
+    .cta-group {
+        justify-content: center;
+    }
 }
 
 @media (max-width: 640px) {
+    .kitcraft-section {
+        padding: 40px 20px;
+    }
+
     h2 {
         font-size: 2rem;
     }

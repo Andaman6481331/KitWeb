@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS products (
     price_3 REAL DEFAULT 0,
     price_4 REAL DEFAULT 0,
     price_5 REAL DEFAULT 0,
+    name_th TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

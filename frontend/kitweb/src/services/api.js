@@ -4,7 +4,7 @@ export const API_URL = 'https://hidden-water-ed9d.shop-backend-kitweb.workers.de
 
 export const api = {
   getToken() {
-    return localStorage.getItem('admin_token');
+    return localStorage.getItem('admin_token') || localStorage.getItem('kitweb_auth_token');
   },
 
   async adminLogin(password) {
@@ -17,6 +17,28 @@ export const api = {
     if (data.success) {
       localStorage.setItem('admin_token', data.token);
     }
+    return data;
+  },
+
+  async signup(customerData) {
+    const response = await fetch(`${API_URL}/customer/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(customerData)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Signup failed');
+    return data;
+  },
+
+  async login(credentials) {
+    const response = await fetch(`${API_URL}/customer/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Login failed');
     return data;
   },
 
@@ -73,9 +95,13 @@ export const api = {
     return await response.json();
   },
 
-  async uploadImage(file) {
+  async uploadImage(files) {
     const formData = new FormData();
-    formData.append('file', file);
+    if (Array.isArray(files)) {
+      files.forEach(file => formData.append('file', file));
+    } else {
+      formData.append('file', files);
+    }
     
     const response = await fetch(`${API_URL}/upload`, {
       method: 'POST',
@@ -122,8 +148,11 @@ export const api = {
     return await response.json();
   },
 
-  async getOrders() {
-    const response = await fetch(`${API_URL}/orders`, {
+  async getOrders(customerId = null) {
+    let url = `${API_URL}/orders`;
+    if (customerId) url += `?customer_id=${encodeURIComponent(customerId)}`;
+    
+    const response = await fetch(url, {
       headers: {
         'Authorization': this.getToken()
       }
@@ -142,5 +171,16 @@ export const api = {
       body: JSON.stringify({ change, reason, admin_id: 'admin' }) // admin_id can be dynamic if you have multiple admins
     });
     return await response.json();
+  },
+
+  async translateText(text, targetLang, sourceLang = 'en') {
+    const response = await fetch(`${API_URL}/translate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, targetLang, sourceLang })
+    });
+    if (!response.ok) throw new Error('Translation failed');
+    const data = await response.json();
+    return data.translated_text;
   }
 };

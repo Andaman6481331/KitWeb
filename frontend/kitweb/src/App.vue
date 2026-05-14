@@ -1,21 +1,24 @@
 <script setup>
-import { RouterLink, RouterView } from 'vue-router'
-import { ref, onMounted } from 'vue'
+import { RouterLink, RouterView, useRouter } from 'vue-router'
+import { ref, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale } from './i18n'
+import { authStore } from './stores/authStore'
 
 const { t } = useI18n()
+const router = useRouter()
 
 // Get saved language from localStorage or default to 'EN'
 const savedLang = localStorage.getItem('locale') || 'EN'
 const currentLanguage = ref(savedLang)
 const showLanguageMenu = ref(false)
+const showLogoutConfirm = ref(false)
 
 const languages = [
-  { code: 'EN', label: 'English', flag: '🇬🇧' },
-  { code: 'TH', label: 'ไทย', flag: '🇹🇭' },
-  { code: 'CN', label: '中文', flag: '🇨🇳' },
-  { code: 'JP', label: '日本語', flag: '🇯🇵' }
+  { code: 'EN', label: 'English', flag: 'EN' },
+  { code: 'TH', label: 'ไทย', flag: 'TH' },
+  { code: 'CN', label: '中文', flag: 'CN' },
+  { code: 'JP', label: '日本語', flag: 'JP' }
 ]
 
 const changeLanguage = (langCode) => {
@@ -27,6 +30,29 @@ const changeLanguage = (langCode) => {
 const toggleLanguageMenu = () => {
   showLanguageMenu.value = !showLanguageMenu.value
 }
+
+const handleLogout = () => {
+  showLogoutConfirm.value = true
+}
+
+const confirmLogout = () => {
+  showLogoutConfirm.value = false
+  authStore.logout()
+  router.push('/')
+}
+
+const cancelLogout = () => {
+  showLogoutConfirm.value = false
+}
+
+// Watch for language changes to apply specific fonts
+watch(currentLanguage, (newLang) => {
+  if (newLang === 'TH') {
+    document.body.classList.add('thai-font')
+  } else {
+    document.body.classList.remove('thai-font')
+  }
+}, { immediate: true })
 </script>
 
 <template>
@@ -40,7 +66,7 @@ const toggleLanguageMenu = () => {
       </div>
 
       <!-- Center: Links -->
-      <div class="nav-center">
+      <div class="nav-center" style="justify-content: center; align-items: center; text-align: center;">
         <router-link to="/" class="nav-link" active-class="active">{{ $t('nav.home') }}</router-link>
         <router-link to="/catalog" class="nav-link" active-class="active">{{ $t('nav.products') }}</router-link>
         <router-link to="/event" class="nav-link" active-class="active">{{ $t('nav.events') }}</router-link>
@@ -49,7 +75,7 @@ const toggleLanguageMenu = () => {
       </div>
 
       <!-- Right: Search & Actions -->
-      <div class="nav-right">
+      <div class="nav-right" style="justify-content: center; align-items: center; text-align: center;">
         <div class="search-capsule">
           <ion-icon name="search-outline"></ion-icon>
           <input type="text" placeholder="Search materials...">
@@ -72,13 +98,22 @@ const toggleLanguageMenu = () => {
             </transition>
           </div>
 
-          <router-link to="/orderpage" class="order-capsule">
+          <router-link v-if="authStore.isAuthenticated" to="/orderpage" class="order-capsule">
             {{ $t('nav.startOrder') }}
           </router-link>
 
-          <router-link to="/login" class="login-capsule">
+          <router-link v-if="!authStore.isAuthenticated" to="/login" class="login-capsule">
             {{ $t('nav.login') }}
           </router-link>
+          <div v-else class="logged-in-actions">
+            <router-link to="/orderpage" class="login-capsule account-link">
+              <ion-icon name="person-circle-outline"></ion-icon>
+              <span>{{ authStore.user?.businessName || authStore.user?.ownerName || $t('nav.account') }}</span>
+            </router-link>
+            <button class="logout-btn-nav" @click="handleLogout" :title="$t('order.logout')">
+              <ion-icon name="log-out-outline"></ion-icon>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -124,14 +159,38 @@ const toggleLanguageMenu = () => {
         <p>{{ $t('footer.copyright') }}</p>
       </div>
     </footer>
+
+    <!-- Logout Confirmation Popup -->
+    <transition name="fade">
+      <div v-if="showLogoutConfirm" class="confirm-overlay" @click.self="cancelLogout">
+        <div class="confirm-card">
+          <div class="confirm-icon logout-icon">
+            <ion-icon name="log-out-outline"></ion-icon>
+          </div>
+          <h3>{{ $t('auth.logoutConfirmTitle') }}</h3>
+          <p>{{ $t('auth.logoutConfirmMessage') }}</p>
+          <div class="confirm-actions">
+            <button class="cancel-btn" @click="cancelLogout">{{ $t('auth.cancelLogoutBtn') }}</button>
+            <button class="logout-confirm-btn" @click="confirmLogout">{{ $t('auth.logoutConfirmBtn') }}</button>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@100;200;300;400;500;600;700&display=swap');
 
 * {
   font-family: 'ZCOOL XiaoWei', serif !important;
+}
+
+/* Override font for Thai language */
+body.thai-font * {
+  font-family: 'Kanit', sans-serif !important;
+  /* font-family: 'Prompt', sans-serif !important; */
 }
 
 body {
@@ -218,7 +277,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  width: 280px;
+  width: 180px;
 }
 
 .search-capsule ion-icon {
@@ -262,7 +321,8 @@ body {
 .lang-popup {
   position: absolute;
   top: 45px;
-  right: 0;
+  left: 50%;
+  transform: translateX(-50%);
   background: white;
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
@@ -294,7 +354,19 @@ body {
 }
 
 .lang-flag {
-  font-size: 18px;
+  font-size: 10px;
+  font-weight: 800;
+  background: #f0f2f5;
+  color: #3D2B1F;
+  padding: 3px 6px;
+  border-radius: 4px;
+  min-width: 32px;
+  text-align: center;
+}
+
+.lang-item.active .lang-flag {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
 }
 
 .login-capsule {
@@ -322,7 +394,8 @@ body {
   border: 2px solid #006666;
 }
 
-.login-capsule:hover, .order-capsule:hover {
+.login-capsule:hover,
+.order-capsule:hover {
   transform: translateY(-1px);
   opacity: 0.9;
 }
@@ -333,6 +406,47 @@ body {
 
 .order-capsule:hover {
   background-color: #f8f8f8;
+}
+
+.account-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-link ion-icon {
+  font-size: 20px;
+}
+
+.logged-in-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logout-btn-nav {
+  background: transparent;
+  border: 1px solid #dcdcdc;
+  color: #5d4037;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.logout-btn-nav:hover {
+  background-color: #fff;
+  border-color: #008080;
+  color: #008080;
+  transform: translateY(-1px);
+}
+
+.logout-btn-nav ion-icon {
+  font-size: 20px;
 }
 
 /* ===== FOOTER ===== */
@@ -433,42 +547,98 @@ body {
 }
 
 /* Responsive Design */
-@media (max-width: 1024px) {
-  .nav-group {
-    gap: 10px;
+@media (max-width: 1280px) {
+  .NavBar {
+    padding: 0 3%;
   }
 
-  .button {
-    padding: 10px 18px;
-    font-size: 14px;
+  .nav-center {
+    gap: 20px;
   }
 
-  .button-icon {
+  .nav-right {
+    gap: 15px;
+  }
+
+  .search-capsule {
+    width: 220px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .nav-center {
+    gap: 15px;
+  }
+
+  .nav-link {
+    font-size: 15px;
+  }
+
+  .search-capsule {
+    width: 180px;
+  }
+
+  .login-capsule,
+  .order-capsule {
+    padding: 10px 20px;
     font-size: 14px;
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 992px) {
   .NavBar {
     height: auto;
-    min-height: 90px;
-    flex-direction: column;
-    padding: 15px 5%;
+    padding: 15px 3%;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 15px;
   }
 
-  .nav-group {
-    flex-wrap: wrap;
+  .nav-left {
+    width: 100%;
     justify-content: center;
   }
 
-  .nav-group p {
-    display: none;
+  .nav-center {
+    width: 100%;
+    justify-content: center;
+    order: 3;
+    gap: 25px;
   }
 
-  .button {
-    padding: 8px 16px;
+  .nav-right {
+    width: 100%;
+    justify-content: center;
+    order: 2;
+  }
+
+  .search-capsule {
+    width: 300px;
+  }
+}
+
+@media (max-width: 640px) {
+  .nav-center {
+    gap: 15px;
+  }
+
+  .nav-link {
     font-size: 13px;
+  }
+
+  .action-icons {
+    gap: 10px;
+  }
+
+  .login-capsule,
+  .order-capsule {
+    padding: 8px 16px;
+    font-size: 12px;
+  }
+
+  .search-capsule {
+    display: none;
+    /* Hide search on very small screens to save space */
   }
 }
 </style>
@@ -504,5 +674,128 @@ body {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Dropdown Animation */
+.dropdown-fade-enter-active,
+.dropdown-fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.dropdown-fade-enter-from,
+.dropdown-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(10px);
+}
+
+/* Confirmation Popup Styles */
+.confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.confirm-card {
+  background: white;
+  padding: 40px;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 400px;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  animation: modalPop 0.3s ease-out;
+}
+
+@keyframes modalPop {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.confirm-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24px;
+  font-size: 32px;
+}
+
+.logout-icon {
+  background-color: #FEF2F2;
+  color: #DC2626;
+}
+
+.confirm-card h3 {
+  margin: 0 0 12px 0;
+  font-size: 22px;
+  color: #3D2B1F;
+}
+
+.confirm-card p {
+  color: #666;
+  font-size: 15px;
+  line-height: 1.5;
+  margin-bottom: 30px;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.confirm-actions button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.confirm-actions .cancel-btn {
+  background: #F3F0EB;
+  color: #5d4037;
+}
+
+.confirm-actions .cancel-btn:hover {
+  background: #E5E2DD;
+}
+
+.confirm-actions .logout-confirm-btn {
+  background: #DC2626;
+  color: white;
+}
+
+.confirm-actions .logout-confirm-btn:hover {
+  background: #B91C1C;
+  transform: translateY(-1px);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

@@ -32,7 +32,7 @@ const reviews = ref([
         rating: 5,
         date: 'November 2024',
         review: 'As an online seller, reliable suppliers are crucial. KitCraft not only offers great products but also helps with packaging suggestions and marketing materials. They truly care about their partners\' success!',
-        image: 'https://images.unsplash.com/photo-1590735213920-68192a487bc2?w=600',
+        image: 'src/assets/customer/customer-img03.jpg',
         product: 'DIY Craft Kits'
     },
     {
@@ -43,7 +43,7 @@ const reviews = ref([
         rating: 4,
         date: 'October 2024',
         review: 'Great selection and competitive pricing. We\'ve been ordering from KitCraft for our store for over a year. The variety of products keeps our customers coming back. Would love to see more eco-friendly options!',
-        image: 'https://images.unsplash.com/photo-1611337388484-18fb1b726dd6?w=600',
+        image: 'src/assets/customer/customer-img04.jpg',
         product: 'Macramé Materials'
     },
     {
@@ -54,7 +54,7 @@ const reviews = ref([
         rating: 5,
         date: 'September 2024',
         review: 'I attended their workshop and was so impressed I became a wholesale customer! The quality is unmatched and the team is incredibly knowledgeable. They even helped me start my own small craft business.',
-        image: 'https://images.unsplash.com/photo-1452696193712-6cabf5103b63?w=600',
+        image: 'src/assets/customer/customer-img04.jpg',
         product: 'Embroidery Supplies'
     }
 ]);
@@ -194,8 +194,8 @@ const getStars = (rating) => {
 
 <style scoped>
 .container {
-    max-width: 1600px;
-    margin: 5rem auto;
+    max-width: 1400px;
+    margin: 80px auto;
     padding: 0 40px;
 }
 
@@ -227,8 +227,8 @@ const getStars = (rating) => {
 
 .card-grid {
     display: grid;
-    grid-template-columns: 400px 1fr;
-    height: 450px;
+    grid-template-columns: minmax(300px, 400px) 1fr;
+    min-height: 450px;
 }
 
 .review-image {
@@ -480,7 +480,7 @@ const getStars = (rating) => {
     }
 
     .review-image {
-        height: 300px;
+        height: 350px;
     }
 
     .review-content {

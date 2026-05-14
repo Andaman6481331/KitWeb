@@ -1,49 +1,66 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { api, API_URL } from '../services/api'
+import { useProducts } from '../composables/useProducts';
+import { cartStore } from '../stores/cartStore';
+import { authStore } from '../stores/authStore';
+
+const { t, locale } = useI18n()
+
+// Helper to translate product fields
+const tProduct = (item, field) => {
+    if (!item) return '';
+    const lang = locale.value.toLowerCase();
+
+    const thField = `${field}_th`;
+    if (lang === 'th' && item[thField]) {
+        return item[thField];
+    }
+
+    return item[field] || '';
+};
+
+// Helper to translate product arrays
+const tArray = (item, field) => {
+    const text = tProduct(item, field);
+    if (!text) return [];
+    return typeof text === 'string' ? text.split(',').map(x => x.trim()) : (Array.isArray(text) ? text : []);
+};
 
 
 // Sample product data with size and color options
-const products = ref([])
-const isLoading = ref(true)
+const { products: rawProducts, isLoading, fetchProducts: revalidateProducts } = useProducts()
 
-// Fetch products from database
-const fetchProducts = async () => {
-    isLoading.value = true
-    try {
-        const data = await api.getProducts()
-        products.value = data.map(p => ({
-            ...p,
-            // Ensure these properties exist for the UI logic
-            sizes: p.sizes ? (typeof p.sizes === 'string' ? p.sizes.split(',').map(s => s.trim()) : p.sizes) : ['Standard'],
-            colors: p.colors ? (typeof p.colors === 'string' ? p.colors.split(',').map(c => c.trim()) : p.colors) : ['Default'],
-            inStock: p.stock !== undefined ? p.stock > 0 : true,
-            image: p.image_key ? `${API_URL}/images/${p.image_key}` : 'https://via.placeholder.com/100x100/F9F5F0/3D2B1F?text=Product'
-        }))
+const products = computed(() => {
+    return rawProducts.value.map(p => ({
+        ...p,
+        sizes: p.sizes ? (typeof p.sizes === 'string' ? p.sizes.split(',').map(s => s.trim()) : p.sizes) : ['Standard'],
+        sizes_th: p.sizes_th ? (typeof p.sizes_th === 'string' ? p.sizes_th.split(',').map(s => s.trim()) : p.sizes_th) : null,
+        colors: p.colors ? (typeof p.colors === 'string' ? p.colors.split(',').map(c => c.trim()) : p.colors) : ['Default'],
+        colors_th: p.colors_th ? (typeof p.colors_th === 'string' ? p.colors_th.split(',').map(c => c.trim()) : p.colors_th) : null,
+        varieties: p.varieties ? (typeof p.varieties === 'string' ? p.varieties.split(',').map(v => v.trim()) : p.varieties) : null,
+        varieties_th: p.varieties_th ? (typeof p.varieties_th === 'string' ? p.varieties_th.split(',').map(v => v.trim()) : p.varieties_th) : null,
+        inStock: p.stock !== undefined ? p.stock > 0 : true,
+        image: p.image_key ? `${API_URL}/images/${p.image_key}-thumb.webp` : 'https://via.placeholder.com/100x100/F9F5F0/3D2B1F?text=Product'
+    }))
+})
 
-        // Initialize selections for each product after loading
-        products.value.forEach(product => {
+// Initialize selections
+const initSelections = () => {
+    products.value.forEach(product => {
+        if (!productSelections.value[product.id]) {
             productSelections.value[product.id] = {
                 size: product.sizes[0],
                 color: product.colors[0]
             }
-        })
-
-        // Use some products as recommendations
-        if (products.value.length > 0) {
-            recommendations.value = products.value.slice(0, 3).map(p => ({
-                id: p.id,
-                name: p.name,
-                price: p.price,
-                image: p.image
-            }))
         }
-    } catch (error) {
-        console.error('Error fetching products:', error)
-        showNotificationMsg('Failed to load products')
-    } finally {
-        isLoading.value = false
-    }
+    })
+}
+
+const fetchProducts = async () => {
+    await revalidateProducts()
+    initSelections()
 }
 
 onMounted(() => {
@@ -51,14 +68,15 @@ onMounted(() => {
     fetchOrders()
 })
 
-const cart = ref([])
+const cart = computed(() => cartStore.cart)
 const searchQuery = ref('')
 const selectedCategory = ref('All')
 const showCart = ref(false)
 const showNotification = ref(false)
 const notificationMessage = ref('')
 const showCheckoutPopup = ref(false)
-const customerName = ref('')
+const showClearConfirm = ref(false)
+const customerName = ref(authStore.user?.businessName || authStore.user?.ownerName || '')
 const paymentMethod = ref('Bank Transfer')
 const orderNote = ref('')
 const isSubmittingOrder = ref(false)
@@ -74,10 +92,11 @@ const isFetchingOrders = ref(false)
 const fetchOrders = async () => {
     isFetchingOrders.value = true
     try {
-        const data = await api.getOrders()
+        // Only fetch orders for the logged-in customer if applicable
+        const data = await api.getOrders(authStore.user?.id)
         orders.value = data.map(order => ({
             ...order,
-            date: new Date(order.created_at).toLocaleDateString('en-US', {
+            date: new Date(order.created_at).toLocaleDateString(locale.value === 'th' ? 'th-TH' : 'en-US', {
                 month: 'short',
                 day: 'numeric',
                 year: 'numeric'
@@ -96,12 +115,16 @@ const fetchOrders = async () => {
 
 // Helper to get image for a product ID
 const getProductImage = (productId) => {
-    const product = products.value.find(p => p.id === productId)
-    if (product && product.image_key) {
-        return `${API_URL}/images/${product.image_key}`
-    }
-    return 'https://via.placeholder.com/100x100/F9F5F0/3D2B1F?text=Product'
-}
+    const product = products.value.find(p => p.id === productId);
+    const key = product ? (product.image_key || product.image) : null;
+
+    if (!key) return 'https://via.placeholder.com/100x100/F9F5F0/3D2B1F?text=Product';
+
+    const keyStr = String(key);
+    if (keyStr.startsWith('http')) return keyStr;
+    if (keyStr.includes('.')) return `${API_URL}/images/${keyStr}`;
+    return `${API_URL}/images/${keyStr}-thumb.webp`;
+};
 
 // Recommendations data
 const recommendations = ref([])
@@ -116,6 +139,11 @@ const categories = computed(() => {
     const cats = ['All', ...new Set(products.value.map(p => p.category))]
     return cats
 })
+
+const tCategory = (cat) => {
+    if (cat === 'All') return t('order.all');
+    return cat; // Products usually have branded categories, but could be localized if needed
+};
 
 // Filtered products
 const filteredProducts = computed(() => {
@@ -139,23 +167,17 @@ const filteredProducts = computed(() => {
 })
 
 // Cart calculations
-const cartTotal = computed(() => {
-    return cart.value.reduce((total, item) => total + (item.price * item.quantity), 0)
-})
-
-const cartItemCount = computed(() => {
-    return cart.value.reduce((count, item) => count + item.quantity, 0)
-})
+const cartTotal = computed(() => cartStore.cartTotal)
+const cartItemCount = computed(() => cartStore.cartItemCount)
 
 // Add to cart with selected size and color
 const addToCart = (product) => {
     if (!product.inStock) {
-        showNotificationMsg('This product is out of stock.')
+        showNotificationMsg(t('order.outOfStock'))
         return
     }
 
     const selection = productSelections.value[product.id]
-    const cartItemKey = `${product.id}-${selection.size}-${selection.color}`
 
     // Total already in cart for this product (across all size/color combos)
     const totalInCart = cart.value
@@ -163,29 +185,12 @@ const addToCart = (product) => {
         .reduce((sum, i) => sum + i.quantity, 0)
 
     if (product.stock !== undefined && product.stock !== null && totalInCart >= product.stock) {
-        showNotificationMsg(`Only ${product.stock} left in stock for ${product.name}.`)
+        showNotificationMsg(t('order.outOfStock')) // Or a more specific message if available
         return
     }
 
-    const existingItem = cart.value.find(item =>
-        item.id === product.id &&
-        item.selectedSize === selection.size &&
-        item.selectedColor === selection.color
-    )
-
-    if (existingItem) {
-        existingItem.quantity++
-    } else {
-        cart.value.push({
-            ...product,
-            cartItemKey,
-            selectedSize: selection.size,
-            selectedColor: selection.color,
-            quantity: 1
-        })
-    }
-
-    showNotificationMsg(`${product.name} (${selection.size}, ${selection.color}) added to cart! 🛒`)
+    cartStore.addToCart(product, selection);
+    showNotificationMsg(t('order.addedToCart', { name: product.name }))
 }
 
 // Update size selection
@@ -209,39 +214,39 @@ const updateQuantity = (cartItemKey, delta) => {
                 .filter(i => i.id === item.id)
                 .reduce((sum, i) => sum + i.quantity, 0)
             if (product && product.stock !== undefined && product.stock !== null && totalInCart >= product.stock) {
-                showNotificationMsg(`Only ${product.stock} left in stock for ${product.name}.`)
+                showNotificationMsg(t('order.outOfStock'))
                 return
             }
         }
-        item.quantity += delta
-        if (item.quantity <= 0) {
-            removeFromCart(cartItemKey)
-        }
+        cartStore.updateQuantity(cartItemKey, delta);
     }
 }
 
 // Remove from cart
 const removeFromCart = (cartItemKey) => {
-    const index = cart.value.findIndex(i => i.cartItemKey === cartItemKey)
-    if (index > -1) {
-        const itemName = cart.value[index].name
-        cart.value.splice(index, 1)
-        showNotificationMsg(`${itemName} removed from cart`)
+    const item = cart.value.find(i => i.cartItemKey === cartItemKey)
+    if (item) {
+        const itemName = item.name
+        cartStore.removeFromCart(cartItemKey);
+        showNotificationMsg(t('order.removedFromCart', { name: itemName }))
     }
 }
 
 // Clear cart
 const clearCart = () => {
-    if (confirm('Are you sure you want to clear your cart?')) {
-        cart.value = []
-        showNotificationMsg('Cart cleared')
-    }
+    showClearConfirm.value = true
+}
+
+const confirmClearCart = () => {
+    cartStore.clearCart();
+    showClearConfirm.value = false
+    showNotificationMsg(t('order.cartCleared'))
 }
 
 // Checkout
 const checkout = () => {
     if (cart.value.length === 0) {
-        showNotificationMsg('Your cart is empty!')
+        showNotificationMsg(t('order.cartEmptyError'))
         return
     }
 
@@ -284,7 +289,7 @@ const formatOrderMessage = (orderId) => {
 
 const submitOrder = async () => {
     if (!customerName.value.trim()) {
-        showNotificationMsg('Please enter your name')
+        showNotificationMsg(t('order.pleaseEnterName'))
         return
     }
     isSubmittingOrder.value = true
@@ -299,6 +304,7 @@ const submitOrder = async () => {
         const orderData = {
             id: orderId,
             customerName: customerName.value,
+            customerId: authStore.user?.id || null,
             totalAmount: cartTotal.value,
             paymentMethod: paymentMethod.value,
             note: orderNote.value,
@@ -315,8 +321,8 @@ const submitOrder = async () => {
         const result = await api.submitOrder(orderMessage, orderData)
         console.log(result.message)
         if (result.status === 200 || result.success || result.message === 'ok') {
-            showNotificationMsg('Order sent successfully! 🎉')
-            cart.value = []
+            showNotificationMsg(t('order.orderSuccess'))
+            cartStore.clearCart()
             customerName.value = ''
             paymentMethod.value = 'Bank Transfer'
             orderNote.value = ''
@@ -329,7 +335,7 @@ const submitOrder = async () => {
         }
     } catch (error) {
         console.error('Error sending order:', error)
-        showNotificationMsg('Failed to send order. Please try again.')
+        showNotificationMsg(t('order.orderFailed'))
     } finally {
         isSubmittingOrder.value = false
     }
@@ -341,7 +347,7 @@ const showNotificationMsg = (msg) => {
     showNotification.value = true
     setTimeout(() => {
         showNotification.value = false
-    }, 3000)
+    }, 1500)
 }
 
 // Toggle cart
@@ -362,6 +368,9 @@ const closeOrderDetails = () => {
     showOrderDetails.value = false
     selectedOrder.value = null
 }
+
+
+
 </script>
 
 <template>
@@ -369,28 +378,36 @@ const closeOrderDetails = () => {
         <!-- Page Header -->
         <div class="page-header">
             <div class="header-content">
-                <h1 v-reveal>Order Products</h1>
-                <p v-reveal class="delay2">Ordering & Tracking your latest treasures and curated inspirations from
-                    Kitcharoen.</p>
+                <h1 v-reveal>{{ t('order.title') }}</h1>
+                <p v-reveal class="delay2">
+                    {{ authStore.isAuthenticated ? t('order.welcomeBack', {
+                        name: authStore.user?.businessName ||
+                            authStore.user?.ownerName
+                    }) :
+                        t('order.heroSubtitle') }}
+                </p>
             </div>
 
-            <!-- Cart Button (Mobile) -->
-            <button class="cart-toggle mobile-only" @click="toggleCart" style="margin: auto 0;">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0" />
-                </svg>
-                <span v-if="cartItemCount > 0" class="cart-badge">{{ cartItemCount }}</span>
-            </button>
+            <!-- Action Buttons (Logout & Cart) -->
+            <div class="header-actions">
+
+                <button class="cart-toggle mobile-only" @click="toggleCart">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0" />
+                    </svg>
+                    <span v-if="cartItemCount > 0" class="cart-badge">{{ cartItemCount }}</span>
+                </button>
+            </div>
         </div>
 
         <!-- Secondary Navbar -->
         <div class="secondary-navbar">
             <button class="nav-item" :class="{ active: activeTab === 'new-order' }" @click="activeTab = 'new-order'">
-                NEW ORDER
+                {{ t('order.newOrder') }}
             </button>
             <button class="nav-item" :class="{ active: activeTab === 'track-orders' }"
                 @click="activeTab = 'track-orders'">
-                TRACK ORDERS
+                {{ t('order.trackOrders') }}
             </button>
         </div>
 
@@ -401,7 +418,8 @@ const closeOrderDetails = () => {
                     <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="2" />
                     <path d="M14 14L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
                 </svg>
-                <input v-model="searchQuery" type="text" placeholder="Search products..." class="search-input" />
+                <input v-model="searchQuery" type="text" :placeholder="t('order.searchPlaceholder')"
+                    class="search-input" />
             </div>
 
             <div class="category-filters">
@@ -411,7 +429,7 @@ const closeOrderDetails = () => {
                 </button> -->
                 <button v-for="category in categories" :key="category" class="category-btn"
                     :class="{ active: selectedCategory === category }" @click="selectedCategory = category">
-                    {{ category }}
+                    {{ tCategory(category) }}
                 </button>
             </div>
         </div>
@@ -424,73 +442,80 @@ const closeOrderDetails = () => {
                     <div class="products-container">
                         <!-- Table Header -->
                         <div class="table-header">
-                            <div class="th-image">IMAGE</div>
-                            <div class="th-details">PRODUCT DETAILS</div>
-                            <div class="th-variations">VARIATIONS</div>
-                            <div class="th-price">PRICE</div>
-                            <div class="th-action">ACTION</div>
+                            <div class="th-image">{{ t('order.tableHeader.image') }}</div>
+                            <div class="th-details">{{ t('order.tableHeader.details') }}</div>
+                            <div class="th-variations">{{ t('order.tableHeader.variations') }}</div>
+                            <div class="th-price">{{ t('order.tableHeader.price') }}</div>
+                            <div class="th-action">{{ t('order.tableHeader.action') }}</div>
                         </div>
 
                         <!-- Table Body -->
                         <div class="products-list">
                             <div v-if="isLoading" class="loading-products">
                                 <div class="loader"></div>
-                                <p>Curating premium supplies...</p>
+                                <p>{{ t('order.loadingProducts') }}</p>
                             </div>
                             <template v-else>
-                                <div v-for="product in filteredProducts" :key="product.id" class="product-row" :class="{
-                                    'out-of-stock': !product.inStock,
-                                    'in-cart': isProductInCart(product.id)
-                                }">
+                                <RecycleScroller class="scroller" :items="filteredProducts" :item-size="160"
+                                    key-field="id" v-slot="{ item: product }">
+                                    <div v-memo="[product.id, product.stock, isProductInCart(product.id), locale]"
+                                        class="product-row" :class="{
+                                            'out-of-stock': !product.inStock,
+                                            'in-cart': isProductInCart(product.id)
+                                        }">
 
-                                    <!-- Image -->
-                                    <div class="td-image">
-                                        <div class="image-wrapper">
-                                            <img :src="product.image" :alt="product.name" class="product-thumb" />
-                                            <div v-if="!product.inStock" class="stock-badge">Out of Stock</div>
+                                        <!-- Image -->
+                                        <div class="td-image">
+                                            <div class="image-wrapper">
+                                                <img :src="product.image" :alt="tProduct(product, 'name')"
+                                                    class="product-thumb" />
+                                                <div v-if="!product.inStock" class="stock-badge">{{
+                                                    t('order.outOfStock') }}</div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Product Info -->
+                                        <div class="td-details">
+                                            <span class="product-tag">{{ product.category }}</span>
+                                            <h3 class="product-name">{{ tProduct(product, 'name') }}</h3>
+                                            <p class="product-desc">{{ tProduct(product, 'description') }}</p>
+                                        </div>
+
+                                        <!-- Variations -->
+                                        <div class="td-variations" v-if="productSelections[product.id]">
+                                            <select v-model="productSelections[product.id].size"
+                                                @change="updateSize(product.id, $event.target.value)"
+                                                class="variation-select" :disabled="!product.inStock">
+                                                <option v-for="(size, idx) in product.sizes" :key="size" :value="size">
+                                                    {{ tArray(product, 'sizes')[idx] || size }}
+                                                </option>
+                                            </select>
+                                            <select v-model="productSelections[product.id].color"
+                                                @change="updateColor(product.id, $event.target.value)"
+                                                class="variation-select" :disabled="!product.inStock">
+                                                <option v-for="(color, idx) in product.colors" :key="color"
+                                                    :value="color">
+                                                    {{ tArray(product, 'colors')[idx] || color }}
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        <!-- Price -->
+                                        <div class="td-price">
+                                            <span class="price-currency">฿</span>
+                                            <span class="price-amount">{{ product.price }}</span>
+                                        </div>
+
+                                        <!-- Action Button -->
+                                        <div class="td-action">
+                                            <button class="add-to-cart-btn" :disabled="!product.inStock"
+                                                @click="addToCart(product)">
+                                                <span class="btn-icon">+</span>
+                                                {{ t('order.add') }}
+                                            </button>
                                         </div>
                                     </div>
-
-                                    <!-- Product Info -->
-                                    <div class="td-details">
-                                        <span class="product-tag">{{ product.category }}</span>
-                                        <h3 class="product-name">{{ product.name }}</h3>
-                                        <p class="product-desc">{{ product.description }}</p>
-                                    </div>
-
-                                    <!-- Variations -->
-                                    <div class="td-variations" v-if="productSelections[product.id]">
-                                        <select v-model="productSelections[product.id].size"
-                                            @change="updateSize(product.id, $event.target.value)"
-                                            class="variation-select" :disabled="!product.inStock">
-                                            <option v-for="size in product.sizes" :key="size" :value="size">
-                                                {{ size }}
-                                            </option>
-                                        </select>
-                                        <select v-model="productSelections[product.id].color"
-                                            @change="updateColor(product.id, $event.target.value)"
-                                            class="variation-select" :disabled="!product.inStock">
-                                            <option v-for="color in product.colors" :key="color" :value="color">
-                                                {{ color }}
-                                            </option>
-                                        </select>
-                                    </div>
-
-                                    <!-- Price -->
-                                    <div class="td-price">
-                                        <span class="price-currency">฿</span>
-                                        <span class="price-amount">{{ product.price }}</span>
-                                    </div>
-
-                                    <!-- Action Button -->
-                                    <div class="td-action">
-                                        <button class="add-to-cart-btn" :disabled="!product.inStock"
-                                            @click="addToCart(product)">
-                                            <span class="btn-icon">+</span>
-                                            Add
-                                        </button>
-                                    </div>
-                                </div>
+                                </RecycleScroller>
                             </template>
                         </div>
                     </div>
@@ -498,8 +523,8 @@ const closeOrderDetails = () => {
                     <!-- Empty State -->
                     <div v-if="filteredProducts.length === 0" class="empty-state">
                         <div class="empty-icon">🔍</div>
-                        <h2>No products found</h2>
-                        <p>Try adjusting your search or filters</p>
+                        <h2>{{ t('order.noProductsFound') }}</h2>
+                        <p>{{ t('order.adjustFilters') }}</p>
                     </div>
                 </div>
 
@@ -514,10 +539,11 @@ const closeOrderDetails = () => {
                                         d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0" />
                                 </svg>
                             </div>
-                            <h2>Your Cart</h2>
-                            <div class="items-badge">{{ cartItemCount }} ITEMS</div>
+                            <h2>{{ t('order.yourCart') }}</h2>
+                            <div class="items-badge">{{ cartItemCount }} {{ t('order.items') }}</div>
                         </div>
-                        <button v-if="cart.length > 0" @click="clearCart" class="clear-all-btn">CLEAR ALL</button>
+                        <button v-if="cart.length > 0" @click="clearCart" class="clear-all-btn">{{ t('order.clearAll')
+                        }}</button>
                         <!-- <button class="close-cart mobile-only" @click="toggleCart">✕</button> -->
                     </div>
 
@@ -552,31 +578,33 @@ const closeOrderDetails = () => {
                                 <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
                             </svg>
                         </div>
-                        <h3>Cart is empty</h3>
-                        <p>It looks like you haven't added any premium supplies to your project list yet.</p>
-                        <button class="browse-collections-btn" @click="searchQuery = ''">Browse Collections</button>
+                        <h3>{{ t('order.cartEmpty') }}</h3>
+                        <p>{{ t('order.cartEmptySubtitle') }}</p>
+                        <router-link :to="'/catalog'" class="no-style">
+                            <button class="browse-collections-btn">{{ t('order.browseCollections') }}</button>
+                        </router-link>
                     </div>
 
                     <!-- Cart Footer Modern -->
                     <div class="cart-footer-modern" v-if="cart.length > 0">
                         <div class="cart-summary-modern">
                             <div class="summary-row">
-                                <span>Subtotal</span>
+                                <span>{{ t('order.subtotal') }}</span>
                                 <span>฿{{ cartTotal }}</span>
                             </div>
                             <div class="summary-row">
-                                <span>Delivery</span>
+                                <span>{{ t('order.delivery') }}</span>
                                 <span>฿30</span>
                             </div>
                             <div class="summary-row total">
-                                <span>Total</span>
+                                <span>{{ t('order.total') }}</span>
                                 <span>฿{{ cartTotal + 30 }}</span>
                             </div>
                         </div>
 
                         <div class="cart-actions-modern">
                             <button @click="checkout" class="checkout-btn-modern">
-                                Secure Checkout
+                                {{ t('order.secureCheckout') }}
                             </button>
                         </div>
                     </div>
@@ -588,7 +616,7 @@ const closeOrderDetails = () => {
                                 stroke-width="2">
                                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                             </svg>
-                            SECURE CHECKOUT
+                            {{ t('order.secureCheckout') }}
                         </div>
                         <div class="badge-dot">•</div>
                         <div class="badge-item">
@@ -597,7 +625,7 @@ const closeOrderDetails = () => {
                                 <circle cx="12" cy="12" r="10" />
                                 <path d="M2 12h20M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z" />
                             </svg>
-                            GLOBAL SHIPPING
+                            {{ t('order.globalShipping') }}
                         </div>
                     </div>
                 </div>
@@ -609,12 +637,10 @@ const closeOrderDetails = () => {
                     <div class="history-header">
                         <div class="history-title">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <h2>Order History</h2>
+                                stroke-width="2"></svg>
+                            <h2>{{ t('order.orderHistory') }}</h2>
                         </div>
-                        <button class="download-statements">Download Statements</button>
+                        <button class="download-statements">{{ t('order.downloadStatements') }}</button>
                     </div>
 
                     <div class="orders-history-list">
@@ -624,11 +650,10 @@ const closeOrderDetails = () => {
                                 <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
                                 <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
                             </svg>
-                            <h3>No orders found</h3>
-                            <p>You haven't placed any orders yet. Start your journey with Kitcharoen treasures today.
-                            </p>
+                            <h3>{{ t('order.noOrdersFound') }}</h3>
+                            <p>{{ t('order.noOrdersSubtitle') }}</p>
                             <button class="checkout-btn-modern" style="max-width: 200px; margin-top: 20px;"
-                                @click="activeTab = 'new-order'">SHOP NOW</button>
+                                @click="activeTab = 'new-order'">{{ t('order.shopNow') }}</button>
                         </div>
                         <div v-else v-for="order in orders" :key="order.id" class="order-history-card">
                             <div class="order-main-info">
@@ -637,14 +662,15 @@ const closeOrderDetails = () => {
                                 </div>
                                 <div class="order-text-info">
                                     <div class="order-id-status">
-                                        <span class="order-id">ORDER #{{ order.id }}</span>
-                                        <span v-if="order.status === 'SHIPPED'"
-                                            class="status-tag shipped">SHIPPED</span>
+                                        <span class="order-id">{{ t('order.orderNumber') }}{{ order.id }}</span>
+                                        <span v-if="order.status === 'SHIPPED'" class="status-tag shipped">{{
+                                            t('order.shipped') }}</span>
                                         <span v-else class="status-tag pending">{{ order.status }}</span>
                                     </div>
                                     <h3 class="order-name">{{ order.items && order.items.length > 0 ?
                                         order.items[0].product_name : 'New Order' }}</h3>
-                                    <p class="order-meta">Placed on {{ order.date }} • {{ order.itemsCount }} Items •
+                                    <p class="order-meta">{{ t('order.placedOn') }} {{ order.date }} • {{
+                                        order.itemsCount }} {{ t('order.itemsCount') }} •
                                         ฿{{
                                             order.price.toLocaleString() }}</p>
                                 </div>
@@ -662,10 +688,12 @@ const closeOrderDetails = () => {
                             </div>
 
                             <div class="order-card-actions">
-                                <button class="track-btn" v-if="order.status === 'SHIPPED'">TRACK SHIPMENT</button>
-                                <button class="order-details-btn" @click="selectOrderDetails(order)">ORDER
-                                    DETAILS</button>
-                                <button class="buy-again-btn" v-if="order.status === 'DELIVERED'">BUY AGAIN</button>
+                                <button class="track-btn" v-if="order.status === 'SHIPPED'">{{ t('order.trackShipment')
+                                }}</button>
+                                <button class="order-details-btn" @click="selectOrderDetails(order)">{{
+                                    t('order.orderDetails') }}</button>
+                                <button class="buy-again-btn" v-if="order.status === 'DELIVERED'">{{ t('order.buyAgain')
+                                }}</button>
                             </div>
                         </div>
                     </div>
@@ -675,7 +703,7 @@ const closeOrderDetails = () => {
                 <div class="history-sidebar">
                     <!-- Recommended For You (Default) -->
                     <div v-if="!showOrderDetails" class="recommendations-container">
-                        <h3>RECOMMENDED FOR YOU</h3>
+                        <h3>{{ t('order.recommendedForYou') }}</h3>
                         <div class="rec-list">
                             <div v-for="rec in recommendations" :key="rec.id" class="rec-item">
                                 <img :src="rec.image" :alt="rec.name">
@@ -693,20 +721,21 @@ const closeOrderDetails = () => {
                                 </button>
                             </div>
                         </div>
-                        <button class="view-all-recs">VIEW RECOMMENDATIONS</button>
+                        <button class="view-all-recs">{{ t('order.viewRecommendations') }}</button>
                     </div>
 
                     <!-- Order Details (Toggled) -->
                     <div v-else class="order-details-sidebar">
                         <div class="details-header">
-                            <h3>Order Details</h3>
+                            <h3>{{ t('order.orderDetails') }}</h3>
                             <button @click="closeOrderDetails" class="close-details">✕</button>
                         </div>
                         <div v-if="selectedOrder" class="details-content">
                             <div class="order-summary-mini">
-                                <p><strong>Order ID:</strong> {{ selectedOrder.id }}</p>
-                                <p><strong>Status:</strong> {{ selectedOrder.status }}</p>
-                                <p><strong>Total:</strong> ฿{{ selectedOrder.price.toLocaleString() }}</p>
+                                <p><strong>{{ t('order.orderNumber') }}</strong> {{ selectedOrder.id }}</p>
+                                <p><strong>{{ t('order.status') }}:</strong> {{ selectedOrder.status }}</p>
+                                <p><strong>{{ t('order.total') }}:</strong> ฿{{ selectedOrder.price.toLocaleString() }}
+                                </p>
                             </div>
                             <div class="order-items-mini">
                                 <div v-for="item in selectedOrder.items" :key="item.id" class="mini-item">
@@ -714,7 +743,7 @@ const closeOrderDetails = () => {
                                     <p class="mini-meta">{{ item.size }} | {{ item.color }}</p>
                                 </div>
                             </div>
-                            <button class="checkout-btn-modern">Go to Checkout</button>
+                            <button class="checkout-btn-modern">{{ t('order.goCheckout') }}</button>
                         </div>
                     </div>
                 </div>
@@ -725,13 +754,13 @@ const closeOrderDetails = () => {
     <!-- Notification Toast -->
     <transition name="slide-up">
         <div v-if="showNotification" class="notification">
-            <div class="notification-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                    <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-            </div>
             <div class="notification-content">
+                <div class="notification-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                </div>
                 {{ notificationMessage }}
             </div>
         </div>
@@ -746,8 +775,8 @@ const closeOrderDetails = () => {
             <button class="popup-close-btn" @click="closeCheckoutPopup">✕</button>
 
             <div class="popup-header">
-                <h2>🧾 Complete Your Order</h2>
-                <p>Review your order and provide details</p>
+                <h2>{{ t('order.completeOrder') }}</h2>
+                <p>{{ t('order.completeOrderSubtitle') }}</p>
             </div>
 
             <div class="popup-body">
@@ -755,57 +784,60 @@ const closeOrderDetails = () => {
                 <!-- Order Summary -->
                 <div class="order-summary-section">
                     <div class="order-summary-header">
-                        <h3>Order Summary</h3>
-                        <h3>Qty</h3>
-                        <h3>Price</h3>
-                        <h3>Total</h3>
+                        <h3>{{ t('order.orderSummary') }}</h3>
+                        <h3>{{ t('order.qty') }}</h3>
+                        <h3>{{ t('order.price') }}</h3>
+                        <h3>{{ t('order.total') }}</h3>
                     </div>
                     <div class="summary-items">
                         <div v-for="item in cart" :key="item.cartItemKey" class="summary-item">
                             <div class="summary-item-info">
                                 <strong>{{ item.name }}</strong>
                                 <span class="summary-specs">{{ item.selectedSize }} • {{ item.selectedColor
-                                    }}</span>
+                                }}</span>
                             </div>
-                            <div class="summary-item-calc">
-                                <span>{{ item.quantity }}</span>
-                                <span>•</span>
+                            <div class="summary-item-quantity">
+                                <span>x {{ item.quantity }}</span>
+                            </div>
+                            <div class="summary-item-price">
                                 <span>{{ item.price }}</span>
-                                <strong>฿{{ item.quantity * item.price }}</strong>
+                            </div>
+                            <div class="summary-item-total">
+                                <strong>{{ item.quantity * item.price }} ฿</strong>
                             </div>
                         </div>
                     </div>
 
                     <div class="summary-total">
                         <div class="total-row">
-                            <span>Subtotal</span>
+                            <span>{{ t('order.subtotal') }}</span>
                             <span>฿{{ cartTotal }}</span>
                         </div>
                         <div class="total-row">
-                            <span>Delivery</span>
+                            <span>{{ t('order.delivery') }}</span>
                             <span>฿30</span>
                         </div>
                         <div class="total-row grand-total">
-                            <span>Grand Total</span>
+                            <span>{{ t('order.grandTotal') }}</span>
                             <span>฿{{ cartTotal + 30 }}</span>
                         </div>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Full Name</label>
-                    <input v-model="customerName" type="text" placeholder="Enter your name..." class="form-input"
-                        required />
+                    <label>{{ t('order.fullName') }}</label>
+                    <input v-model="customerName" type="text" :placeholder="t('order.fullNamePlaceholder')"
+                        class="form-input" required />
                 </div>
 
                 <div class="form-group">
-                    <label>Order Note (Optional)</label>
-                    <textarea v-model="orderNote" placeholder="Special requests or delivery instructions..."
-                        class="form-textarea" rows="3"></textarea>
+                    <label>{{ t('order.orderNote') }}</label>
+                    <textarea v-model="orderNote" :placeholder="t('order.orderNotePlaceholder')" class="form-textarea"
+                        rows="3"></textarea>
                 </div>
             </div>
 
             <div class="popup-footer">
-                <button @click="closeCheckoutPopup" class="cancel-btn">Cancel</button>
+                <button @click="closeCheckoutPopup" class="cancel-btn">{{ t('order.cancel') }}</button>
                 <button @click="submitOrder" class="submit-order-btn" :disabled="isSubmittingOrder">
                     <span v-if="!isSubmittingOrder">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -813,10 +845,28 @@ const closeOrderDetails = () => {
                                 d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
                                 stroke="currentColor" stroke-width="2" />
                         </svg>
-                        Send Order to LINE
+                        {{ t('order.sendToLine') }}
                     </span>
-                    <span v-else>Sending...</span>
+                    <span v-else>{{ t('order.sending') }}</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clear Cart Confirmation Modal -->
+    <div v-if="showClearConfirm" class="checkout-overlay" @click="showClearConfirm = false">
+        <div class="confirm-popup" @click.stop>
+            <div class="confirm-icon-box">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path
+                        d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" />
+                </svg>
+            </div>
+            <h3>{{ t('order.clearCartConfirm') }}</h3>
+            <p>{{ t('order.clearCartSubtitle') }}</p>
+            <div class="confirm-actions">
+                <button class="cancel-btn" @click="showClearConfirm = false">{{ t('order.keepItems') }}</button>
+                <button class="clear-confirm-btn" @click="confirmClearCart">{{ t('order.yesClearCart') }}</button>
             </div>
         </div>
     </div>
@@ -948,13 +998,19 @@ const closeOrderDetails = () => {
     letter-spacing: 0.05em;
 }
 
+.scroller {
+    height: 700px;
+}
+
 .product-row {
     display: grid;
     grid-template-columns: 140px 2fr 180px 100px 120px;
-    padding: 30px;
+    padding: 20px 30px;
     border-bottom: 1px solid #F4EDE6;
     align-items: center;
     transition: background 0.3s ease;
+    height: 160px;
+    box-sizing: border-box;
 }
 
 .product-row:last-child {
@@ -1005,6 +1061,11 @@ const closeOrderDetails = () => {
     font-weight: 700;
     color: #3D2B1F;
     margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .product-desc {
@@ -1012,6 +1073,11 @@ const closeOrderDetails = () => {
     color: #8C7B6E;
     line-height: 1.5;
     margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .td-variations {
@@ -1829,7 +1895,7 @@ const closeOrderDetails = () => {
 .checkout-popup {
     background: white;
     border-radius: 5px;
-    max-width: 1200px;
+    max-width: 1000px;
     width: 100%;
     max-height: 90vh;
     overflow-y: auto;
@@ -1838,7 +1904,7 @@ const closeOrderDetails = () => {
 }
 
 .popup-header {
-    padding: 40px;
+    padding: 10px;
     border-bottom: 1px solid #F4EDE6;
     text-align: center;
 }
@@ -1885,16 +1951,31 @@ const closeOrderDetails = () => {
     margin-bottom: 24px;
 }
 
+.order-summary-header {
+    display: grid;
+    grid-template-columns: 3fr 1fr 2fr 1fr;
+    text-align: center;
+}
+
 .summary-item {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 3fr 1fr 2fr 1fr;
     padding: 12px 0;
     border-bottom: 1px solid #E6E0D9;
+    text-align: center;
+}
+
+.summary-item-info {
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    padding-left: 20px;
 }
 
 .summary-item:last-child {
     border-bottom: none;
 }
+
 
 .summary-total {
     margin-top: 16px;
@@ -2014,15 +2095,15 @@ const closeOrderDetails = () => {
 /* Notification Popup Modern */
 .notification {
     position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    bottom: 40px;
+    left: 40px;
     background: white;
     color: #3D2B1F;
     padding: 30px 40px;
     border-radius: 20px;
     box-shadow: 0 25px 60px rgba(61, 43, 31, 0.25);
-    z-index: 100000; /* Extremely high z-index to stay on top */
+    z-index: 100000;
+    /* Extremely high z-index to stay on top */
     font-weight: 700;
     font-size: 18px;
     text-align: center;
@@ -2033,7 +2114,8 @@ const closeOrderDetails = () => {
     gap: 16px;
     min-width: 340px;
     max-width: 90%;
-    pointer-events: auto; /* Allow interactions if needed, though mostly for display */
+    pointer-events: auto;
+    /* Allow interactions if needed, though mostly for display */
 }
 
 .notification-icon {
@@ -2063,12 +2145,104 @@ const closeOrderDetails = () => {
 
 @keyframes notification-pop {
     0% {
-        transform: translate(-50%, -40%) scale(0.85);
+        transform: translateY(20px) scale(0.85);
         opacity: 0;
     }
+
     100% {
-        transform: translate(-50%, -50%) scale(1);
+        transform: translateY(0) scale(1);
         opacity: 1;
     }
 }
+
+@media (max-width: 480px) {
+    .notification {
+        left: 20px;
+        bottom: 20px;
+        min-width: 0;
+        width: calc(100% - 40px);
+        padding: 20px;
+        font-size: 16px;
+    }
+}
+
+/* Confirmation Popup */
+.confirm-popup {
+    background: white;
+    border-radius: 24px;
+    padding: 40px;
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(61, 43, 31, 0.3);
+    animation: modalPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.confirm-icon-box {
+    width: 70px;
+    height: 70px;
+    background: #FFF5F5;
+    color: #FF7675;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+}
+
+.confirm-popup h3 {
+    font-family: 'Crimson Pro', serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: #3D2B1F;
+    margin: 0 0 12px 0;
+}
+
+.confirm-popup p {
+    font-size: 14px;
+    color: #8C7E71;
+    line-height: 1.6;
+    margin: 0 0 30px 0;
+}
+
+.confirm-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.clear-confirm-btn {
+    flex: 1;
+    padding: 14px;
+    background: #FF7675;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.clear-confirm-btn:hover {
+    background: #D63031;
+    transform: translateY(-2px);
+}
+
+@keyframes modalPop {
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
 </style>
