@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { getUtilsUrl } from '@/services/api';
 
 const { t } = useI18n();
 
@@ -70,7 +71,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
 
 <template>
     <!-- Page Header -->
-    <div class="catalog-header">
+    <div class="catalog-header" :style="{ backgroundImage: `url(${getUtilsUrl('shop04.png')})` }">
         <div class="header-content">
             <span class="since-badge">SINCE 1984</span>
             <h1 class="catalog-title">{{ $t('contact.headerTitle') }}</h1>
@@ -195,7 +196,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
 
                     <!-- Quote Image Card -->
                     <div class="quote-card">
-                        <img src="../assets/shop02.jpg" alt="Heritage Store" class="quote-bg" />
+                        <img :src="getUtilsUrl('shop02.jpg')" alt="Heritage Store" class="quote-bg" />
                         <div class="quote-overlay">
                             <p>"{{ $t('contact.hub.quote') }}"</p>
                         </div>
@@ -258,7 +259,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
 <style scoped>
 /* Catalog Header */
 .catalog-header {
-    background: url('../assets/shop04.png');
+    /* background: url('../assets/shop04.png'); */
     background-size: contain;
     background-position: center;
     min-height: 600px;

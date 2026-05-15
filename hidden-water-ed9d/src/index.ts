@@ -14,6 +14,7 @@
 interface Env {
 	DB: D1Database;
 	IMAGES: R2Bucket;
+	WEB_UTILS: R2Bucket;
 	AI: any;
 	LINE_CHANNEL_ACCESS_TOKEN?: string;
 	LINE_NOTIFY_TOKEN?: string;
@@ -30,12 +31,35 @@ async function hashPassword(password: string): Promise<string> {
 	return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
+function generateSKU(category: string, countInCategory: number): string {
+	const parts = (category || "UK").trim().split(/\s+/);
+	let prefix = "";
+	if (parts.length >= 2) {
+		prefix = (parts[0][0] + parts[1][0]).toUpperCase();
+	} else {
+		// Use first two letters, pad with 'X' if too short
+		prefix = (category || "UK").substring(0, 2).toUpperCase().padEnd(2, 'X');
+	}
+	const suffix = (countInCategory + 1).toString().padStart(3, '0');
+	return `${prefix}${suffix}`;
+}
+
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
 		const url = new URL(request.url);
 
 		// Helper to wrap responses with CORS
 		const corsResponse = (body: any, init?: ResponseInit) => {
+			const origin = request.headers.get("Origin");
+			const allowedOrigins = [
+				"https://kitcharoensampeng.com",
+				"https://www.kitcharoensampeng.com",
+				"http://localhost:5173",
+				"http://127.0.0.1:5173"
+			];
+			
+			const responseOrigin = (origin && allowedOrigins.includes(origin)) ? origin : allowedOrigins[0];
+
 			let resp: Response;
 			if (body instanceof Response) {
 				resp = body;
@@ -46,21 +70,32 @@ export default {
 			}
 
 			const newResp = new Response(resp.body, resp);
-			newResp.headers.set("Access-Control-Allow-Origin", "*");
+			newResp.headers.set("Access-Control-Allow-Origin", responseOrigin);
 			newResp.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
 			newResp.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+			newResp.headers.set("Access-Control-Allow-Credentials", "true");
 			return newResp;
 		};
 
 		// 1. Handle CORS Preflight
 		if (request.method === "OPTIONS") {
+			const origin = request.headers.get("Origin");
+			const allowedOrigins = [
+				"https://kitcharoensampeng.com",
+				"https://www.kitcharoensampeng.com",
+				"http://localhost:5173",
+				"http://127.0.0.1:5173"
+			];
+			const responseOrigin = (origin && allowedOrigins.includes(origin)) ? origin : allowedOrigins[0];
+
 			return new Response(null, {
 				status: 204,
 				headers: {
-					"Access-Control-Allow-Origin": "*",
+					"Access-Control-Allow-Origin": responseOrigin,
 					"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
 					"Access-Control-Allow-Headers": "Content-Type, Authorization",
 					"Access-Control-Max-Age": "86400",
+					"Access-Control-Allow-Credentials": "true"
 				},
 			});
 		}
@@ -129,6 +164,16 @@ export default {
 			if (url.pathname.startsWith("/images/") && request.method === "GET") {
 				const key = decodeURIComponent(url.pathname.split("/images/")[1]);
 				const object = await env.IMAGES.get(key);
+				if (!object) return corsResponse("Not Found", { status: 404 });
+				const headers = new Headers();
+				object.writeHttpMetadata(headers);
+				headers.set("Access-Control-Allow-Origin", "*");
+				return new Response(object.body, { headers });
+			}
+
+			if (url.pathname.startsWith("/utils/") && request.method === "GET") {
+				const key = decodeURIComponent(url.pathname.split("/utils/")[1]);
+				const object = await env.WEB_UTILS.get(key);
 				if (!object) return corsResponse("Not Found", { status: 404 });
 				const headers = new Headers();
 				object.writeHttpMetadata(headers);
@@ -326,9 +371,13 @@ export default {
 				const activePrice = price || price_3 || 0;
 				const initialStock = stock || 0;
 
+				// Generate SKU
+				const { count } = await env.DB.prepare("SELECT COUNT(*) as count FROM products WHERE category = ?").bind(category).first() as any;
+				const sku = generateSKU(category, count || 0);
+
 				const { meta } = await env.DB.prepare(
-					"INSERT INTO products (name, name_th, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-				).bind(name, name_th, description, activePrice, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, initialStock).run();
+					"INSERT INTO products (name, name_th, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, stock, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+				).bind(name, name_th, description, activePrice, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, initialStock, sku).run();
 
 				const productId = meta.last_row_id;
 

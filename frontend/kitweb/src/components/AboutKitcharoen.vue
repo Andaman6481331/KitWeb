@@ -2,6 +2,7 @@
 import { RouterLink } from 'vue-router';
 import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { getUtilsUrl } from '@/services/api';
 
 const { t } = useI18n();
 
@@ -37,7 +38,7 @@ const aboutInfo = computed(() => ({
         <div class="container">
             <!-- Left Side - Image -->
             <div v-reveal class="image-content">
-                <img src="../assets/card-img02.jpg" alt="">
+                <img :src="getUtilsUrl('card-img02.jpg')" alt="">
             </div>
             <!-- Right Side - About Us Information -->
             <div class="text-content">

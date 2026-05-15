@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS products (
     price_4 REAL,
     price_5 REAL,
     name_th TEXT,
+    sku TEXT UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

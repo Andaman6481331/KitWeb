@@ -1,7 +1,7 @@
 <template>
     <div class="partners-reach-page">
         <!-- Hero Section -->
-        <section class="hero">
+        <section class="hero" :style="{ backgroundImage: `url(${getUtilsUrl('shop03.png')})` }">
             <div class="hero-content">
                 <h1 v-reveal>{{ $t('partner.heroTitle') }}</h1>
                 <p class="subtitle" v-reveal delay="0.5s">{{ $t('partner.heroSubtitle') }}</p>
@@ -59,7 +59,7 @@
 
 
         <!-- Operations Photos -->
-        <section class="operations-section">
+        <section v-if="$isDev" class="operations-section">
             <div class="container">
                 <h2 class="section-title">Behind the Scenes</h2>
                 <p class="section-subtitle">A glimpse into our daily operations and commitment to quality</p>
@@ -76,7 +76,7 @@
         </section>
 
         <!-- Testimonials -->
-        <section class="testimonials-section">
+        <section v-if="$isDev" class="testimonials-section">
             <div class="container">
                 <h2 class="section-title">What Our Partners Say</h2>
                 <p class="section-subtitle">Real experiences from retail partners across our network</p>
@@ -91,7 +91,7 @@
         </section>
 
         <!-- How We Work Process -->
-        <section class="process-section">
+        <section v-if="$isDev" class="process-section">
             <div class="container">
                 <h2 class="section-title">How We Work With Partners</h2>
                 <p class="section-subtitle">A simple, transparent process built on trust and mutual growth</p>
@@ -106,7 +106,7 @@
         </section>
 
         <!-- Call to Action -->
-        <section class="cta-section">
+        <section v-if="$isDev" class="cta-section">
             <div class="container">
                 <div class="cta-content">
                     <h2 class="cta-title">{{ cta.title }}</h2>
@@ -123,6 +123,7 @@
 
 <script setup>
 import { ref } from 'vue';
+import { getUtilsUrl } from '@/services/api';
 
 // Hero text is now handled via i18n in the template
 
@@ -138,24 +139,21 @@ const wallSection = ref({
     subtitle: 'Celebrating the success of our partners and the creativity of our customers across the globe'
 });
 
-import front01 from '@/assets/customer/front01.jpg';
-import front02 from '@/assets/customer/front02.jpg';
-import front03 from '@/assets/customer/front03.jpg';
-import front04 from '@/assets/customer/front04.jpg';
-import front05 from '@/assets/customer/front05.jpg';
-import front06 from '@/assets/customer/front06.jpg';
-import front07 from '@/assets/customer/front07.jpg';
-import front08 from '@/assets/customer/front08.jpg';
-import front09 from '@/assets/customer/front09.jpg';
-import front10 from '@/assets/customer/front10.jpg';
-import front11 from '@/assets/customer/front11.jpg';
-import front12 from '@/assets/customer/front12.jpg';
-import front13 from '@/assets/customer/front13.jpg';
-import front14 from '@/assets/customer/front14.jpg';
-import res01 from '@/assets/customer/res01.jpg';
-
 const wallImages = [
-    front01, front02, front03, front04, front05, front06, front07, front08, front09, front10, front11, front12, front13, front14
+    getUtilsUrl('front01.jpg'),
+    getUtilsUrl('front02.jpg'),
+    getUtilsUrl('front03.jpg'),
+    getUtilsUrl('front04.jpg'),
+    getUtilsUrl('front05.jpg'),
+    getUtilsUrl('front06.jpg'),
+    getUtilsUrl('front07.jpg'),
+    getUtilsUrl('front08.jpg'),
+    getUtilsUrl('front09.jpg'),
+    getUtilsUrl('front10.jpg'),
+    getUtilsUrl('front11.jpg'),
+    getUtilsUrl('front12.jpg'),
+    getUtilsUrl('front13.jpg'),
+    getUtilsUrl('front14.jpg')
 ];
 
 
@@ -260,7 +258,7 @@ const handleLearnMoreClick = () => {
 }
 
 .hero {
-    background: url('../assets/shop03.png');
+    /* background: url('../assets/shop03.png'); */
     background-size: contain;
     background-position: center;
     min-height: 600px;

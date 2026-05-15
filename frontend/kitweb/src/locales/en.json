@@ -339,7 +339,7 @@
     "signIn": "Sign In",
     "signInSubtitle": "Enter your details to access your account.",
     "emailLabel": "Email Address",
-    "emailPlaceholder": "weaver@heritage.com",
+    "emailPlaceholder": "weaver{'@'}heritage.com",
     "passwordLabel": "Password",
     "forgotPassword": "Forgot Password?",
     "passwordPlaceholder": "••••••••",

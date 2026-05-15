@@ -339,7 +339,7 @@
         "signIn": "เข้าสู่ระบบ",
         "signInSubtitle": "กรอกรายละเอียดของคุณเพื่อเข้าสู่ระบบ",
         "emailLabel": "ที่อยู่อีเมล",
-        "emailPlaceholder": "weaver@heritage.com",
+        "emailPlaceholder": "weaver{'@'}heritage.com",
         "passwordLabel": "รหัสผ่าน",
         "forgotPassword": "ลืมรหัสผ่าน?",
         "passwordPlaceholder": "••••••••",

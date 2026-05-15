@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { getUtilsUrl } from '@/services/api';
 
 const reviews = ref([
     {
@@ -10,7 +11,7 @@ const reviews = ref([
         rating: 5,
         date: 'January 2025',
         review: 'KitCraft has transformed my business! The quality of their yarns is exceptional, and the wholesale prices allow me to maintain healthy margins. Their customer service is outstanding - always responsive and helpful.',
-        image: 'src/assets/customer/customer-img01.jpg',
+        image: getUtilsUrl('customer-img01.jpg'),
         product: 'Premium Yarn Collection'
     },
     {
@@ -21,7 +22,7 @@ const reviews = ref([
         rating: 5,
         date: 'December 2024',
         review: 'I\'ve been running workshops for 3 years and KitCraft is my go-to supplier. The beads are vibrant, the materials are consistent, and they never let me down on delivery. My students love the quality!',
-        image: 'src/assets/customer/customer-img02.jpg',
+        image: getUtilsUrl('customer-img02.jpg'),
         product: 'Beaded Craft Supplies'
     },
     {
@@ -32,7 +33,7 @@ const reviews = ref([
         rating: 5,
         date: 'November 2024',
         review: 'As an online seller, reliable suppliers are crucial. KitCraft not only offers great products but also helps with packaging suggestions and marketing materials. They truly care about their partners\' success!',
-        image: 'src/assets/customer/customer-img03.jpg',
+        image: getUtilsUrl('customer-img03.jpg'),
         product: 'DIY Craft Kits'
     },
     {
@@ -43,7 +44,7 @@ const reviews = ref([
         rating: 4,
         date: 'October 2024',
         review: 'Great selection and competitive pricing. We\'ve been ordering from KitCraft for our store for over a year. The variety of products keeps our customers coming back. Would love to see more eco-friendly options!',
-        image: 'src/assets/customer/customer-img04.jpg',
+        image: getUtilsUrl('customer-img04.jpg'),
         product: 'Macramé Materials'
     },
     {
@@ -54,7 +55,7 @@ const reviews = ref([
         rating: 5,
         date: 'September 2024',
         review: 'I attended their workshop and was so impressed I became a wholesale customer! The quality is unmatched and the team is incredibly knowledgeable. They even helped me start my own small craft business.',
-        image: 'src/assets/customer/customer-img04.jpg',
+        image: getUtilsUrl('customer-img04.jpg'),
         product: 'Embroidery Supplies'
     }
 ]);

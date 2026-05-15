@@ -25,6 +25,10 @@
 		{
 			"binding": "IMAGES",
 			"bucket_name": "product-images"
+		},
+		{
+			"binding": "WEB_UTILS",
+			"bucket_name": "web-utils"
 		}
 	],
 	"ai": {

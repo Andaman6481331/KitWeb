@@ -2,38 +2,40 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import { getUtilsUrl } from '@/services/api'
+
 const { t } = useI18n()
 
 // Video data with localized content
 const videos = computed(() => [
   {
     id: 1,
-    src: '/shop-clip01.mp4',
-    poster: '/shop-clip01-tn.jpg',
+    src: getUtilsUrl('shop-clip01.mp4'),
+    poster: getUtilsUrl('shop-clip01-tn.jpg'),
     title: t('videoSection.videos.clip1.title'),
     description: t('videoSection.videos.clip1.description'),
     duration: '2:30'
   },
   {
     id: 2,
-    src: '/shop-clip01.mp4',
-    poster: '/shop-clip02-tn.png',
+    src: getUtilsUrl('shop-clip02.mp4'),
+    poster: getUtilsUrl('shop-clip02-tn.png'),
     title: t('videoSection.videos.clip2.title'),
     description: t('videoSection.videos.clip2.description'),
     duration: '1:45'
   },
   {
     id: 3,
-    src: '/shop-clip01.mp4',
-    poster: '/shop-clip01-tn.jpg',
+    src: getUtilsUrl('shop-clip01.mp4'),
+    poster: getUtilsUrl('shop-clip01-tn.jpg'),
     title: t('videoSection.videos.clip3.title'),
     description: t('videoSection.videos.clip3.description'),
     duration: '3:00'
   },
   {
     id: 4,
-    src: '/shop-clip01.mp4',
-    poster: '/shop-clip02-tn.png',
+    src: getUtilsUrl('shop-clip01.mp4'),
+    poster: getUtilsUrl('shop-clip02-tn.png'),
     title: t('videoSection.videos.clip4.title'),
     description: t('videoSection.videos.clip4.description'),
     duration: '1:20'

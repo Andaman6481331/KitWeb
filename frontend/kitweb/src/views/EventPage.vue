@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import AutoScrollEvent from '../components/auto-scroll-event.vue';
+import { getUtilsUrl } from '@/services/api';
 
 const pastEvents = ref([
     {
@@ -75,7 +76,7 @@ const handleContactSubmit = () => {
 <template>
     <div class="diy-page">
         <!-- Hero Section -->
-        <section class="hero">
+        <section class="hero" :style="{ backgroundImage: `url(${getUtilsUrl('shop05.png')})` }">
             <div class="hero-overlay"></div>
             <div class="hero-content">
                 <div class="logo">
@@ -311,9 +312,9 @@ const handleContactSubmit = () => {
 /* Hero Section */
 .hero {
     height: 70vh;
-    background: url("../assets/shop05.png") center/cover;
-    display: flex;
-    align-items: center;
+    /* background: url("../assets/shop05.png") center/cover; */
+    background-size: cover;
+    background-position: center;
     justify-content: center;
     color: white;
     text-align: center;

@@ -8,7 +8,7 @@ import AboutKitcharoen from '../components/AboutKitcharoen.vue';
 import AutoScrollBanner from '../components/auto-scroll-banner.vue';
 import FeaturedCategories from '../components/featured-categories.vue';
 import customerReview from '../components/customer-review.vue';
-import { api } from '../services/api';
+import { api, getUtilsUrl } from '../services/api';
 
 const products = ref([]);
 const loading = ref(true);
@@ -27,7 +27,7 @@ onMounted(async () => {
   <div class="content">
 
     <!-- Hero Section -->
-    <section class="hero-section">
+    <section class="hero-section" :style="{ backgroundImage: `url(${getUtilsUrl('shop02.jpg')})` }">
       <div class="hero-content">
         <div class="hero-text">
           <h1 class="hero-title">{{ $t('home.heroTitle') }}</h1>
@@ -45,13 +45,13 @@ onMounted(async () => {
         <div class="hero-decoration">
           <div class="floating-card-container container-group-1">
             <div class="floating-card card-1">
-              <img src="../assets/card-img09.jpg" alt="">
+              <img :src="getUtilsUrl('card-img09.jpg')" alt="">
             </div>
             <div class="floating-card card-2">
-              <img src="../assets/card-img01.jpg" alt="">
+              <img :src="getUtilsUrl('card-img01.jpg')" alt="">
             </div>
             <div class="floating-card card-3">
-              <img src="../assets/card-img07.jpg" alt="">
+              <img :src="getUtilsUrl('card-img07.jpg')" alt="">
             </div>
             <!-- <div class="floating-card card-4">
               <img src="../assets/card-img06.jpg" alt="">
@@ -59,21 +59,21 @@ onMounted(async () => {
           </div>
           <div class="floating-card-container container-group-2">
             <div class="floating-card card-5">
-              <img src="../assets/card-img09.jpg" alt="">
+              <img :src="getUtilsUrl('card-img09.jpg')" alt="">
             </div>
             <div class="floating-card card-6">
-              <img src="../assets/card-img06.jpg" alt="">
+              <img :src="getUtilsUrl('card-img06.jpg')" alt="">
             </div>
           </div>
           <div class="floating-card-container container-group-3">
             <div class="floating-card card-7">
-              <img src="../assets/card-img09.jpg" alt="">
+              <img :src="getUtilsUrl('card-img09.jpg')" alt="">
             </div>
             <div class="floating-card card-8">
-              <img src="../assets/card-img09.jpg" alt="">
+              <img :src="getUtilsUrl('card-img09.jpg')" alt="">
             </div>
             <div class="floating-card card-9">
-              <img src="../assets/card-img09.jpg" alt="">
+              <img :src="getUtilsUrl('card-img09.jpg')" alt="">
             </div>
           </div>
         </div>
@@ -128,10 +128,10 @@ onMounted(async () => {
 
 /* ===== HERO SECTION ===== */
 .hero-section {
-  background: url('../assets/shop02.jpg');
-  background-size: contain;
-  background-repeat: repeat;
-  background-position: center;
+    /* background: url('../assets/shop02.jpg'); */
+    background-size: contain;
+    background-repeat: repeat;
+    background-position: center;
   height: 600px;
   display: flex;
   align-items: center;

@@ -30,6 +30,10 @@ import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
 //initializing app
 const app = createApp(App)
 
+// Global development flag
+app.config.globalProperties.$isDev = import.meta.env.DEV;
+
+
 app.use(router)
 app.use(i18n)
 app.use(VueVirtualScroller)

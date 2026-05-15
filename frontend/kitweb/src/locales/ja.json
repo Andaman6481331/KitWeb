@@ -323,7 +323,7 @@
         "signIn": "サインイン",
         "signInSubtitle": "アカウントにアクセスするには詳細を入力してください。",
         "emailLabel": "メールアドレス",
-        "emailPlaceholder": "weaver@heritage.com",
+        "emailPlaceholder": "weaver{'@'}heritage.com",
         "passwordLabel": "パスワード",
         "forgotPassword": "パスワードをお忘れですか？",
         "passwordPlaceholder": "••••••••",

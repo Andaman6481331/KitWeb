@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue';
+import { getUtilsUrl } from '@/services/api';
 
 const isPaused = ref(false);
 </script>
@@ -11,28 +12,28 @@ const isPaused = ref(false);
 
                 <!-- Duplicate set -->
                 <div class="banner-item">
-                    <img src="../assets/event-banner/shop-card01.jpg" alt="" />
+                    <img :src="getUtilsUrl('shop-card01.jpg')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/event-banner/shop-card02.jpg" alt="" />
+                    <img :src="getUtilsUrl('shop-card02.jpg')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/event-banner/shop-card03.jpg" alt="" />
+                    <img :src="getUtilsUrl('shop-card03.jpg')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/event-banner/shop-card04.jpg" alt="" />
+                    <img :src="getUtilsUrl('shop-card04.jpg')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/event-banner/shop-card01.jpg" alt="" />
+                    <img :src="getUtilsUrl('shop-card01.jpg')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/event-banner/shop-card02.jpg" alt="" />
+                    <img :src="getUtilsUrl('shop-card02.jpg')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/event-banner/shop-card03.jpg" alt="" />
+                    <img :src="getUtilsUrl('shop-card03.jpg')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/event-banner/shop-card04.jpg" alt="" />
+                    <img :src="getUtilsUrl('shop-card04.jpg')" alt="" />
                 </div>
             </div>
         </div>

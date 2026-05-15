@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { getUtilsUrl } from '@/services/api';
 
 const { t } = useI18n();
 const activeCat = ref(null);
@@ -9,22 +10,22 @@ const categories = [
     {
         id: 1,
         key: 'needles',
-        image: new URL('../assets/card-img06.jpg', import.meta.url).href
+        image: getUtilsUrl('card-img06.jpg')
     },
     {
         id: 2,
         key: 'yarn',
-        image: new URL('../assets/card-img01.jpg', import.meta.url).href
+        image: getUtilsUrl('card-img01.jpg')
     },
     {
         id: 3,
         key: 'accessories',
-        image: new URL('../assets/card-img10.png', import.meta.url).href
+        image: getUtilsUrl('card-img10.png')
     },
     {
         id: 4,
         key: 'beads',
-        image: new URL('../assets/card-img04.jpg', import.meta.url).href
+        image: getUtilsUrl('card-img04.jpg')
     }
 ];
 </script>

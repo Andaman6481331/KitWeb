@@ -1,6 +1,8 @@
 // Service to communicate with Cloudflare Backend
 // const API_URL = 'http://127.0.0.1:8787';
 export const API_URL = 'https://hidden-water-ed9d.shop-backend-kitweb.workers.dev';
+export const getImageUrl = (filename) => `${API_URL}/images/${filename}`;
+export const getUtilsUrl = (filename) => `${API_URL}/utils/${filename}`;
 
 export const api = {
   getToken() {

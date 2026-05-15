@@ -323,7 +323,7 @@
         "signIn": "登录",
         "signInSubtitle": "输入您的详细信息以访问您的帐户。",
         "emailLabel": "电子邮件地址",
-        "emailPlaceholder": "weaver@heritage.com",
+        "emailPlaceholder": "weaver{'@'}heritage.com",
         "passwordLabel": "密码",
         "forgotPassword": "忘记密码？",
         "passwordPlaceholder": "••••••••",

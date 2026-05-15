@@ -1,11 +1,6 @@
 <script setup>
-import { ref } from 'vue';
+import { getUtilsUrl } from '@/services/api';
 
-const isPaused = ref(false);
-
-const togglePause = () => {
-    isPaused.value = !isPaused.value;
-};
 </script>
 <template>
     <div class="banner-section">
@@ -16,40 +11,40 @@ const togglePause = () => {
 
                 <!-- Duplicate set -->
                 <div class="banner-item">
-                    <img src="../assets/banner02.png" alt="" />
+                    <img :src="getUtilsUrl('banner02.png')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/banner03.png" alt="" />
+                    <img :src="getUtilsUrl('banner03.png')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/banner04.png" alt="" />
+                    <img :src="getUtilsUrl('banner04.png')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/banner05.png" alt="" />
+                    <img :src="getUtilsUrl('banner05.png')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/banner01.jpg" alt="" />
+                    <img :src="getUtilsUrl('banner01.jpg')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/banner06.png" alt="" />
+                    <img :src="getUtilsUrl('banner06.png')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/banner02.png" alt="" />
+                    <img :src="getUtilsUrl('banner02.png')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/banner03.png" alt="" />
+                    <img :src="getUtilsUrl('banner03.png')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/banner04.png" alt="" />
+                    <img :src="getUtilsUrl('banner04.png')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/banner05.png" alt="" />
+                    <img :src="getUtilsUrl('banner05.png')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/banner01.jpg" alt="" />
+                    <img :src="getUtilsUrl('banner01.jpg')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img src="../assets/banner06.png" alt="" />
+                    <img :src="getUtilsUrl('banner06.png')" alt="" />
                 </div>
             </div>
         </div>

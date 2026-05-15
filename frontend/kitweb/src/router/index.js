@@ -6,7 +6,6 @@ import OrderPage from '../views/OrderPage.vue';
 import ContactUsPage from '../views/ContactUsPage.vue';
 import Login from '../views/Login.vue';
 import EventPage from '../views/EventPage.vue';
-import DIYProductPage from '../views/DIYProductPage.vue';
 import PartnerPage from '../views/PartnerPage.vue';
 import AdminDashboard from '../views/AdminDashboard.vue';
 
@@ -56,11 +55,7 @@ const routes = [
         name: 'event',
         component: EventPage
     },
-    {
-        path: '/diyproduct',
-        name: 'diyproduct',
-        component: DIYProductPage
-    },
+
     {
         path: '/partners',
         name: 'partners',

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- The Main Entry Point -->
+  <url>
+    <loc>https://kitcharoensampeng.com/</loc>
+    <priority>1.0</priority>
+  </url>
+  
+  <!-- Trust & Reliability Pages -->
+  <url>
+    <loc>https://kitcharoensampeng.com/event</loc>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://kitcharoensampeng.com/partners</loc>
+    <priority>0.8</priority>
+  </url>
+  
+  <!-- Communication Page -->
+  <url>
+    <loc>https://kitcharoensampeng.com/contactus</loc>
+    <priority>0.7</priority>
+  </url>
+</urlset>

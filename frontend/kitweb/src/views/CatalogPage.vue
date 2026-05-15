@@ -1,6 +1,7 @@
 <script setup>
 import ProductStock from '../components/products-stock.vue';
 import DiyProductKit from '../components/diy-product-kit.vue';
+import { getUtilsUrl } from '@/services/api';
 
 const toggleCart = () => {
 
@@ -9,7 +10,7 @@ const toggleCart = () => {
 </script>
 <template>
     <!-- Page Header -->
-    <div class="catalog-header">
+    <div class="catalog-header" :style="{ backgroundImage: `url(${getUtilsUrl('shop06.png')})` }">
         <div class="overlay"></div>
         <div class="header-content">
             <span class="since-badge" v-reveal delay="0.2s">{{ $t('catalog.since') }}</span>
@@ -31,7 +32,7 @@ const toggleCart = () => {
 /* Catalog Header */
 .catalog-header {
     padding: 120px 5% 100px 5%;
-    background-image: url('../assets/shop06.png');
+    /* background-image: url('../assets/shop06.png'); */
     background-size: cover;
     background-position: center;
     text-align: center;
