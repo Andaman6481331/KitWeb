@@ -71,6 +71,32 @@ cd hidden-water-ed9d
 npm run dev
 ```
 
+## Deployment
+
+The project is deployed using **Cloudflare** (Pages for frontend and Workers for backend).
+
+### Frontend (Cloudflare Pages)
+- **Primary Domain**: [kitcharoensampeng.com](https://kitcharoensampeng.com)
+- **Cloudflare Project**: `kitweb`
+- **Deployment Folder**: `frontend/kitweb`
+- **Workflow**:
+  ```sh
+  cd frontend/kitweb
+  npm run build
+  npx wrangler pages deploy dist
+  ```
+
+### Backend (Cloudflare Workers)
+- **Cloudflare Project**: `hidden-water-ed9d`
+- **Deployment Folder**: `hidden-water-ed9d`
+- **Workflow**:
+  ```sh
+  cd hidden-water-ed9d
+  npx wrangler deploy
+  ```
+
 ## Troubleshooting
 - **Node Version**: If you encounter issues with package installation, ensure your Node.js version is up to date.
 - **Port Conflicts**: If port `5173` is in use, Vite will automatically try the next available port.
+- **Wrangler Login**: If deployment fails, ensure you are logged into Cloudflare via `npx wrangler login`.
+

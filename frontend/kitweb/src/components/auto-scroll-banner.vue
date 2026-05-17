@@ -11,40 +11,40 @@ import { getUtilsUrl } from '@/services/api';
 
                 <!-- Duplicate set -->
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('banner02.png')" alt="" />
+                    <img :src="getUtilsUrl('banner02-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('banner03.png')" alt="" />
+                    <img :src="getUtilsUrl('banner03-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('banner04.png')" alt="" />
+                    <img :src="getUtilsUrl('banner04-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('banner05.png')" alt="" />
+                    <img :src="getUtilsUrl('banner05-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('banner01.jpg')" alt="" />
+                    <img :src="getUtilsUrl('banner01-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('banner06.png')" alt="" />
+                    <img :src="getUtilsUrl('banner06-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('banner02.png')" alt="" />
+                    <img :src="getUtilsUrl('banner02-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('banner03.png')" alt="" />
+                    <img :src="getUtilsUrl('banner03-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('banner04.png')" alt="" />
+                    <img :src="getUtilsUrl('banner04-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('banner05.png')" alt="" />
+                    <img :src="getUtilsUrl('banner05-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('banner01.jpg')" alt="" />
+                    <img :src="getUtilsUrl('banner01-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('banner06.png')" alt="" />
+                    <img :src="getUtilsUrl('banner06-large.webp')" alt="" />
                 </div>
             </div>
         </div>

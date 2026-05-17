@@ -5,59 +5,44 @@ import { getUtilsUrl } from '@/services/api';
 const reviews = ref([
     {
         id: 1,
-        name: 'Siriwan P.',
-        role: 'Small Business Owner',
-        avatar: 'https://i.pravatar.cc/150?img=1',
+        name: 'Sabrina.',
+        role: 'Authentic Handicraft Shop Owner',
         rating: 5,
         date: 'January 2025',
-        review: 'KitCraft has transformed my business! The quality of their yarns is exceptional, and the wholesale prices allow me to maintain healthy margins. Their customer service is outstanding - always responsive and helpful.',
-        image: getUtilsUrl('customer-img01.jpg'),
-        product: 'Premium Yarn Collection'
+        review: 'J’adore 💕 These threads are perfect for making couple bracelets and handmade crafts. The colors are beautiful, strong, and very good quality. Highly recommend!” — Sabrina, France',
+        image: getUtilsUrl('customer-img01-large.webp'),
+        product: 'Premium Thread Collection'
     },
     {
         id: 2,
-        name: 'Michael Chen',
+        name: 'คุณ หน่อย',
         role: 'Craft Workshop Instructor',
-        avatar: 'https://i.pravatar.cc/150?img=12',
         rating: 5,
         date: 'December 2024',
-        review: 'I\'ve been running workshops for 3 years and KitCraft is my go-to supplier. The beads are vibrant, the materials are consistent, and they never let me down on delivery. My students love the quality!',
-        image: getUtilsUrl('customer-img02.jpg'),
+        review: 'ฉันจัดเวิร์กช็อปงานฝีมือมาหลายปีแล้ว และร้านกิจเจริญคือร้านที่สั่งประจำ ลูกปัดสีสวย วัสดุมีคุณภาพสม่ำเสมอ และจัดส่งตรงเวลาตลอด นักเรียนของฉันก็ชอบคุณภาพสินค้ามากค่ะ\!(I\'ve been running workshops for years and Kitcharoen is my go-to supplier. The beads are vibrant, the materials are consistent, and they never let me down on delivery. My students love the quality!)',
+        image: getUtilsUrl('customer-img02-large.webp'),
         product: 'Beaded Craft Supplies'
     },
     {
         id: 3,
-        name: 'Natthida K.',
-        role: 'Online Retailer',
-        avatar: 'https://i.pravatar.cc/150?img=5',
+        name: 'Sao Samui',
+        role: 'Stationary, Craft Shop, and Cafe Owner',
         rating: 5,
         date: 'November 2024',
-        review: 'As an online seller, reliable suppliers are crucial. KitCraft not only offers great products but also helps with packaging suggestions and marketing materials. They truly care about their partners\' success!',
-        image: getUtilsUrl('customer-img03.jpg'),
-        product: 'DIY Craft Kits'
+        review: 'เป็นลูกค้ากับทางร้านมาตั้งแต่รุ่นคุณแม่จนตอนนี้เป็นรุ่นลูกแล้วค่ะ 😊 สินค้ามีให้เลือกเยอะมากทั้งอุปกรณ์งานฝีมือ และไหมพรมคุณภาพดี ราคาเป็นกันเอง ประทับใจมากค่ะ (We’ve been customers since my mother’s generation, and now to mine 😊 There are so many craft supplies and quality yarns to choose from at friendly prices. Very impressed!)',
+        image: getUtilsUrl('customer-img03-large.webp'),
+        product: 'Decorative Yarns Supplies'
     },
     {
         id: 4,
-        name: 'James Wilson',
+        name: 'Emily Carter',
         role: 'Retail Store Manager',
-        avatar: 'https://i.pravatar.cc/150?img=15',
-        rating: 4,
-        date: 'October 2024',
-        review: 'Great selection and competitive pricing. We\'ve been ordering from KitCraft for our store for over a year. The variety of products keeps our customers coming back. Would love to see more eco-friendly options!',
-        image: getUtilsUrl('customer-img04.jpg'),
-        product: 'Macramé Materials'
-    },
-    {
-        id: 5,
-        name: 'Pimchanok S.',
-        role: 'DIY Enthusiast',
-        avatar: 'https://i.pravatar.cc/150?img=9',
         rating: 5,
-        date: 'September 2024',
-        review: 'I attended their workshop and was so impressed I became a wholesale customer! The quality is unmatched and the team is incredibly knowledgeable. They even helped me start my own small craft business.',
-        image: getUtilsUrl('customer-img04.jpg'),
-        product: 'Embroidery Supplies'
-    }
+        date: 'October 2024',
+        review: 'Great selection and competitive pricing. We\'ve been ordering from Kitcharoen for our store for over a year. The variety of products keeps our customers coming back. Would love to see more eco-friendly options!',
+        image: getUtilsUrl('customer-img04-large.webp'),
+        product: 'Premium Yarns Collection'
+    },
 ]);
 
 const currentIndex = ref(0);
@@ -84,7 +69,7 @@ const startAutoPlay = () => {
         if (isAutoPlaying.value) {
             nextReview();
         }
-    }, 8000);
+    }, 30000);
 };
 
 const toggleAutoPlay = () => {
@@ -133,7 +118,6 @@ const getStars = (rating) => {
                             <p class="review-text">{{ currentReview.review }}</p>
 
                             <div class="reviewer-info">
-                                <img :src="currentReview.avatar" :alt="currentReview.name" class="avatar" />
                                 <div class="reviewer-details">
                                     <h4 class="reviewer-name">{{ currentReview.name }}</h4>
                                     <p class="reviewer-role">{{ currentReview.role }}</p>
@@ -173,7 +157,7 @@ const getStars = (rating) => {
             <!-- Stats Section -->
             <div class="stats-grid">
                 <div class="stat-item">
-                    <div class="stat-number">5,000+</div>
+                    <div class="stat-number">4,000+</div>
                     <div class="stat-label">Happy Customers</div>
                 </div>
                 <div class="stat-item">
@@ -185,7 +169,7 @@ const getStars = (rating) => {
                     <div class="stat-label">Satisfaction Rate</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-number">10+</div>
+                    <div class="stat-number">40+</div>
                     <div class="stat-label">Years in Business</div>
                 </div>
             </div>

@@ -71,7 +71,8 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
 
 <template>
     <!-- Page Header -->
-    <div class="catalog-header" :style="{ backgroundImage: `url(${getUtilsUrl('shop04.png')})` }">
+    <img :src="getUtilsUrl('shop04-large.webp')" fetchpriority="high" aria-hidden="true" style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">
+    <div class="catalog-header" :style="{ backgroundImage: `url(${getUtilsUrl('shop04-large.webp')})` }">
         <div class="header-content">
             <span class="since-badge">SINCE 1984</span>
             <h1 class="catalog-title">{{ $t('contact.headerTitle') }}</h1>
@@ -196,7 +197,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
 
                     <!-- Quote Image Card -->
                     <div class="quote-card">
-                        <img :src="getUtilsUrl('shop02.jpg')" alt="Heritage Store" class="quote-bg" />
+                        <img :src="getUtilsUrl('shop02-large.webp')" alt="Heritage Store" class="quote-bg" />
                         <div class="quote-overlay">
                             <p>"{{ $t('contact.hub.quote') }}"</p>
                         </div>

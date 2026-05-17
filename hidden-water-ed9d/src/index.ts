@@ -44,6 +44,87 @@ function generateSKU(category: string, countInCategory: number): string {
 	return `${prefix}${suffix}`;
 }
 
+function parseRange(encoded: string | null, size: number) {
+	if (encoded === null) return null;
+	const parts = encoded.split("bytes=")[1]?.split("-");
+	if (!parts) return null;
+	const start = parseInt(parts[0], 10);
+	const end = parseInt(parts[1], 10) || size - 1;
+	
+	if (isNaN(start)) return null;
+	
+	return { 
+		offset: start, 
+		length: end - start + 1 
+	};
+}
+
+async function handleR2Request(
+	bucket: R2Bucket, 
+	key: string, 
+	request: Request, 
+	negotiate: boolean = true
+): Promise<Response> {
+	const acceptHeader = request.headers.get("Accept") || "";
+	let bestKey = key;
+
+	// Content Negotiation for Images
+	// Only negotiate if it's a standard image format and the user didn't already ask for a specific modern format
+	const isNegotiatable = /\.(png|jpg|jpeg)$/i.test(key);
+	if (negotiate && isNegotiatable) {
+		const baseKey = key.replace(/\.[^.]+$/, "");
+		
+		// 1. Try AVIF
+		if (acceptHeader.includes("image/avif")) {
+			const avifKey = `${baseKey}.avif`;
+			const head = await bucket.head(avifKey);
+			if (head) bestKey = avifKey;
+		} 
+		
+		// 2. Try WebP if AVIF not found or not supported
+		if (bestKey === key && acceptHeader.includes("image/webp")) {
+			const webpKey = `${baseKey}.webp`;
+			const head = await bucket.head(webpKey);
+			if (head) bestKey = webpKey;
+		}
+	}
+
+	const rangeHeader = request.headers.get("Range");
+	
+	// Handle Range Requests (important for video/large assets)
+	if (rangeHeader && request.method === "GET") {
+		const head = await bucket.head(bestKey);
+		if (!head) return new Response("Not Found", { status: 404 });
+		
+		const range = parseRange(rangeHeader, head.size);
+		if (range) {
+			const object = await bucket.get(bestKey, { range });
+			if (!object) return new Response("Not Found", { status: 404 });
+			
+			const headers = new Headers();
+			object.writeHttpMetadata(headers);
+			headers.set("Access-Control-Allow-Origin", "*");
+			headers.set("Accept-Ranges", "bytes");
+			headers.set("Content-Range", `bytes ${range.offset}-${range.offset + (range.length || 0) - 1}/${head.size}`);
+			headers.set("Cache-Control", "public, max-age=31536000, immutable");
+			
+			return new Response(object.body, { headers, status: 206 });
+		}
+	}
+
+	// Default GET/HEAD
+	const object = await bucket.get(bestKey);
+	if (!object) return new Response("Not Found", { status: 404 });
+
+	const headers = new Headers();
+	object.writeHttpMetadata(headers);
+	headers.set("Access-Control-Allow-Origin", "*");
+	headers.set("Accept-Ranges", "bytes");
+	headers.set("Cache-Control", "public, max-age=31536000, immutable");
+	
+	return new Response(request.method === "HEAD" ? null : object.body, { headers });
+}
+
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
 		const url = new URL(request.url);
@@ -161,24 +242,14 @@ export default {
 				return corsResponse(results);
 			}
 
-			if (url.pathname.startsWith("/images/") && request.method === "GET") {
+			if (url.pathname.startsWith("/images/") && (request.method === "GET" || request.method === "HEAD")) {
 				const key = decodeURIComponent(url.pathname.split("/images/")[1]);
-				const object = await env.IMAGES.get(key);
-				if (!object) return corsResponse("Not Found", { status: 404 });
-				const headers = new Headers();
-				object.writeHttpMetadata(headers);
-				headers.set("Access-Control-Allow-Origin", "*");
-				return new Response(object.body, { headers });
+				return await handleR2Request(env.IMAGES, key, request, true);
 			}
 
-			if (url.pathname.startsWith("/utils/") && request.method === "GET") {
+			if (url.pathname.startsWith("/utils/") && (request.method === "GET" || request.method === "HEAD")) {
 				const key = decodeURIComponent(url.pathname.split("/utils/")[1]);
-				const object = await env.WEB_UTILS.get(key);
-				if (!object) return corsResponse("Not Found", { status: 404 });
-				const headers = new Headers();
-				object.writeHttpMetadata(headers);
-				headers.set("Access-Control-Allow-Origin", "*");
-				return new Response(object.body, { headers });
+				return await handleR2Request(env.WEB_UTILS, key, request, true);
 			}
 
 			if (url.pathname === "/notify" && request.method === "POST") {

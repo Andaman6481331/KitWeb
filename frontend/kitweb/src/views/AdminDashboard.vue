@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { api, API_URL } from '../services/api';
-import imageCompression from 'browser-image-compression';
+import { processProductImage } from '../services/image-processor';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
@@ -223,19 +223,8 @@ const handleSubmit = async () => {
 
     const prepareAndUpload = async (file) => {
       const baseName = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
-
-      const thumbOptions = { maxWidthOrHeight: 300, useWebWorker: true, fileType: 'image/webp' };
-      const largeOptions = { maxWidthOrHeight: 1000, useWebWorker: true, fileType: 'image/webp' };
-
-      const [thumbBlob, largeBlob] = await Promise.all([
-        imageCompression(file, thumbOptions),
-        imageCompression(file, largeOptions)
-      ]);
-
-      const thumbFile = new File([thumbBlob], `${baseName}-thumb.webp`, { type: 'image/webp' });
-      const largeFile = new File([largeBlob], `${baseName}-large.webp`, { type: 'image/webp' });
-
-      await api.uploadImage([thumbFile, largeFile]);
+      const processedFiles = await processProductImage(file, baseName);
+      await api.uploadImage(processedFiles);
       return baseName;
     };
 

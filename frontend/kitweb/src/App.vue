@@ -5,6 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { setLocale } from './i18n'
 import { authStore } from './stores/authStore'
 
+const isDev = import.meta.env.DEV
+
 const { t } = useI18n()
 const router = useRouter()
 
@@ -68,7 +70,9 @@ watch(currentLanguage, (newLang) => {
       <!-- Center: Links -->
       <div class="nav-center" style="justify-content: center; align-items: center; text-align: center;">
         <router-link to="/" class="nav-link" active-class="active">{{ $t('nav.home') }}</router-link>
-        <router-link to="/catalog" class="nav-link" active-class="active">{{ $t('nav.products') }}</router-link>
+        <template v-if="isDev">
+          <router-link to="/catalog" class="nav-link" active-class="active">{{ $t('nav.products') }}</router-link>
+        </template>
         <router-link to="/event" class="nav-link" active-class="active">{{ $t('nav.events') }}</router-link>
         <router-link to="/partners" class="nav-link" active-class="active">{{ $t('nav.partners') }}</router-link>
         <router-link to="/contactus" class="nav-link" active-class="active">{{ $t('nav.contactUs') }}</router-link>
@@ -97,23 +101,24 @@ watch(currentLanguage, (newLang) => {
               </div>
             </transition>
           </div>
-
-          <router-link v-if="authStore.isAuthenticated" to="/orderpage" class="order-capsule">
-            {{ $t('nav.startOrder') }}
-          </router-link>
-
-          <router-link v-if="!authStore.isAuthenticated" to="/login" class="login-capsule">
-            {{ $t('nav.login') }}
-          </router-link>
-          <div v-else class="logged-in-actions">
-            <router-link to="/orderpage" class="login-capsule account-link">
-              <ion-icon name="person-circle-outline"></ion-icon>
-              <span>{{ authStore.user?.businessName || authStore.user?.ownerName || $t('nav.account') }}</span>
+          <template v-if="isDev">
+            <router-link v-if="authStore.isAuthenticated" to="/orderpage" class="order-capsule">
+              {{ $t('nav.startOrder') }}
             </router-link>
-            <button class="logout-btn-nav" @click="handleLogout" :title="$t('order.logout')">
-              <ion-icon name="log-out-outline"></ion-icon>
-            </button>
-          </div>
+
+            <router-link v-if="!authStore.isAuthenticated" to="/login" class="login-capsule">
+              {{ $t('nav.login') }}
+            </router-link>
+            <div v-else class="logged-in-actions">
+              <router-link to="/orderpage" class="login-capsule account-link">
+                <ion-icon name="person-circle-outline"></ion-icon>
+                <span>{{ authStore.user?.businessName || authStore.user?.ownerName || $t('nav.account') }}</span>
+              </router-link>
+              <button class="logout-btn-nav" @click="handleLogout" :title="$t('order.logout')">
+                <ion-icon name="log-out-outline"></ion-icon>
+              </button>
+            </div>
+          </template>
         </div>
       </div>
     </div>

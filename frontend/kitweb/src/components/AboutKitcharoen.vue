@@ -38,7 +38,7 @@ const aboutInfo = computed(() => ({
         <div class="container">
             <!-- Left Side - Image -->
             <div v-reveal class="image-content">
-                <img :src="getUtilsUrl('card-img02.jpg')" alt="">
+                <img :src="getUtilsUrl('card-img02-large.webp')" alt="">
             </div>
             <!-- Right Side - About Us Information -->
             <div class="text-content">

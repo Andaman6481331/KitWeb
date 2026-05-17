@@ -76,7 +76,8 @@ const handleContactSubmit = () => {
 <template>
     <div class="diy-page">
         <!-- Hero Section -->
-        <section class="hero" :style="{ backgroundImage: `url(${getUtilsUrl('shop05.png')})` }">
+        <img :src="getUtilsUrl('shop05-large.webp')" fetchpriority="high" aria-hidden="true" style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">
+        <section class="hero" :style="{ backgroundImage: `url(${getUtilsUrl('shop05-large.webp')})` }">
             <div class="hero-overlay"></div>
             <div class="hero-content">
                 <div class="logo">

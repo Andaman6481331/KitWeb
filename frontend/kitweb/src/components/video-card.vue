@@ -11,40 +11,35 @@ const videos = computed(() => [
   {
     id: 1,
     src: getUtilsUrl('shop-clip01.mp4'),
-    poster: getUtilsUrl('shop-clip01-tn.jpg'),
+    poster: getUtilsUrl('video-clip01-tn-large.webp'),
     title: t('videoSection.videos.clip1.title'),
     description: t('videoSection.videos.clip1.description'),
     duration: '2:30'
   },
   {
     id: 2,
-    src: getUtilsUrl('shop-clip02.mp4'),
-    poster: getUtilsUrl('shop-clip02-tn.png'),
+    src: getUtilsUrl('shop-clip01.mp4'),
+    poster: getUtilsUrl('video-clip02-tn-large.webp'),
     title: t('videoSection.videos.clip2.title'),
     description: t('videoSection.videos.clip2.description'),
-    duration: '1:45'
+    duration: '0:44'
   },
   {
     id: 3,
-    src: getUtilsUrl('shop-clip01.mp4'),
-    poster: getUtilsUrl('shop-clip01-tn.jpg'),
+    src: getUtilsUrl('shop-clip02.mp4'),
+    poster: getUtilsUrl('video-clip03-tn-large.webp'),
     title: t('videoSection.videos.clip3.title'),
     description: t('videoSection.videos.clip3.description'),
-    duration: '3:00'
-  },
-  {
-    id: 4,
-    src: getUtilsUrl('shop-clip01.mp4'),
-    poster: getUtilsUrl('shop-clip02-tn.png'),
-    title: t('videoSection.videos.clip4.title'),
-    description: t('videoSection.videos.clip4.description'),
-    duration: '1:20'
+    duration: '2:44'
   }
 ])
 
 const currentIndex = ref(Math.floor(videos.value.length / 2))
 const isPlaying = ref(false)
 const videoElements = ref([])
+const setVideoRef = (el, index) => {
+  if (el) videoElements.value[index] = el
+}
 const modalVideoElement = ref(null)
 const containerElement = ref(null)
 const isExpanded = ref(false)
@@ -136,21 +131,26 @@ const togglePlay = () => {
     if (modalVideo) modalVideo.pause()
     if (cardVideo) cardVideo.pause()
     isPlaying.value = false
-    showControls.value = true // Always show controls when paused
+    showControls.value = true
   } else {
-    if (isExpanded.value && modalVideo) {
-      modalVideo.play()
-    } else if (cardVideo) {
-      // Before expanding, sync time if needed
-      cardVideo.play()
-    }
     isPlaying.value = true
+
+    const playPromise = (isExpanded.value && modalVideo) ? modalVideo.play() : (cardVideo ? cardVideo.play() : null);
+
+    if (playPromise) {
+      playPromise.catch(error => {
+        console.error("Video playback failed:", error);
+        isPlaying.value = false;
+        // Optionally show a notification to the user that the video file might be missing
+      });
+    }
+
     if (!isExpanded.value) {
       isExpanded.value = true
-      showControls.value = false // Hide initially on expansion
-      resetControlsTimeout(false) // Start timer without showing
+      showControls.value = false
+      resetControlsTimeout(false)
     } else {
-      resetControlsTimeout(true) // Show and reset timer on normal toggle
+      resetControlsTimeout(true)
     }
   }
 }
@@ -169,8 +169,10 @@ const closeExpanded = () => {
 
 const seek = (seconds) => {
   const activeVideo = isExpanded.value ? modalVideoElement.value : videoElements.value[currentIndex.value]
-  if (activeVideo) {
-    activeVideo.currentTime += seconds
+  if (activeVideo && !isNaN(activeVideo.duration)) {
+    let newTime = activeVideo.currentTime + seconds
+    // Ensure we stay within bounds [0, duration]
+    activeVideo.currentTime = Math.max(0, Math.min(newTime, activeVideo.duration))
     resetControlsTimeout()
   }
 }
@@ -179,7 +181,7 @@ const restartVideo = () => {
   const activeVideo = isExpanded.value ? modalVideoElement.value : videoElements.value[currentIndex.value]
   if (activeVideo) {
     activeVideo.currentTime = 0
-    activeVideo.play()
+    activeVideo.play().catch(e => console.error("Restart play failed:", e))
     isPlaying.value = true
     resetControlsTimeout()
   }
@@ -190,7 +192,7 @@ const handleTimelineClick = (e) => {
   const x = e.clientX - rect.left
   const percentage = x / rect.width
   const activeVideo = isExpanded.value ? modalVideoElement.value : videoElements.value[currentIndex.value]
-  if (activeVideo) {
+  if (activeVideo && !isNaN(activeVideo.duration)) {
     activeVideo.currentTime = percentage * activeVideo.duration
     resetControlsTimeout()
   }
@@ -269,8 +271,8 @@ onUnmounted(() => {
           <div class="video-modal-content" @mousemove.stop="resetControlsTimeout(true, $event)"
             @mouseleave="handleMouseLeave" @click.stop>
             <video :src="videos[currentIndex].src" :poster="videos[currentIndex].poster" autoplay
-              class="modal-video-player" @timeupdate="handleTimeUpdate" @ended="handleVideoEnd"
-              ref="modalVideoElement" />
+              class="modal-video-player" @timeupdate="handleTimeUpdate" @ended="handleVideoEnd" ref="modalVideoElement"
+              crossorigin="anonymous" />
 
             <!-- Modal Controls -->
             <transition name="fade">
@@ -360,8 +362,8 @@ onUnmounted(() => {
           <div class="click-overlay" @click.stop="goToVideo(index)" v-if="getPosition(index) !== 3"></div>
 
           <div class="video-wrapper">
-            <video ref="videoElements" :src="video.src" :poster="video.poster" @ended="handleVideoEnd"
-              class="video-player" preload="metadata" />
+            <video :ref="el => setVideoRef(el, index)" :src="video.src" :poster="video.poster" @ended="handleVideoEnd"
+              class="video-player" preload="metadata" crossorigin="anonymous" />
 
             <!-- Play/Pause Overlay (only for center card) -->
             <div class="video-overlay" @click="togglePlay" v-if="getPosition(index) === 3">

@@ -12,28 +12,28 @@ const isPaused = ref(false);
 
                 <!-- Duplicate set -->
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('shop-card01.jpg')" alt="" />
+                    <img :src="getUtilsUrl('shop-card01-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('shop-card02.jpg')" alt="" />
+                    <img :src="getUtilsUrl('shop-card02-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('shop-card03.jpg')" alt="" />
+                    <img :src="getUtilsUrl('shop-card03-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('shop-card04.jpg')" alt="" />
+                    <img :src="getUtilsUrl('shop-card04-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('shop-card01.jpg')" alt="" />
+                    <img :src="getUtilsUrl('shop-card01-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('shop-card02.jpg')" alt="" />
+                    <img :src="getUtilsUrl('shop-card02-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('shop-card03.jpg')" alt="" />
+                    <img :src="getUtilsUrl('shop-card03-large.webp')" alt="" />
                 </div>
                 <div class="banner-item">
-                    <img :src="getUtilsUrl('shop-card04.jpg')" alt="" />
+                    <img :src="getUtilsUrl('shop-card04-large.webp')" alt="" />
                 </div>
             </div>
         </div>

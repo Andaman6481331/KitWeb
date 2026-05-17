@@ -1,5 +1,6 @@
 {
     "nav": {
+        "home": "首页",
         "products": "产品",
         "startOrder": "开始订购",
         "contactUs": "联系我们",
@@ -9,7 +10,7 @@
         "account": "账户"
     },
     "footer": {
-        "companyName": "吉祥隆",
+        "companyName": "侨成发",
         "companyDesc": "自1995年以来，您值得信赖的优质纱线和缝纫用品来源。",
         "quickLinks": "快速链接",
         "aboutUs": "关于我们",
@@ -18,10 +19,10 @@
         "faq": "常见问题",
         "contactInfo": "联系信息",
         "followUs": "关注我们",
-        "copyright": "© 2026 吉祥隆。版权所有。"
+        "copyright": "© 2026 侨成发。版权所有。"
     },
     "home": {
-        "heroTitle": "吉祥隆 手工艺和缝纫用品",
+        "heroTitle": "侨成发 手工艺和缝纫用品",
         "heroSubtitle": "来自曼谷三聘市场的可信赖材料、公道价格和友好服务。自1984年",
         "shopNow": "立即购买",
         "viewCatalog": "查看目录",
@@ -43,16 +44,16 @@
     },
     "about": {
         "eyebrow": "我们的故事",
-        "title": "关于吉祥隆",
+        "title": "关于侨成发",
         "subtitle": "自1995年以来您值得信赖的手工艺合作伙伴",
-        "description": "吉祥隆是一家家族经营的手工艺品店，位于曼谷三聘市场，靠近耀华力（唐人街）。成立于1984年，我们的业务已经传承了三代，从我祖父到我父亲，现在传到我。吉祥隆这个名字来源于泰语，意思是生意和繁荣，反映我们对诚实、稳定增长的信念。",
+        "description": "侨成发是一家家族经营的手工艺品店，位于曼谷三聘市场，靠近耀华力（唐人街）。成立于1984年，我们的业务已经传承了三代，从我祖父到我父亲，现在传到我。侨成发这个名字来源于泰语，意思是生意和繁荣，反映我们对诚实、稳定增长的信念。",
         "mission": "我们提供各种手工艺品和缝纫材料，包括纱线、丝带、针、珠子、钩针用品、人造花等。我们的产品质量好、可靠，价格批发友好，我们以友善的服务、诚实和与客户的长期信任为傲。"
     },
     "contact": {
         "eyebrow": "联系我们",
-        "title": "联系吉祥隆",
+        "title": "联系侨成发",
         "subtitle": "自1995年以来您值得信赖的手工艺合作伙伴",
-        "description": "在吉祥隆，我们相信手工艺术的美丽。25多年来，我们一直为曼谷及其他地区的工匠、爱好者和创意人士提供优质纱线、珠子和手工艺用品。",
+        "description": "在侨成发，我们相信手工艺术的美丽。25多年来，我们一直为曼谷及其他地区的工匠、爱好者和创意人士提供优质纱线、珠子和手工艺用品。",
         "mission": "我们的使命是激发创造力，在拥抱现代技术的同时保护传统手工艺艺术。我们从世界各地精选最好的材料，确保您创作的每个项目都是杰作。",
         "visitUs": "访问我们",
         "findUsHere": "在这里找到我们",
@@ -80,7 +81,7 @@
             "title": "咨询表",
             "subtitle": "告诉我们您的项目或询问有关我们传承系列的问题。",
             "name": "全名",
-            "namePlaceholder": "阿伦·吉祥隆",
+            "namePlaceholder": "阿伦·侨成发",
             "email": "电子邮件地址",
             "emailPlaceholder": "arun{'@'}example.com",
             "subject": "主题",
@@ -270,16 +271,16 @@
         },
         "videos": {
             "clip1": {
-                "title": "手工纱线染色",
-                "description": "传统染色技术，色彩鲜艳"
+                "title": "寻找 侨成发",
+                "description": "跟着我们一起走到侨成发"
             },
             "clip2": {
-                "title": "优质生丝",
-                "description": "源自泰国北部当地工匠"
+                "title": "侨成发 手工材料店",
+                "description": "侨成发 幕后花絮"
             },
             "clip3": {
-                "title": "手工编织纹理",
-                "description": "世代相传的技艺打造"
+                "title": "如何制作属于自己的项链？",
+                "description": "周日工作坊 - KitCraft 商店"
             },
             "clip4": {
                 "title": "精密工具",
@@ -301,7 +302,7 @@
         "sortPriceAsc": "价格：从低到高",
         "sortPriceDesc": "价格：从高到低",
         "sortName": "名称",
-        "artisanChoice": "吉祥隆精选",
+        "artisanChoice": "侨成发精选",
         "addToOrder": "加入订单",
         "confirmAddToCart": "加入订单？",
         "confirmMessage": "您想将此项目添加到您的订单列表中吗？",
@@ -318,7 +319,7 @@
     },
     "auth": {
         "since": "始于 1984 年",
-        "brandName": "吉祥隆<br>Haberdashery",
+        "brandName": "侨成发<br>Haberdashery",
         "brandDesc": "传承自三代的手工艺术与泰国传统工艺，为现代创作者精心保留。欢迎回到 Heritage Craft & Stitch 之家。",
         "signIn": "登录",
         "signInSubtitle": "输入您的详细信息以访问您的帐户。",
@@ -345,7 +346,7 @@
         "agreeToTerms": "我同意",
         "terms": "条款",
         "createAccount": "创建账户",
-        "footer": "© 1984 吉祥隆 Haberdashery。世代传承的匠心品质。",
+        "footer": "© 1984 侨成发 Haberdashery。世代传承的匠心品质。",
         "loginFailed": "登录失败。请检查您的凭据。",
         "passwordsDoNotMatch": "密码不匹配！",
         "agreeTermsError": "请同意条款和条件",

@@ -27,7 +27,8 @@ onMounted(async () => {
   <div class="content">
 
     <!-- Hero Section -->
-    <section class="hero-section" :style="{ backgroundImage: `url(${getUtilsUrl('shop02.jpg')})` }">
+    <img :src="getUtilsUrl('shop02-large.webp')" fetchpriority="high" aria-hidden="true" style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">
+    <section class="hero-section" :style="{ backgroundImage: `url(${getUtilsUrl('shop02-large.webp')})` }">
       <div class="hero-content">
         <div class="hero-text">
           <h1 class="hero-title">{{ $t('home.heroTitle') }}</h1>
@@ -45,35 +46,35 @@ onMounted(async () => {
         <div class="hero-decoration">
           <div class="floating-card-container container-group-1">
             <div class="floating-card card-1">
-              <img :src="getUtilsUrl('card-img09.jpg')" alt="">
+              <img :src="getUtilsUrl('card-img09-thumb.webp')" alt="">
             </div>
             <div class="floating-card card-2">
-              <img :src="getUtilsUrl('card-img01.jpg')" alt="">
+              <img :src="getUtilsUrl('card-img01-thumb.webp')" alt="">
             </div>
             <div class="floating-card card-3">
-              <img :src="getUtilsUrl('card-img07.jpg')" alt="">
+              <img :src="getUtilsUrl('card-img07-thumb.webp')" alt="">
             </div>
             <!-- <div class="floating-card card-4">
-              <img src="../assets/card-img06.jpg" alt="">
+              <img src="../assets/card-img06.webp" alt="">
             </div> -->
           </div>
           <div class="floating-card-container container-group-2">
             <div class="floating-card card-5">
-              <img :src="getUtilsUrl('card-img09.jpg')" alt="">
+              <img :src="getUtilsUrl('card-img09-thumb.webp')" alt="">
             </div>
             <div class="floating-card card-6">
-              <img :src="getUtilsUrl('card-img06.jpg')" alt="">
+              <img :src="getUtilsUrl('card-img06-thumb.webp')" alt="">
             </div>
           </div>
           <div class="floating-card-container container-group-3">
             <div class="floating-card card-7">
-              <img :src="getUtilsUrl('card-img09.jpg')" alt="">
+              <img :src="getUtilsUrl('card-img09-thumb.webp')" alt="">
             </div>
             <div class="floating-card card-8">
-              <img :src="getUtilsUrl('card-img09.jpg')" alt="">
+              <img :src="getUtilsUrl('card-img09-thumb.webp')" alt="">
             </div>
             <div class="floating-card card-9">
-              <img :src="getUtilsUrl('card-img09.jpg')" alt="">
+              <img :src="getUtilsUrl('card-img09-thumb.webp')" alt="">
             </div>
           </div>
         </div>

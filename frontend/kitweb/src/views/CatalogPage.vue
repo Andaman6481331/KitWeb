@@ -10,7 +10,8 @@ const toggleCart = () => {
 </script>
 <template>
     <!-- Page Header -->
-    <div class="catalog-header" :style="{ backgroundImage: `url(${getUtilsUrl('shop06.png')})` }">
+    <img :src="getUtilsUrl('shop06-large.webp')" fetchpriority="high" aria-hidden="true" style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">
+    <div class="catalog-header" :style="{ backgroundImage: `url(${getUtilsUrl('shop06-large.webp')})` }">
         <div class="overlay"></div>
         <div class="header-content">
             <span class="since-badge" v-reveal delay="0.2s">{{ $t('catalog.since') }}</span>

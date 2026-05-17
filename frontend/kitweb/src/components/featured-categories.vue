@@ -10,22 +10,22 @@ const categories = [
     {
         id: 1,
         key: 'needles',
-        image: getUtilsUrl('card-img06.jpg')
+        image: getUtilsUrl('card-img06-large.webp')
     },
     {
         id: 2,
         key: 'yarn',
-        image: getUtilsUrl('card-img01.jpg')
+        image: getUtilsUrl('card-img01-large.webp')
     },
     {
         id: 3,
         key: 'accessories',
-        image: getUtilsUrl('card-img10.png')
+        image: getUtilsUrl('card-img10-large.webp')
     },
     {
         id: 4,
         key: 'beads',
-        image: getUtilsUrl('card-img04.jpg')
+        image: getUtilsUrl('card-img04-large.webp')
     }
 ];
 </script>
@@ -38,7 +38,7 @@ const categories = [
         </div>
 
         <div class="categories-accordion" v-reveal>
-                <div v-for="cat in categories" :key="cat.id" class="accordion-item"
+            <div v-for="cat in categories" :key="cat.id" class="accordion-item"
                 :class="{ active: activeCat === cat.id }" @mouseenter="activeCat = cat.id"
                 @mouseleave="activeCat = null">
 
