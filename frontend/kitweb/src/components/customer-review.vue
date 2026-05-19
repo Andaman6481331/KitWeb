@@ -180,19 +180,18 @@ const getStars = (rating) => {
 <style scoped>
 .container {
     max-width: 1400px;
-    margin: 80px auto;
-    padding: 0 40px;
+    margin: 4rem auto;
+    padding: 0 4rem;
 }
 
 .carousel-wrapper {
     position: relative;
-    margin-bottom: 20px;
+    margin-bottom: 2rem;
 }
 
 /* Review Card */
 .review-card {
     background: white;
-    /* border-radius: 24px; */
     overflow: hidden;
     box-shadow: 0 10px 50px rgba(0, 0, 0, 0.1);
     animation: fadeSlideIn 0.5s ease;
@@ -213,7 +212,7 @@ const getStars = (rating) => {
 .card-grid {
     display: grid;
     grid-template-columns: minmax(300px, 400px) 1fr;
-    min-height: 450px;
+    min-height: 400px;
 }
 
 .review-image {
@@ -340,8 +339,8 @@ const getStars = (rating) => {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 24px;
-    margin-top: 32px;
+    gap: 1rem;
+    margin-top: 1rem;
 }
 
 .nav-btn {

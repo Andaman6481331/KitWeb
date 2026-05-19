@@ -36,6 +36,68 @@ const tProduct = (item, field) => {
     return item[field] || '';
 };
 
+const tCategory = (catName) => {
+    if (!catName) return '';
+    const mapping = {
+        'yarn': 'Yarn',
+        'yarns': 'Yarn',
+        'needles': 'Needles',
+        'needle': 'Needles',
+        'threads': 'Threads',
+        'thread': 'Threads',
+        'tools': 'Tools',
+        'tool': 'Tools',
+        'beads': 'Beads',
+        'bead': 'Beads',
+        'ribbons': 'Ribbons',
+        'ribbon': 'Ribbons',
+        'buttons': 'Buttons',
+        'button': 'Buttons',
+        'accessories': 'Accessories',
+        'accessory': 'Accessories',
+        'artificialflowers': 'ArtificialFlowers',
+        'artificialflower': 'ArtificialFlowers',
+        'artificial flowers': 'ArtificialFlowers'
+    };
+    const lower = catName.toLowerCase().trim();
+    const key = mapping[lower];
+    if (key) {
+        return t(`categories.${key}`);
+    }
+    return t(`categories.${catName}`, catName);
+};
+
+const tCategoryDesc = (catName) => {
+    if (!catName) return '';
+    const mapping = {
+        'yarn': 'YarnDesc',
+        'yarns': 'YarnDesc',
+        'needles': 'NeedlesDesc',
+        'needle': 'NeedlesDesc',
+        'threads': 'ThreadsDesc',
+        'thread': 'ThreadsDesc',
+        'tools': 'ToolsDesc',
+        'tool': 'ToolsDesc',
+        'beads': 'BeadsDesc',
+        'bead': 'BeadsDesc',
+        'ribbons': 'RibbonsDesc',
+        'ribbon': 'RibbonsDesc',
+        'buttons': 'ButtonsDesc',
+        'button': 'ButtonsDesc',
+        'accessories': 'AccessoriesDesc',
+        'accessory': 'AccessoriesDesc',
+        'artificialflowers': 'ArtificialFlowersDesc',
+        'artificialflower': 'ArtificialFlowersDesc',
+        'artificial flowers': 'ArtificialFlowersDesc'
+    };
+    const lower = catName.toLowerCase().trim();
+    const key = mapping[lower];
+    if (key) {
+        return t(`categories.${key}`);
+    }
+    return t(`categories.${catName}Desc`, t('catalog.categoryDescriptions.Default'));
+};
+
 const products = ref([]);
 const loading = ref(true);
 const showPopup = ref(false);
@@ -193,9 +255,8 @@ const sortedProducts = computed(() => {
                     <div class="since-badge">
                         <ion-icon name="star"></ion-icon> {{ $t('catalog.since') }}
                     </div>
-                    <h1 class="hero-title">{{ $t('catalog.collection', { category: currentCategory }) }}</h1>
-                    <p class="hero-desc">{{ $t(`catalog.categoryDescriptions.${currentCategory}`,
-                        $t('catalog.categoryDescriptions.Default')) }}</p>
+                    <h1 class="hero-title">{{ $t('catalog.collection', { category: tCategory(currentCategory) }) }}</h1>
+                    <p class="hero-desc">{{ tCategoryDesc(currentCategory) }}</p>
                 </div>
                 <div class="hero-image-container">
                     <img v-if="heroImage" :src="heroImage" alt="Category Hero" />
@@ -229,7 +290,7 @@ const sortedProducts = computed(() => {
                 <div class="card-content">
                     <h3 class="card-title">{{ tProduct(item, 'name') }}</h3>
                     <p class="card-desc">{{ tProduct(item, 'description') || $t('catalog.categoryDescriptions.Default')
-                    }}</p>
+                        }}</p>
                     <div class="card-footer">
                         <button class="add-btn" @click.stop="handleAddToCartClick(item)">
                             <ion-icon name="cart"></ion-icon> {{ $t('catalog.addToOrder') }}
@@ -271,7 +332,7 @@ const sortedProducts = computed(() => {
 
                     <div class="popup-details">
                         <div class="popup-info-header">
-                            <span class="popup-category">{{ selectedProduct.category }}</span>
+                            <span class="popup-category">{{ tCategory(selectedProduct.category) }}</span>
                             <h2 class="popup-title">{{ tProduct(selectedProduct, 'name') }}</h2>
                         </div>
                         <p class="popup-description">{{ tProduct(selectedProduct, 'description') }}</p>
@@ -348,7 +409,7 @@ const sortedProducts = computed(() => {
                             :alt="tProduct(selectedProductForCart, 'name')">
                         <div class="confirm-text">
                             <h3>{{ tProduct(selectedProductForCart, 'name') }}</h3>
-                            <p class="category-tag">{{ selectedProductForCart.category }}</p>
+                            <p class="category-tag">{{ tCategory(selectedProductForCart.category) }}</p>
                         </div>
                     </div>
                     <p class="confirm-message">
@@ -357,7 +418,7 @@ const sortedProducts = computed(() => {
                 </div>
                 <div class="confirm-footer">
                     <button class="btn-cancel" @click="closeConfirmModal">{{ $t('catalog.cancel') || 'Cancel'
-                        }}</button>
+                    }}</button>
                     <button class="btn-confirm" @click="confirmAddToCart">
                         {{ $t('catalog.confirm') || 'Yes, Add to Order' }}
                     </button>
@@ -418,8 +479,9 @@ const sortedProducts = computed(() => {
     max-width: 1300px;
     margin: 0 auto;
     padding: 0 5% 50px 5%;
-    display: flex;
-    gap: 60px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
     align-items: center;
     margin-bottom: 50px;
     background-color: #E5E2DD;
@@ -607,6 +669,11 @@ const sortedProducts = computed(() => {
 }
 
 .card-desc {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-size: 14px;
     color: #636e72;
     line-height: 1.6;

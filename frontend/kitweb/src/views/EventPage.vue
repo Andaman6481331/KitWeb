@@ -6,35 +6,33 @@ import { getUtilsUrl } from '@/services/api';
 const pastEvents = ref([
     {
         id: 1,
-        title: 'Summer Macramé Workshop',
-        date: 'June 15, 2024',
-        image: 'https://images.unsplash.com/photo-1556910110-b4a8e538d65e?w=800',
-        participants: 24,
-        location: 'KitCraft Studio, Bangkok',
-        description: 'A wonderful afternoon creating beautiful plant hangers and wall art.',
-        gallery: ['📸', '📸', '📸']
-    },
-    {
-        id: 2,
-        title: 'Holiday Ornament Crafting',
-        date: 'December 10, 2024',
-        image: 'https://images.unsplash.com/photo-1512909006721-3d6018887383?w=800',
-        participants: 32,
-        location: 'Siam Paragon Hall',
-        description: 'Festive workshop where we made yarn ornaments and beaded decorations.',
-        gallery: ['📸', '📸', '📸', '📸']
-    },
-    {
-        id: 3,
-        title: 'Beginner Crochet Circle',
-        date: 'August 22, 2024',
-        image: 'https://images.unsplash.com/photo-1559131397-f94da358f7ca?w=800',
-        participants: 18,
-        location: 'KitCraft Studio, Bangkok',
-        description: 'Friendly gathering for crochet beginners learning basic stitches.',
-        gallery: ['📸', '📸']
+        title: 'KIN KAN CRAFTS | THE LUENRIT STREET CRAFTS',
+        date: 'February 7-8, 2026',
+        image: getUtilsUrl('eventB_tn-large.webp'),
+        participants: '80+',
+        location: 'The Luenrit, Yaowarat, Bangkok',
+        description: 'An interactive premium showcase of our handcrafted accessories, custom DIY crochet sets, and wholesale yarn creations.',
+        gallery: [
+            { type: 'image', src: 'eventB_2-large.webp', title: 'Craft Showcase & Beads' },
+            { type: 'image', src: 'eventB_3-large.webp', title: 'Premium Yarn Detail' },
+            { type: 'video', src: 'eventB_0.mp4', title: 'Grand Showcase Walkthrough' },
+            { type: 'video', src: 'eventB_1.mp4', title: 'Craft Workshop Highlights (.mp4)' }
+        ]
     }
 ]);
+
+const selectedEvent = ref(null);
+const showEventPopup = ref(false);
+
+const openEventPopup = (event) => {
+    selectedEvent.value = event;
+    showEventPopup.value = true;
+};
+
+const closeEventPopup = () => {
+    selectedEvent.value = null;
+    showEventPopup.value = false;
+};
 
 const contactForm = ref({
     name: '',
@@ -76,7 +74,8 @@ const handleContactSubmit = () => {
 <template>
     <div class="diy-page">
         <!-- Hero Section -->
-        <img :src="getUtilsUrl('shop05-large.webp')" fetchpriority="high" aria-hidden="true" style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">
+        <img :src="getUtilsUrl('shop05-large.webp')" fetchpriority="high" aria-hidden="true"
+            style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">
         <section class="hero" :style="{ backgroundImage: `url(${getUtilsUrl('shop05-large.webp')})` }">
             <div class="hero-overlay"></div>
             <div class="hero-content">
@@ -105,13 +104,22 @@ const handleContactSubmit = () => {
                 </div>
 
                 <div class="events-grid">
-                    <div v-for="event in pastEvents" :key="event.id" class="event-card">
+                    <div v-for="event in pastEvents" :key="event.id" class="event-card" @click="openEventPopup(event)"
+                        style="cursor: pointer;">
                         <div class="event-image">
                             <img :src="event.image" :alt="event.title" />
                             <div class="event-overlay">
-                                <div class="gallery-preview">
-                                    <span v-for="(photo, idx) in event.gallery" :key="idx" class="photo-icon">
-                                        {{ photo }}
+                                <div class="gallery-preview"
+                                    style="display: flex; gap: 10px; justify-content: center; width: 100%;">
+                                    <span class="preview-badge"
+                                        style="background: rgba(255,255,255,0.2); backdrop-filter: blur(5px); padding: 6px 12px; border-radius: 20px; color: white; font-weight: 700; font-size: 13px; border: 1px solid rgba(255,255,255,0.3);">
+                                        📸 {{event.gallery.filter(m => m.type === 'image').length}} {{
+                                            $t('events.images') || 'Images' }}
+                                    </span>
+                                    <span class="preview-badge"
+                                        style="background: rgba(255,255,255,0.2); backdrop-filter: blur(5px); padding: 6px 12px; border-radius: 20px; color: white; font-weight: 700; font-size: 13px; border: 1px solid rgba(255,255,255,0.3);">
+                                        🎥 {{event.gallery.filter(m => m.type === 'video').length}} {{
+                                            $t('events.videos') || 'Videos' }}
                                     </span>
                                 </div>
                             </div>
@@ -183,13 +191,13 @@ const handleContactSubmit = () => {
 
                         <div class="direct-contact">
                             <h3>{{ $t('events.contactDirectly') }}</h3>
-                            <a href="tel:+6622223456" class="contact-link">
+                            <a href="tel:+662211414" class="contact-link">
                                 <span class="icon">📞</span>
-                                +66 2 222 3456
+                                +66 2 221 1414
                             </a>
                             <a href="mailto:events@kitcraft.com" class="contact-link">
                                 <span class="icon">✉️</span>
-                                events@kitcraft.com
+                                kitcharoen.sampeng@gmail.com
                             </a>
                             <a href="#" class="contact-link">
                                 <span class="icon">💬</span>
@@ -296,6 +304,50 @@ const handleContactSubmit = () => {
             </div>
         </div>
     </div>
+
+    <!-- Past Event Details Popup Modal -->
+    <Teleport to="body">
+        <transition name="fade">
+            <div v-if="showEventPopup && selectedEvent" class="event-modal-overlay" @click.self="closeEventPopup">
+                <div class="event-modal-card">
+                    <button class="event-close-btn" @click="closeEventPopup" aria-label="Close">✕</button>
+
+                    <div class="event-modal-header">
+                        <span class="event-modal-date">{{ selectedEvent.date }}</span>
+                        <h2 class="event-modal-title">{{ selectedEvent.title }}</h2>
+                        <p class="event-modal-desc">{{ selectedEvent.description }}</p>
+
+                        <div class="event-modal-meta">
+                            <span class="meta-item">👥 {{ selectedEvent.participants }} {{ $t('events.attendees')
+                            }}</span>
+                            <span class="meta-item">📍 {{ selectedEvent.location }}</span>
+                        </div>
+                    </div>
+
+                    <div class="event-modal-gallery">
+                        <h3 class="gallery-section-title">Event Media Gallery</h3>
+                        <div class="gallery-grid">
+                            <div v-for="(media, idx) in selectedEvent.gallery" :key="idx" class="gallery-item-card">
+                                <!-- Image Card -->
+                                <div v-if="media.type === 'image'" class="gallery-image-wrapper">
+                                    <img :src="getUtilsUrl(media.src)" :alt="media.title" class="gallery-media-img" />
+                                    <div class="media-title-overlay">{{ media.title }}</div>
+                                </div>
+                                <!-- Video Card -->
+                                <div v-else-if="media.type === 'video'" class="gallery-video-wrapper">
+                                    <video :src="getUtilsUrl(media.src)" controls playsinline
+                                        class="gallery-media-video" crossorigin="anonymous" preload="metadata"></video>
+                                    <div class="media-title-overlay">
+                                        🎥 {{ media.title }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </transition>
+    </Teleport>
 </template>
 
 <style scoped>
@@ -333,6 +385,11 @@ const handleContactSubmit = () => {
 }
 
 .hero-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
     position: relative;
     z-index: 2;
 }
@@ -759,5 +816,333 @@ const handleContactSubmit = () => {
 .modal-desc {
     font-size: 1.05rem;
     color: #666;
+}
+
+/* ===== PREMIUM PAST EVENT GALLERY MODAL STYLE ===== */
+.event-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(43, 33, 27, 0.7);
+    backdrop-filter: blur(12px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: fadeInModal 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.event-modal-card {
+    background: #FFFAF6;
+    border-radius: 24px;
+    width: 100%;
+    max-width: 900px;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 30px 60px rgba(53, 35, 29, 0.25);
+    border: 1px solid rgba(139, 111, 71, 0.15);
+    padding: 40px;
+    scrollbar-width: thin;
+    scrollbar-color: #8b6f47 rgba(139, 111, 71, 0.05);
+}
+
+.event-modal-card::-webkit-scrollbar {
+    width: 6px;
+}
+
+.event-modal-card::-webkit-scrollbar-track {
+    background: rgba(139, 111, 71, 0.05);
+    border-radius: 10px;
+}
+
+.event-modal-card::-webkit-scrollbar-thumb {
+    background: #8b6f47;
+    border-radius: 10px;
+}
+
+.event-close-btn {
+    position: absolute;
+    top: 25px;
+    right: 25px;
+    width: 45px;
+    height: 45px;
+    background: rgba(139, 111, 71, 0.1);
+    border: none;
+    border-radius: 50%;
+    font-size: 1.3rem;
+    color: #5d4037;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 100;
+}
+
+.event-close-btn:hover {
+    background: #5d4037;
+    color: white;
+    transform: rotate(90deg) scale(1.1);
+}
+
+.event-modal-header {
+    margin-bottom: 35px;
+    border-bottom: 1px solid rgba(139, 111, 71, 0.15);
+    padding-bottom: 25px;
+}
+
+.event-modal-date {
+    display: inline-block;
+    font-size: 14px;
+    font-weight: 700;
+    color: #8b6f47;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+
+.event-modal-title {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: #2D241E;
+    margin: 0 0 15px 0;
+    line-height: 1.2;
+}
+
+.event-modal-desc {
+    font-size: 1.1rem;
+    line-height: 1.6;
+    color: #6b5d54;
+    margin-bottom: 20px;
+}
+
+.event-modal-meta {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.event-modal-meta .meta-item {
+    font-size: 14px;
+    color: #8b6f47;
+    font-weight: 600;
+    background: rgba(139, 111, 71, 0.08);
+    padding: 6px 14px;
+    border-radius: 20px;
+}
+
+.event-modal-gallery {
+    margin-top: 20px;
+}
+
+.gallery-section-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #2D241E;
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+@media (max-width: 768px) {
+    .gallery-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .event-modal-title {
+        font-size: 1.8rem;
+    }
+}
+
+.gallery-item-card {
+    background: #FFFAF6;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(53, 35, 29, 0.08);
+    border: 1px solid rgba(139, 111, 71, 0.1);
+    position: relative;
+    transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), box-shadow 0.4s ease;
+}
+
+.gallery-item-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 35px rgba(53, 35, 29, 0.15);
+}
+
+.gallery-image-wrapper {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    width: 100%;
+}
+
+.gallery-media-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s ease;
+}
+
+.gallery-item-card:hover .gallery-media-img {
+    transform: scale(1.05);
+}
+
+.gallery-video-wrapper {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    width: 100%;
+    background: #000;
+}
+
+.gallery-media-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.media-title-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(43, 33, 27, 0.95), transparent);
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 20px 15px 10px;
+    pointer-events: none;
+    text-align: left;
+}
+
+@keyframes fadeInModal {
+    from {
+        opacity: 0;
+        backdrop-filter: blur(0px);
+    }
+
+    to {
+        opacity: 1;
+        backdrop-filter: blur(12px);
+    }
+}
+
+/* Responsive Layout Adjustments */
+@media (max-width: 1024px) {
+    .contact-grid {
+        grid-template-columns: 1fr;
+        gap: 40px;
+    }
+    
+    .section-header h2 {
+        font-size: 2.2rem;
+    }
+    
+    .logo h1 {
+        font-size: 3rem;
+    }
+    
+    .tagline {
+        font-size: 1.6rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .hero {
+        height: 60vh;
+    }
+    
+    .logo h1 {
+        font-size: 2.2rem;
+    }
+    
+    .tagline {
+        font-size: 1.2rem;
+        letter-spacing: 1px;
+        line-height: 1.3;
+    }
+    
+    .subtitle {
+        font-size: 1rem;
+        margin-bottom: 24px;
+        line-height: 1.4;
+    }
+    
+    .cta-btn {
+        padding: 12px 30px;
+        font-size: 1rem;
+    }
+    
+    .container {
+        padding: 0 20px;
+    }
+    
+    .section-header {
+        margin-bottom: 40px;
+    }
+    
+    .section-header h2 {
+        font-size: 1.8rem;
+    }
+    
+    .section-header p {
+        font-size: 1rem;
+    }
+    
+    .events-section {
+        padding: 60px 0;
+    }
+    
+    .events-grid {
+        grid-template-columns: 1fr;
+        gap: 24px;
+    }
+    
+    .contact-section {
+        padding: 60px 0;
+    }
+    
+    .contact-form {
+        padding: 24px;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+    
+    /* Product Details Modal Mobile */
+    .modal-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .modal-image {
+        height: 250px;
+    }
+    
+    .modal-details {
+        padding: 24px;
+    }
+    
+    .modal-details h2 {
+        font-size: 1.6rem;
+    }
+    
+    .modal-price {
+        font-size: 2rem;
+        margin-bottom: 12px;
+    }
+    
+    .event-modal-card {
+        padding: 24px;
+    }
+    
+    .event-modal-title {
+        font-size: 1.6rem;
+    }
 }
 </style>

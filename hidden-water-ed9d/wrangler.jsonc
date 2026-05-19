@@ -29,6 +29,10 @@
 		{
 			"binding": "WEB_UTILS",
 			"bucket_name": "web-utils"
+		},
+		{
+			"binding": "KIT_IMAGE",
+			"bucket_name": "kit-image"
 		}
 	],
 	"ai": {

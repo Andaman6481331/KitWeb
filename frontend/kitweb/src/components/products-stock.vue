@@ -8,6 +8,68 @@ import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
 const router = useRouter();
 
+const tCategory = (catName) => {
+    if (!catName) return '';
+    const mapping = {
+        'yarn': 'Yarn',
+        'yarns': 'Yarn',
+        'needles': 'Needles',
+        'needle': 'Needles',
+        'threads': 'Threads',
+        'thread': 'Threads',
+        'tools': 'Tools',
+        'tool': 'Tools',
+        'beads': 'Beads',
+        'bead': 'Beads',
+        'ribbons': 'Ribbons',
+        'ribbon': 'Ribbons',
+        'buttons': 'Buttons',
+        'button': 'Buttons',
+        'accessories': 'Accessories',
+        'accessory': 'Accessories',
+        'artificialflowers': 'ArtificialFlowers',
+        'artificialflower': 'ArtificialFlowers',
+        'artificial flowers': 'ArtificialFlowers'
+    };
+    const lower = catName.toLowerCase().trim();
+    const key = mapping[lower];
+    if (key) {
+        return t(`categories.${key}`);
+    }
+    return t(`categories.${catName}`, catName);
+};
+
+const tCategoryDesc = (catName) => {
+    if (!catName) return '';
+    const mapping = {
+        'yarn': 'YarnDesc',
+        'yarns': 'YarnDesc',
+        'needles': 'NeedlesDesc',
+        'needle': 'NeedlesDesc',
+        'threads': 'ThreadsDesc',
+        'thread': 'ThreadsDesc',
+        'tools': 'ToolsDesc',
+        'tool': 'ToolsDesc',
+        'beads': 'BeadsDesc',
+        'bead': 'BeadsDesc',
+        'ribbons': 'RibbonsDesc',
+        'ribbon': 'RibbonsDesc',
+        'buttons': 'ButtonsDesc',
+        'button': 'ButtonsDesc',
+        'accessories': 'AccessoriesDesc',
+        'accessory': 'AccessoriesDesc',
+        'artificialflowers': 'ArtificialFlowersDesc',
+        'artificialflower': 'ArtificialFlowersDesc',
+        'artificial flowers': 'ArtificialFlowersDesc'
+    };
+    const lower = catName.toLowerCase().trim();
+    const key = mapping[lower];
+    if (key) {
+        return t(`categories.${key}`);
+    }
+    return t(`categories.${catName}Desc`, t('catalog.categoryDescriptions.Default'));
+};
+
 const products = ref([]);
 const loading = ref(true);
 
@@ -65,8 +127,8 @@ const selectCategory = (categoryName) => {
                         <img :src="category.image" :alt="category.name" class="category-img">
                     </div>
                     <div class="category-info">
-                        <h3 class="category-title-text">{{ category.name }}</h3>
-                        <p class="category-description-text">{{ category.description }}</p>
+                        <h3 class="category-title-text">{{ tCategory(category.name) }}</h3>
+                        <p class="category-description-text">{{ tCategoryDesc(category.name) }}</p>
                         <div class="category-action">
                             <span class="shop-now-link">{{ $t('catalog.shopCategory') }} <ion-icon
                                     name="arrow-forward-outline"></ion-icon></span>
@@ -86,7 +148,7 @@ const selectCategory = (categoryName) => {
 }
 
 .category-grid-container {
-    max-width: 1400px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 0 5%;
 }
@@ -94,7 +156,7 @@ const selectCategory = (categoryName) => {
 .category-list {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 40px;
+    gap: 1rem;
 }
 
 .category-card {
@@ -153,6 +215,11 @@ const selectCategory = (categoryName) => {
     line-height: 1.6;
     margin-bottom: 25px;
     opacity: 0.9;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
 }
 
 .category-action {
@@ -192,90 +259,6 @@ const selectCategory = (categoryName) => {
     .category-list {
         grid-template-columns: 1fr;
     }
-}
-
-/* ===== ITEM LIST ===== */
-.itemlist {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 30px;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 5%;
-}
-
-.item {
-    background: white;
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    min-height: 400px;
-    /* Ensures all cards are at least this tall */
-}
-
-.item:hover {
-    transform: translateY(-6px);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
-}
-
-.item-image {
-    position: relative;
-    overflow: hidden;
-    height: 300px;
-    /* Fixed height for consistency */
-    width: 100%;
-    background: #f8f8f8;
-}
-
-.item-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    /* This ensures the image fills the area without distortion */
-    transition: transform 0.4s ease;
-}
-
-.item:hover .item-image img {
-    transform: scale(1.1);
-}
-
-.item-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.item:hover .item-overlay {
-    opacity: 1;
-}
-
-.quick-view {
-    padding: 12px 28px;
-    background: white;
-    color: #2d2d2d;
-    border: none;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transform: translateY(10px);
-    transition: all 0.3s ease;
-}
-
-.item:hover .quick-view {
-    transform: translateY(0);
 }
 
 .item-content {
@@ -519,8 +502,7 @@ const selectCategory = (categoryName) => {
         width: 200px;
     }
 
-    .category-list,
-    .itemlist {
+    .category-list {
         grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     }
 

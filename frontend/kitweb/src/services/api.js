@@ -3,6 +3,13 @@
 export const API_URL = 'https://hidden-water-ed9d.shop-backend-kitweb.workers.dev';
 export const getImageUrl = (filename) => `${API_URL}/images/${filename}`;
 export const getUtilsUrl = (filename) => `${API_URL}/utils/${filename}`;
+export const getDiyImageUrl = (filename, variant = 'thumb') => {
+  if (!filename) return 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg';
+  const keyStr = String(filename);
+  if (keyStr.startsWith('http')) return keyStr;
+  if (keyStr.includes('.')) return `${API_URL}/kit-image/${keyStr}`;
+  return `${API_URL}/kit-image/${keyStr}-${variant}.webp`;
+};
 
 export const api = {
   getToken() {
@@ -184,5 +191,65 @@ export const api = {
     if (!response.ok) throw new Error('Translation failed');
     const data = await response.json();
     return data.translated_text;
+  },
+
+  async getDiyProducts() {
+    const response = await fetch(`${API_URL}/diy/products`);
+    if (!response.ok) throw new Error('Failed to fetch DIY products');
+    return await response.json();
+  },
+
+  async addDiyProduct(productData) {
+    const response = await fetch(`${API_URL}/diy/products`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': this.getToken()
+      },
+      body: JSON.stringify(productData)
+    });
+    if (!response.ok) throw new Error(`Add DIY product failed: ${response.status}`);
+    return await response.json();
+  },
+
+  async updateDiyProduct(id, productData) {
+    const response = await fetch(`${API_URL}/diy/products/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': this.getToken()
+      },
+      body: JSON.stringify(productData)
+    });
+    if (!response.ok) throw new Error(`Update DIY product failed: ${response.status}`);
+    return await response.json();
+  },
+
+  async deleteDiyProduct(id) {
+    const response = await fetch(`${API_URL}/diy/products/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': this.getToken()
+      }
+    });
+    if (!response.ok) throw new Error(`Delete DIY product failed: ${response.status}`);
+    return await response.json();
+  },
+
+  async uploadDiyImage(files) {
+    const formData = new FormData();
+    if (Array.isArray(files)) {
+      files.forEach(file => formData.append('file', file));
+    } else {
+      formData.append('file', files);
+    }
+    
+    const response = await fetch(`${API_URL}/diy/upload`, {
+      method: 'POST',
+      headers: { 'Authorization': this.getToken() },
+      body: formData
+    });
+    if (!response.ok) throw new Error(`DIY Upload failed: ${response.status}`);
+    return await response.json();
   }
 };

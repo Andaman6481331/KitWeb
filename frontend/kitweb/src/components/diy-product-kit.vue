@@ -1,88 +1,217 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+import { api, getDiyImageUrl } from '../services/api';
+import { cartStore } from '../stores/cartStore';
+import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
+import translationStore from '../stores/translationStore';
 
-const diyProducts = ref([
-    {
-        id: 2,
-        name: 'Beaded Bracelet Set',
-        image: 'https://images.unsplash.com/photo-1611652022419-a9419f74343d?w=500',
-        price: 399,
-        difficulty: 'Beginner',
-        duration: '1-2 hours',
-        includes: ['Assorted Beads (200pcs)', 'Elastic Cord', 'Charms', 'Storage Box'],
-        description: 'Design your own unique bracelets with colorful beads and charms.'
-    },
-    {
-        id: 3,
-        name: 'Crochet Tote Bag Kit',
-        image: 'https://images.unsplash.com/photo-1590735213920-68192a487bc2?w=500',
-        price: 799,
-        difficulty: 'Intermediate',
-        duration: '4-6 hours',
-        includes: ['T-Shirt Yarn (3 rolls)', 'Crochet Hook', 'Video Tutorial', 'Pattern'],
-        description: 'Crochet a stylish and eco-friendly tote bag perfect for shopping.'
-    },
-    {
-        id: 4,
-        name: 'Embroidery Starter Set',
-        image: 'https://images.unsplash.com/photo-1452696193712-6cabf5103b63?w=500',
-        price: 499,
-        difficulty: 'Beginner',
-        duration: '3-4 hours',
-        includes: ['Embroidery Hoop', '12 Thread Colors', 'Needles', 'Fabric', 'Pattern Sheets'],
-        description: 'Learn the art of embroidery with modern floral patterns.'
+const { locale, t } = useI18n();
+const router = useRouter();
+
+const diyProducts = ref([]);
+const isLoading = ref(true);
+
+const selectedProduct = ref(null);
+const showDetailsPopup = ref(false);
+const activeImageIndex = ref(0);
+
+const openDetailsPopup = (product) => {
+    selectedProduct.value = product;
+    activeImageIndex.value = 0;
+    showDetailsPopup.value = true;
+};
+
+const closeDetailsPopup = () => {
+    selectedProduct.value = null;
+    showDetailsPopup.value = false;
+};
+
+const loadDiyProducts = async () => {
+    try {
+        isLoading.value = true;
+        diyProducts.value = await api.getDiyProducts();
+    } catch (error) {
+        console.error('Failed to load DIY products:', error);
+    } finally {
+        isLoading.value = false;
     }
-]);
+};
+
+onMounted(() => {
+    loadDiyProducts();
+});
+
+const tProduct = (item, field) => {
+    if (!item) return '';
+    const lang = locale.value.toLowerCase();
+
+    // 1. Manual Thai Name Priority if provided
+    const thField = `${field}_th`;
+    if (lang === 'th' && item[thField]) {
+        return item[thField];
+    }
+
+    // 2. Auto-translation for metadata fields (name, description)
+    const autoFields = ['name', 'description'];
+    if (autoFields.includes(field) && lang !== 'en') {
+        const text = item[field];
+        if (text) {
+            translationStore.getTranslation(`diy-${item.id}`, field, text, lang);
+            const key = `diy-${item.id}-${field}-${lang}`;
+            return translationStore.translations[key] || text; // Show original while loading
+        }
+    }
+
+    return item[field] || '';
+};
+
+const handleAddToCart = (product) => {
+    if (product.stock <= 0) {
+        alert('Out of stock!');
+        return;
+    }
+
+    const cartProduct = {
+        id: `diy-${product.id}`, // Scope prefixed ID to prevent collision in cart
+        name: product.name,
+        name_th: product.name_th,
+        price: product.price_1, // Display Level 1 price as requested by user
+        image_key: product.images && product.images.length > 0 ? product.images[0] : '',
+        category: 'DIY Kit',
+        sku: product.sku,
+        stock: product.stock
+    };
+
+    cartStore.addToCart(cartProduct, { size: 'Default', color: 'Default' });
+    alert(`${tProduct(product, 'name')} added to cart!`);
+    router.push('/orderpage');
+};
 </script>
 
 <template>
     <section class="diy-kits-section">
         <div class="container">
-            <div class="section-header" v-reveal>
-                <span class="section-tag">{{ $t('diyKits.tag') }}</span>
-                <h2 class="section-title">{{ $t('diyKits.title') }}</h2>
-                <p class="section-description">
-                    {{ $t('diyKits.description') }}
-                </p>
-            </div>
 
             <div class="kits-grid">
-                <div v-for="(product, index) in diyProducts" :key="product.id" class="kit-card" v-reveal
-                    :style="{ animationDelay: (index * 0.15) + 's' }">
+                <div v-if="isLoading" class="loading-state"
+                    style="grid-column: 1/-1; text-align: center; padding: 60px 0;">
+                    <div class="loader"></div>
+                    <p style="color: #6b5d54; font-weight: 600; margin-top: 15px;">Loading DIY Kits Collection...</p>
+                </div>
 
-                    <div class="kit-image-wrapper">
-                        <img :src="product.image" :alt="product.name" class="kit-image" />
-                        <div class="kit-badge" :class="product.difficulty.toLowerCase()">
-                            {{ product.difficulty }}
-                        </div>
-                    </div>
+                <template v-else-if="diyProducts.length > 0">
+                    <div v-for="(product, index) in diyProducts" :key="product.id" class="kit-card" v-reveal
+                        :style="{ animationDelay: (index * 0.15) + 's' }" @click="openDetailsPopup(product)"
+                        style="cursor: pointer;">
 
-                    <div class="kit-content">
-                        <div class="kit-header">
-                            <h3 class="kit-name">{{ product.name }}</h3>
-                            <p class="kit-description">{{ product.description }}</p>
-                        </div>
-
-
-                        <div class="kit-features">
-                            <div class="feature">
-                                <ion-icon name="time-outline"></ion-icon>
-                                <span>{{ product.duration }}</span>
-                            </div>
-                            <div class="feature">
-                                <ion-icon name="layers-outline"></ion-icon>
-                                <span>{{ product.includes.length }} {{ $t('diyKits.essentialItems') }}</span>
+                        <div class="kit-image-wrapper">
+                            <img :src="getDiyImageUrl(product.images && product.images.length > 0 ? product.images[0] : '', 'large')"
+                                :alt="tProduct(product, 'name')" class="kit-image" />
+                            <div class="kit-badge beginner">
+                                DIY KIT
                             </div>
                         </div>
 
-                        <button class="kit-btn">
-                            {{ $t('diyKits.exploreDetails') }}
-                            <ion-icon name="chevron-forward-outline"></ion-icon>
-                        </button>
+                        <div class="kit-content">
+                            <div class="kit-header" style="display: block; margin-bottom: 12px; text-align: left;">
+                                <h3 class="kit-name" style="margin: 0;">{{ tProduct(product, 'name') }}</h3>
+                                <p class="kit-description">{{ tProduct(product, 'description') }}</p>
+                                <div style="display: flex; justify-content: right; align-items: center;">
+                                    <span style="font-size: 22px; color: #2D241E; font-weight: 800;">฿{{ product.price_1
+                                    }}</span>
+                                </div>
+                            </div>
+
+
+                            <div class="kit-features"
+                                style="margin-top: auto; border-top: 1px solid #E8E2DD; padding-top: 15px;">
+                                <div class="feature">
+                                    <ion-icon name="cube-outline"></ion-icon>
+                                    <span>Stock: {{ product.stock || 0 }}</span>
+                                </div>
+                                <div class="feature" style="margin-left: auto;">
+                                    <ion-icon name="ribbon-outline"></ion-icon>
+                                    <span>Premium Quality</span>
+                                </div>
+                            </div>
+
+                            <button class="kit-btn" @click.stop="handleAddToCart(product)"
+                                :disabled="product.stock <= 0">
+                                <ion-icon name="cart-outline"></ion-icon>
+                                {{ product.stock > 0 ?
+                                    ($t('catalog.addToOrder') || 'Add to Order Cart') : 'Out of Stock' }}
+                            </button>
+                        </div>
                     </div>
+                </template>
+                <div v-else class="empty-state" style="grid-column: 1/-1; text-align: center; padding: 60px 0;">
+                    <p style="color: #6b5d54; font-size: 16px; font-weight: 600;">No DIY Kits currently available in the
+                        showcase.</p>
                 </div>
             </div>
         </div>
+
+        <!-- DIY Product Details Popup Modal -->
+        <transition name="fade">
+            <div v-if="showDetailsPopup && selectedProduct" class="modal-overlay" @click.self="closeDetailsPopup">
+                <div class="modal-card">
+                    <button class="modal-close-btn" @click="closeDetailsPopup">
+                        <ion-icon name="close-outline"></ion-icon>
+                    </button>
+
+                    <div class="modal-body-layout">
+                        <!-- Left Side: Dynamic Gallery -->
+                        <div class="modal-gallery-side">
+                            <div class="main-image-box">
+                                <img :src="getDiyImageUrl(selectedProduct.images && selectedProduct.images.length > 0 ? selectedProduct.images[activeImageIndex] : '', 'large')"
+                                    :alt="tProduct(selectedProduct, 'name')" />
+                            </div>
+                            <!-- Thumbnails list -->
+                            <div v-if="selectedProduct.images && selectedProduct.images.length > 1"
+                                class="thumbnail-row">
+                                <div v-for="(img, idx) in selectedProduct.images" :key="idx"
+                                    :class="['thumbnail-box', { active: activeImageIndex === idx }]"
+                                    @click="activeImageIndex = idx">
+                                    <img :src="getDiyImageUrl(img, 'thumb')" alt="thumbnail" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Side: Details and Cart -->
+                        <div class="modal-details-side">
+                            <span class="modal-tag">DIY Special Kit</span>
+                            <h2 class="modal-product-name">{{ tProduct(selectedProduct, 'name') }}</h2>
+
+                            <div class="modal-price-row">
+                                <span class="price-val">฿{{ selectedProduct.price_1 }}</span>
+                                <span class="stock-badge" :class="{ 'out-of-stock': selectedProduct.stock <= 0 }">
+                                    {{ selectedProduct.stock > 0 ?
+                                        `Stock: ${selectedProduct.stock} units` : 'Out of Stock' }}
+                                </span>
+                            </div>
+
+                            <div class="modal-description-box">
+                                <label>Description</label>
+                                <p>{{ tProduct(selectedProduct, 'description') }}</p>
+                            </div>
+
+                            <div class="modal-sku-box"
+                                style="margin-top: 15px; font-size: 13px; color: #8b6f47; font-weight: 700;">
+                                <span>SKU: {{ selectedProduct.sku }}</span>
+                            </div>
+
+                            <button class="modal-buy-btn" @click="handleAddToCart(selectedProduct)"
+                                :disabled="selectedProduct.stock <= 0">
+                                <ion-icon name="cart-outline"></ion-icon>
+                                {{ selectedProduct.stock > 0 ? ($t(
+                                    'catalog.addToOrder') || 'Add to Order Cart') : 'Out of Stock' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </transition>
     </section>
 </template>
 
@@ -99,37 +228,16 @@ const diyProducts = ref([
     margin: 0 auto;
 }
 
-.section-header {
-    margin-bottom: 30px;
-    text-align: left;
-}
 
-.section-tag {
-    display: block;
-    font-size: 13px;
-    font-weight: 700;
-    color: #8b6f47;
-    letter-spacing: 4px;
-}
-
-.section-title {
-    font-family: 'ZCOOL XiaoWei', serif;
-    font-size: 48px;
-    color: #2D241E;
-}
-
-.section-description {
-    font-size: 18px;
-    color: #6B5D54;
-    line-height: 1.6;
-    margin: 0 auto;
-}
 
 /* Grid Layout */
 .kits-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-    gap: 40px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 0 5%;
 }
 
 /* Card Design */
@@ -141,6 +249,9 @@ const diyProducts = ref([
     border: 1px solid #F3EEEA;
     display: flex;
     flex-direction: column;
+    /* max-width: 320px; */
+    width: 100%;
+    margin: 0 auto;
 }
 
 .kit-card:hover {
@@ -151,7 +262,8 @@ const diyProducts = ref([
 
 .kit-image-wrapper {
     position: relative;
-    height: 300px;
+    width: 100%;
+    aspect-ratio: 1 / 1;
     overflow: hidden;
 }
 
@@ -190,7 +302,7 @@ const diyProducts = ref([
 }
 
 .kit-content {
-    padding: 35px;
+    padding: 1rem 2rem 2rem 2rem;
     flex-grow: 1;
     display: flex;
     flex-direction: column;
@@ -212,10 +324,15 @@ const diyProducts = ref([
 }
 
 .kit-description {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-size: 15px;
     color: #6B5D54;
     line-height: 1.6;
-    margin-bottom: 25px;
+    margin: 0;
     flex-grow: 1;
 }
 
@@ -264,9 +381,7 @@ const diyProducts = ref([
 }
 
 @media (max-width: 768px) {
-    .section-title {
-        font-size: 36px;
-    }
+
 
     .desktop-only {
         display: none;
@@ -275,5 +390,304 @@ const diyProducts = ref([
     .kits-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* Spinner Loader styling */
+.loader {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #8b6f47;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* Modal overlay styling */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(45, 36, 30, 0.6);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    padding: 20px;
+}
+
+/* Modal card layout */
+.modal-card {
+    background: #FFFAF6;
+    border-radius: 28px;
+    width: 100%;
+    max-width: 850px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
+    position: relative;
+    overflow: hidden;
+    /* Added back to clip rounded corners and prevent content overflow */
+    animation: zoomIn 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+@keyframes zoomIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Close button styling */
+.modal-close-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: #8b6f47;
+    /* Set distinct brand color background so it pops! */
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 22px;
+    color: white;
+    /* White icon on brand color background for maximum visibility */
+    box-shadow: 0 4px 12px rgba(139, 111, 71, 0.35);
+    transition: all 0.3s ease;
+    z-index: 100;
+    /* Extremely high z-index to sit on top of everything! */
+}
+
+.modal-close-btn:hover {
+    background: #2D241E;
+    color: white;
+    transform: rotate(90deg) scale(1.08);
+}
+
+/* Layout split */
+.modal-body-layout {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+}
+
+@media (max-width: 850px) {
+    .modal-card {
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-body-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .modal-close-btn {
+        top: 15px;
+        right: 15px;
+        background: rgba(45, 36, 30, 0.85);
+        /* Slightly darker semi-transparent background on mobile so it stands out on images */
+    }
+}
+
+/* Left side (images) */
+.modal-gallery-side {
+    background: #F8F4EF;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    /* Prevents CSS Grid auto-expansion from stretching the column */
+}
+
+.main-image-box {
+    width: 100%;
+    height: 380px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    background: white;
+}
+
+.main-image-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.thumbnail-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    width: 100%;
+    max-width: 100%;
+    /* Restrict row width to parent container boundaries */
+    overflow-x: auto;
+    /* Allow horizontal scrolling */
+    flex-wrap: nowrap;
+    /* Keep all thumbnails on a single row */
+    padding-bottom: 8px;
+    /* Leave space for scrollbar visual clearance */
+    box-sizing: border-box;
+}
+
+.thumbnail-box {
+    width: 65px;
+    height: 65px;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+.thumbnail-box.active {
+    border-color: #8b6f47;
+    transform: translateY(-3px);
+}
+
+.thumbnail-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Right side (details) */
+.modal-details-side {
+    padding: 50px 40px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    /* Prevents details column from being squeezed to zero width */
+}
+
+.modal-tag {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #8b6f47;
+    margin-bottom: 8px;
+}
+
+.modal-product-name {
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 32px;
+    color: #2D241E;
+    margin-bottom: 15px;
+    line-height: 1.2;
+}
+
+.modal-price-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 25px;
+}
+
+.price-val {
+    font-size: 28px;
+    font-weight: 800;
+    color: #2D241E;
+}
+
+.stock-badge {
+    background: rgba(46, 204, 113, 0.1);
+    color: #2ecc71;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 30px;
+    font-size: 12px;
+}
+
+.stock-badge.out-of-stock {
+    background: rgba(231, 76, 60, 0.1);
+    color: #e74c3c;
+}
+
+.modal-description-box {
+    flex-grow: 1;
+}
+
+.modal-description-box label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #A0948C;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+}
+
+.modal-description-box p {
+    font-size: 15px;
+    color: #6B5D54;
+    line-height: 1.6;
+    word-break: break-word;
+    /* Ensure extremely long descriptions wrap gracefully without breaking layouts */
+}
+
+.modal-buy-btn {
+    width: 100%;
+    padding: 18px;
+    background: #006666;
+    border: none;
+    border-radius: 50px;
+    color: white;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+    margin-top: 30px;
+    box-shadow: 0 10px 20px rgba(0, 102, 102, 0.2);
+}
+
+.modal-buy-btn:hover:not(:disabled) {
+    background: #004d4d;
+    transform: translateY(-2px);
+    box-shadow: 0 15px 30px rgba(0, 102, 102, 0.3);
+}
+
+.modal-buy-btn:disabled {
+    background: #dcdde1;
+    color: #a1a2a6;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* Transitions */
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
 }
 </style>

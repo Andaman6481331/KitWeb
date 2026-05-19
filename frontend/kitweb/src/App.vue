@@ -146,8 +146,8 @@ watch(currentLanguage, (newLang) => {
           <ul>
             <li>📍 376 Wanich 1 Chakkrawat</li>
             <li>📍 Samphantawong Bangkok</li>
-            <li>📞 +66 (0) 2-XXX-XXXX</li>
-            <li>✉️ info@kitcharoen.com</li>
+            <li>📞 +66 (0)2-221-1414</li>
+            <li>✉️ kitcharoen.sampeng@gmail.com</li>
           </ul>
         </div>
         <div class="footer-column">

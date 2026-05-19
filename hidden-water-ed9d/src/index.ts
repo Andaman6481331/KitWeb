@@ -15,6 +15,7 @@ interface Env {
 	DB: D1Database;
 	IMAGES: R2Bucket;
 	WEB_UTILS: R2Bucket;
+	KIT_IMAGE: R2Bucket;
 	AI: any;
 	LINE_CHANNEL_ACCESS_TOKEN?: string;
 	LINE_NOTIFY_TOKEN?: string;
@@ -41,6 +42,17 @@ function generateSKU(category: string, countInCategory: number): string {
 		prefix = (category || "UK").substring(0, 2).toUpperCase().padEnd(2, 'X');
 	}
 	const suffix = (countInCategory + 1).toString().padStart(3, '0');
+	return `${prefix}${suffix}`;
+}
+
+function generateDiySKU(count: number): string {
+	const prefix = "diyset";
+	let suffix = "";
+	let temp = count;
+	while (temp >= 0) {
+		suffix = String.fromCharCode((temp % 26) + 97) + suffix;
+		temp = Math.floor(temp / 26) - 1;
+	}
 	return `${prefix}${suffix}`;
 }
 
@@ -237,6 +249,19 @@ export default {
 				return corsResponse(parsedProducts);
 			}
 
+			if (url.pathname === "/diy/products" && request.method === "GET") {
+				const { results: diyProducts } = await env.DB.prepare(
+					"SELECT * FROM diy_products ORDER BY created_at DESC"
+				).all();
+
+				const parsed = diyProducts.map((p: any) => ({
+					...p,
+					images: typeof p.images === 'string' ? JSON.parse(p.images) : (p.images || [])
+				}));
+
+				return corsResponse(parsed);
+			}
+
 			if (url.pathname === "/categories" && request.method === "GET") {
 				const { results } = await env.DB.prepare("SELECT * FROM categories ORDER BY name ASC").all();
 				return corsResponse(results);
@@ -250,6 +275,11 @@ export default {
 			if (url.pathname.startsWith("/utils/") && (request.method === "GET" || request.method === "HEAD")) {
 				const key = decodeURIComponent(url.pathname.split("/utils/")[1]);
 				return await handleR2Request(env.WEB_UTILS, key, request, true);
+			}
+
+			if (url.pathname.startsWith("/kit-image/") && (request.method === "GET" || request.method === "HEAD")) {
+				const key = decodeURIComponent(url.pathname.split("/kit-image/")[1]);
+				return await handleR2Request(env.KIT_IMAGE, key, request, true);
 			}
 
 			if (url.pathname === "/notify" && request.method === "POST") {
@@ -279,15 +309,21 @@ export default {
 							).bind(id, item.id, item.name, item.selectedSize, item.selectedColor, item.quantity, item.price).run();
 
 							// Update stock
-							const p = await env.DB.prepare("SELECT stock FROM products WHERE id = ?").bind(item.id).first() as any;
+							const isDiy = typeof item.id === 'string' && item.id.startsWith('diy-');
+							const dbTable = isDiy ? 'diy_products' : 'products';
+							const productId = isDiy ? parseInt(item.id.substring(4), 10) : item.id;
+
+							const p = await env.DB.prepare(`SELECT stock FROM ${dbTable} WHERE id = ?`).bind(productId).first() as any;
 							if (p) {
 								const newStock = p.stock - item.quantity;
-								await env.DB.prepare("UPDATE products SET stock = ? WHERE id = ?").bind(newStock, item.id).run();
+								await env.DB.prepare(`UPDATE ${dbTable} SET stock = ? WHERE id = ?`).bind(newStock, productId).run();
 
 								// Log history
-								await env.DB.prepare(
-									"INSERT INTO stock_history (product_id, admin_id, change_amount, new_stock, reason) VALUES (?, ?, ?, ?, ?)"
-								).bind(item.id, 'SYSTEM', -item.quantity, newStock, `ORDER_${id}`).run();
+								if (!isDiy) {
+									await env.DB.prepare(
+										"INSERT INTO stock_history (product_id, admin_id, change_amount, new_stock, reason) VALUES (?, ?, ?, ?, ?)"
+									).bind(productId, 'SYSTEM', -item.quantity, newStock, `ORDER_${id}`).run();
+								}
 							}
 						}
 					} catch (dbError: any) {
@@ -523,10 +559,50 @@ export default {
 				return corsResponse({ success: true, newStock });
 			}
 
+			if (url.pathname === "/diy/products" && request.method === "POST") {
+				const body = await request.json() as any;
+				const { name, name_th, description, price_1, price_2, price_3, images, stock } = body;
+				const initialStock = stock || 0;
+
+				let seqVal = 0;
+				const seqResult = await env.DB.prepare("SELECT seq FROM sqlite_sequence WHERE name = 'diy_products'").first() as any;
+				if (seqResult && seqResult.seq !== undefined && seqResult.seq !== null) {
+					seqVal = seqResult.seq;
+				}
+				const sku = generateDiySKU(seqVal);
+
+				const serializedImages = JSON.stringify(images || []);
+
+				const { meta } = await env.DB.prepare(
+					"INSERT INTO diy_products (name, name_th, description, price_1, price_2, price_3, images, stock, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+				).bind(name, name_th, description, price_1 || 0, price_2 || 0, price_3 || 0, serializedImages, initialStock, sku).run();
+
+				return corsResponse({ success: true, id: meta.last_row_id, sku });
+			}
+
+			if (url.pathname.startsWith("/diy/products/") && request.method === "PUT") {
+				const id = url.pathname.split("/diy/products/")[1];
+				const body = await request.json() as any;
+				const { name, name_th, description, price_1, price_2, price_3, images, stock } = body;
+
+				const serializedImages = JSON.stringify(images || []);
+
+				await env.DB.prepare(
+					"UPDATE diy_products SET name=?, name_th=?, description=?, price_1=?, price_2=?, price_3=?, images=?, stock=? WHERE id=?"
+				).bind(name, name_th, description, price_1 || 0, price_2 || 0, price_3 || 0, serializedImages, stock || 0, id).run();
+
+				return corsResponse({ success: true });
+			}
+
 			if (request.method === "DELETE") {
 				if (url.pathname.startsWith("/products/")) {
 					const id = url.pathname.split("/products/")[1];
 					await env.DB.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
+					return corsResponse({ success: true });
+				}
+				if (url.pathname.startsWith("/diy/products/")) {
+					const id = url.pathname.split("/diy/products/")[1];
+					await env.DB.prepare("DELETE FROM diy_products WHERE id = ?").bind(id).run();
 					return corsResponse({ success: true });
 				}
 				if (url.pathname.startsWith("/categories/")) {
@@ -545,6 +621,22 @@ export default {
 					// Respect the filename provided by the client (allows thumb/large suffixes)
 					const key = file.name;
 					await env.IMAGES.put(key, await file.arrayBuffer(), {
+						httpMetadata: { contentType: file.type }
+					});
+					results.push({ key, success: true });
+				}
+				
+				return corsResponse(results.length === 1 ? results[0] : results);
+			}
+
+			if (url.pathname === "/diy/upload" && request.method === "POST") {
+				const formData = await request.formData();
+				const files = formData.getAll("file") as File[];
+				const results = [];
+
+				for (const file of files) {
+					const key = file.name;
+					await env.KIT_IMAGE.put(key, await file.arrayBuffer(), {
 						httpMetadata: { contentType: file.type }
 					});
 					results.push({ key, success: true });

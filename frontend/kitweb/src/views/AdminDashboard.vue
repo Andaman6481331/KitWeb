@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-import { api, API_URL } from '../services/api';
+import { api, API_URL, getDiyImageUrl } from '../services/api';
 import { processProductImage } from '../services/image-processor';
 import { useI18n } from 'vue-i18n';
 
@@ -83,7 +83,7 @@ onMounted(async () => {
 });
 
 const loadAll = async () => {
-  await Promise.all([loadProducts(), loadCategories()]);
+  await Promise.all([loadProducts(), loadCategories(), loadDiyProducts()]);
 };
 
 const loadProducts = async () => {
@@ -340,6 +340,134 @@ const adjustStock = async (product, change) => {
     alert('Failed to adjust stock');
   }
 };
+
+// DIY reactive states
+const diyProducts = ref([]);
+const isDiyEditing = ref(false);
+const diyEditingId = ref(null);
+const activeAdminSection = ref('standard');
+const diyFileInput = ref(null);
+const diyImages = ref([]);
+
+const newDiyProduct = ref({
+  name: '',
+  name_th: '',
+  description: '',
+  price_1: 0,
+  price_2: 0,
+  price_3: 0,
+  stock: 0
+});
+
+const loadDiyProducts = async () => {
+  try {
+    diyProducts.value = await api.getDiyProducts();
+  } catch (error) {
+    console.error('Failed to load DIY products', error);
+  }
+};
+
+const handleDiyImageUpload = (event) => {
+  const files = Array.from(event.target.files);
+  files.forEach(file => {
+    diyImages.value.push({
+      file,
+      preview: URL.createObjectURL(file),
+      is_new: true,
+      key: ''
+    });
+  });
+  event.target.value = '';
+};
+
+const removeDiyImage = (index) => {
+  diyImages.value.splice(index, 1);
+};
+
+const resetDiyForm = () => {
+  newDiyProduct.value = { name: '', name_th: '', description: '', price_1: 0, price_2: 0, price_3: 0, stock: 0 };
+  diyImages.value = [];
+  isDiyEditing.value = false;
+  diyEditingId.value = null;
+};
+
+const handleDiySubmit = async () => {
+  try {
+    uploading.value = true;
+
+    const prepareAndUploadDiy = async (file) => {
+      const baseName = `diy-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      const processedFiles = await processProductImage(file, baseName);
+      await api.uploadDiyImage(processedFiles);
+      return baseName;
+    };
+
+    const finalImages = [];
+    for (const img of diyImages.value) {
+      if (img.is_new) {
+        const baseKey = await prepareAndUploadDiy(img.file);
+        finalImages.push(baseKey);
+      } else {
+        finalImages.push(img.key);
+      }
+    }
+
+    const payload = {
+      ...newDiyProduct.value,
+      images: finalImages
+    };
+
+    if (isDiyEditing.value) {
+      await api.updateDiyProduct(diyEditingId.value, payload);
+      alert('DIY Product updated successfully!');
+    } else {
+      await api.addDiyProduct(payload);
+      alert('DIY Product added successfully!');
+    }
+    resetDiyForm();
+    await loadDiyProducts();
+  } catch (error) {
+    console.error('Submit error:', error);
+    alert('Error: ' + error.message);
+  } finally {
+    uploading.value = false;
+  }
+};
+
+const editDiyProduct = (prod) => {
+  isDiyEditing.value = true;
+  diyEditingId.value = prod.id;
+  newDiyProduct.value = {
+    name: prod.name,
+    name_th: prod.name_th,
+    description: prod.description,
+    price_1: prod.price_1,
+    price_2: prod.price_2,
+    price_3: prod.price_3,
+    stock: prod.stock
+  };
+  if (prod.images) {
+    diyImages.value = prod.images.map(imgKey => ({
+      key: imgKey,
+      preview: getDiyImageUrl(imgKey),
+      is_new: false
+    }));
+  } else {
+    diyImages.value = [];
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+const deleteDiyProduct = async (id) => {
+  if (confirm('Are you sure you want to delete this DIY product?')) {
+    try {
+      await api.deleteDiyProduct(id);
+      await loadDiyProducts();
+    } catch (error) {
+      alert('Failed to delete DIY product: ' + error.message);
+    }
+  }
+};
 </script>
 
 <template>
@@ -366,6 +494,16 @@ const adjustStock = async (product, change) => {
           <button class="logout-btn" @click="logout">{{ $t('admin.logout') }}</button>
         </div>
       </header>
+
+      <!-- Section Sub-Tabs to toggle Standard Products vs DIY Sets -->
+      <div class="admin-sub-tabs">
+        <button type="button" :class="{ active: activeAdminSection === 'standard' }" @click="activeAdminSection = 'standard'; resetForm();">
+          <ion-icon name="grid-outline"></ion-icon> Standard Inventory
+        </button>
+        <button type="button" :class="{ active: activeAdminSection === 'diy' }" @click="activeAdminSection = 'diy'; resetDiyForm();">
+          <ion-icon name="construct-outline"></ion-icon> DIY Sets Collection
+        </button>
+      </div>
 
       <!-- Category Manager Section (Togglable) -->
       <transition name="slide-fade">
@@ -399,16 +537,17 @@ const adjustStock = async (product, change) => {
 
       <div class="dashboard-grid">
         <section class="form-section">
-          <div class="form-header">
-            <div class="header-title-group">
-              <h2 style="padding: 0; margin: 0;">{{ isEditing ? $t('admin.editProduct') : $t('admin.addProduct') }}</h2>
+          <template v-if="activeAdminSection === 'standard'">
+            <div class="form-header">
+              <div class="header-title-group">
+                <h2 style="padding: 0; margin: 0;">{{ isEditing ? $t('admin.editProduct') : $t('admin.addProduct') }}</h2>
+              </div>
+              <button v-if="isEditing" @click="resetForm" class="cancel-btn">
+                <ion-icon name="close-circle-outline"></ion-icon> {{ $t('admin.cancelEdit') }}
+              </button>
             </div>
-            <button v-if="isEditing" @click="resetForm" class="cancel-btn">
-              <ion-icon name="close-circle-outline"></ion-icon> {{ $t('admin.cancelEdit') }}
-            </button>
-          </div>
 
-          <form @submit.prevent="handleSubmit">
+            <form @submit.prevent="handleSubmit">
             <div class="product-main-row">
               <div class="form-group name-field">
                 <label>{{ $t('admin.productNameEn') }}</label>
@@ -555,6 +694,89 @@ const adjustStock = async (product, change) => {
               {{ uploading ? $t('admin.processing') : (isEditing ? $t('admin.submitUpdate') : $t('admin.submitAdd')) }}
             </button>
           </form>
+          </template>
+
+          <template v-else-if="activeAdminSection === 'diy'">
+            <div class="form-header">
+              <div class="header-title-group">
+                <h2 style="padding: 0; margin: 0;">{{ isDiyEditing ? 'Edit DIY Product' : 'Add New DIY Product' }}</h2>
+              </div>
+              <button v-if="isDiyEditing" @click="resetDiyForm" class="cancel-btn">
+                <ion-icon name="close-circle-outline"></ion-icon> Cancel Edit
+              </button>
+            </div>
+
+            <form @submit.prevent="handleDiySubmit">
+              <div class="product-main-row">
+                <div class="form-group name-field">
+                  <label>DIY Product Name (EN)</label>
+                  <input v-model="newDiyProduct.name" type="text" required placeholder="e.g. Premium Crochet Tote Bag Set" />
+                </div>
+                <div class="form-group name-field">
+                  <label>DIY Product Name (TH)</label>
+                  <input v-model="newDiyProduct.name_th" type="text" placeholder="ชื่อสินค้าภาษาไทย..." />
+                </div>
+              </div>
+
+              <div class="price-levels">
+                <div class="price-header-row">
+                  <label>Wholesale Prices (3 Levels)</label>
+                </div>
+                <div class="price-grid" style="grid-template-columns: repeat(3, 1fr);">
+                  <div class="price-input-box active">
+                    <span class="label">Level 1 (Retail/Display)</span>
+                    <input v-model="newDiyProduct.price_1" type="number" step="0.01" placeholder="0.00" required />
+                  </div>
+                  <div class="price-input-box">
+                    <span class="label">Level 2 (Medium Wholesale)</span>
+                    <input v-model="newDiyProduct.price_2" type="number" step="0.01" placeholder="0.00" required />
+                  </div>
+                  <div class="price-input-box">
+                    <span class="label">Level 3 (Bulk Wholesale)</span>
+                    <input v-model="newDiyProduct.price_3" type="number" step="0.01" placeholder="0.00" required />
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Description</label>
+                <textarea required v-model="newDiyProduct.description" rows="6" placeholder="Describe the DIY kit contents, difficulty level, or instructions..."></textarea>
+              </div>
+
+              <div class="form-group">
+                <label>Stock Count</label>
+                <input v-model.number="newDiyProduct.stock" type="number" min="0" placeholder="0" required />
+              </div>
+
+              <!-- DIY Images Gallery -->
+              <div class="gallery-section">
+                <div class="gallery-header">
+                  <label>DIY Images (First image is main display)</label>
+                  <button type="button" class="add-gallery-btn" @click="diyFileInput?.click()">
+                    <ion-icon name="add-circle-outline"></ion-icon> Add Images
+                  </button>
+                  <input type="file" ref="diyFileInput" class="hidden-input" @change="handleDiyImageUpload" accept="image/*" multiple />
+                </div>
+
+                <div class="gallery-grid" v-if="diyImages.length > 0">
+                  <div v-for="(img, index) in diyImages" :key="index" class="gallery-item">
+                    <div class="gallery-thumb">
+                      <img :src="img.preview" />
+                      <button type="button" class="remove-thumb" @click="removeDiyImage(index)">&times;</button>
+                    </div>
+                    <div class="gallery-meta" style="font-size: 11px; text-align: center; color: #636e72; padding: 5px;">
+                      {{ index === 0 ? '★ Main Image' : `Gallery Image ${index + 1}` }}
+                    </div>
+                  </div>
+                </div>
+                <p v-else class="gallery-empty">No DIY images added yet. Click Add Images above to upload.</p>
+              </div>
+
+              <button type="submit" :disabled="uploading" :class="['submit-btn', isDiyEditing ? 'update' : '']">
+                {{ uploading ? $t('admin.processing') : (isDiyEditing ? 'Update DIY Product' : 'Add DIY Product') }}
+              </button>
+            </form>
+          </template>
 
           <!-- Price Formula Modal -->
           <transition name="fade">
@@ -586,43 +808,76 @@ const adjustStock = async (product, change) => {
         </section>
 
         <section class="list-section">
-          <div class="list-header">
-            <h2>{{ $t('admin.inventory') }}</h2>
-            <!-- Filter Tabs -->
-            <div class="filter-tabs">
-              <button :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'">{{ $t('admin.all')
-                }}</button>
-              <button v-for="cat in categories" :key="cat.id" :class="{ active: activeFilter === cat.path }"
-                @click="activeFilter = cat.path">
-                {{ cat.name }}
-              </button>
-            </div>
-          </div>
-
-          <div class="inventory-scroll">
-            <div v-for="product in filteredProducts" :key="product.id" class="product-item">
-              <div class="item-img">
-                <img :src="getImageUrl(product.image_key || product.image)" :alt="product.name">
+          <template v-if="activeAdminSection === 'standard'">
+            <div class="list-header">
+              <h2>{{ $t('admin.inventory') }}</h2>
+              <!-- Filter Tabs -->
+              <div class="filter-tabs">
+                <button :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'">{{ $t('admin.all')
+                  }}</button>
+                <button v-for="cat in categories" :key="cat.id" :class="{ active: activeFilter === cat.path }"
+                  @click="activeFilter = cat.path">
+                  {{ cat.name }}
+                </button>
               </div>
-              <div class="item-info">
-                <strong>{{ product.name_th ? `${product.name} (${product.name_th})` : product.name }}</strong>
-                <span class="p-meta">{{ product.category }} | ${{ product.price_1 || product.price }}</span>
-                <div class="stock-control">
-                  <span :class="['stock-count', 
-                    product.stock === 0 ? 'low' : (product.stock > 0 && product.stock <= 5 ? 'warning' : '')
-                  ]">{{ $t('admin.inStock', {
-                    count:
-                    product.stock || 0 }) }}</span>
+            </div>
+
+            <div class="inventory-scroll">
+              <div v-for="product in filteredProducts" :key="product.id" class="product-item">
+                <div class="item-img">
+                  <img :src="getImageUrl(product.image_key || product.image)" :alt="product.name">
+                </div>
+                <div class="item-info">
+                  <strong>{{ product.name_th ? `${product.name} (${product.name_th})` : product.name }}</strong>
+                  <span class="p-meta">{{ product.category }} | ${{ product.price_1 || product.price }}</span>
+                  <div class="stock-control">
+                    <span :class="['stock-count', 
+                      product.stock === 0 ? 'low' : (product.stock > 0 && product.stock <= 5 ? 'warning' : '')
+                    ]">{{ $t('admin.inStock', {
+                      count:
+                      product.stock || 0 }) }}</span>
+                  </div>
+                </div>
+                <div class="item-actions">
+                  <button class="action-btn edit" @click="editProduct(product)"><ion-icon
+                      name="create-outline"></ion-icon></button>
+                  <button class="action-btn del" @click="deleteProduct(product.id)"><ion-icon
+                      name="trash-outline"></ion-icon></button>
                 </div>
               </div>
-              <div class="item-actions">
-                <button class="action-btn edit" @click="editProduct(product)"><ion-icon
-                    name="create-outline"></ion-icon></button>
-                <button class="action-btn del" @click="deleteProduct(product.id)"><ion-icon
-                    name="trash-outline"></ion-icon></button>
+            </div>
+          </template>
+
+          <template v-else-if="activeAdminSection === 'diy'">
+            <div class="list-header">
+              <h2>DIY Kits Collection ({{ diyProducts.length }} items)</h2>
+            </div>
+
+            <div class="inventory-scroll">
+              <div v-for="prod in diyProducts" :key="prod.id" class="product-item">
+                <div class="item-img">
+                  <img :src="getDiyImageUrl(prod.images && prod.images.length > 0 ? prod.images[0] : '')" :alt="prod.name">
+                </div>
+                <div class="item-info">
+                  <strong>{{ prod.name_th ? `${prod.name} (${prod.name_th})` : prod.name }}</strong>
+                  <span class="p-meta">SKU: {{ prod.sku }} | ฿{{ prod.price_1 }}</span>
+                  <div class="stock-control">
+                    <span :class="['stock-count', prod.stock === 0 ? 'low' : (prod.stock > 0 && prod.stock <= 5 ? 'warning' : '')]">
+                      {{ prod.stock || 0 }} in stock
+                    </span>
+                  </div>
+                </div>
+                <div class="item-actions">
+                  <button class="action-btn edit" @click="editDiyProduct(prod)">
+                    <ion-icon name="create-outline"></ion-icon>
+                  </button>
+                  <button class="action-btn del" @click="deleteDiyProduct(prod.id)">
+                    <ion-icon name="trash-outline"></ion-icon>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          </template>
         </section>
       </div>
     </div>
@@ -1490,5 +1745,42 @@ select {
   background: rgba(0, 184, 148, 0.1);
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+/* Custom styles for DIY administration sub-tabs */
+.admin-sub-tabs {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 25px;
+  background: white;
+  padding: 12px 18px;
+  border-radius: 16px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+.admin-sub-tabs button {
+  background: transparent;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  color: #636e72;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.admin-sub-tabs button.active {
+  background: #8b6f47;
+  color: white;
+  box-shadow: 0 4px 10px rgba(139, 111, 71, 0.2);
+}
+
+.admin-sub-tabs button:hover:not(.active) {
+  background: #f1f2f6;
+  color: #2d3436;
 }
 </style>

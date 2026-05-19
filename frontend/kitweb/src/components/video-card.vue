@@ -135,22 +135,18 @@ const togglePlay = () => {
   } else {
     isPlaying.value = true
 
-    const playPromise = (isExpanded.value && modalVideo) ? modalVideo.play() : (cardVideo ? cardVideo.play() : null);
-
-    if (playPromise) {
-      playPromise.catch(error => {
-        console.error("Video playback failed:", error);
-        isPlaying.value = false;
-        // Optionally show a notification to the user that the video file might be missing
-      });
-    }
-
-    if (!isExpanded.value) {
-      isExpanded.value = true
-      showControls.value = false
-      resetControlsTimeout(false)
+    if (isExpanded.value) {
+      if (modalVideo) {
+        modalVideo.play().catch(error => {
+          console.error("Modal video playback failed:", error);
+          isPlaying.value = false;
+        });
+      }
     } else {
-      resetControlsTimeout(true)
+      if (cardVideo) cardVideo.pause();
+      isExpanded.value = true;
+      showControls.value = false;
+      resetControlsTimeout(false);
     }
   }
 }

@@ -34,9 +34,9 @@ const aboutInfo = computed(() => ({
     ],
     contact: {
         address: '376 Wanich 1, Chakkrawat, Samphantawong, Bangkok 10100',
-        phone: '+66 2 222 3456',
+        phone: '+66 2 221 1414',
         line: 'https://lin.ee/8pn4sZi',
-        hours: 'Mon-Sat: 8:30 AM - 4:30 PM'
+        hours: 'Mon-Sat: 8:00 AM - 5:30 PM'
     }
 }));
 
@@ -66,12 +66,13 @@ const handleSubmit = () => {
 };
 
 // Google Maps embed URL
-const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7238744842397!2d100.50747631483044!3d13.739716990349886!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x30e299155bf89a8b%3A0x9a280a6e4e3fc7d0!2sSamphanthawong%2C%20Bangkok!5e0!3m2!1sen!2sth!4v1234567890123!5m2!1sen!2sth');
+const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22789416533988!2d100.50763814455125!3d13.739850869934429!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x30e29921c2b3b6cb%3A0xcff9eb54f2c8f3af!2sKIT%20Craft%20376%20Sampeng!5e0!3m2!1sen!2sth!4v1779215611636!5m2!1sen!2sth');
 </script>
 
 <template>
     <!-- Page Header -->
-    <img :src="getUtilsUrl('shop04-large.webp')" fetchpriority="high" aria-hidden="true" style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">
+    <img :src="getUtilsUrl('shop04-large.webp')" fetchpriority="high" aria-hidden="true"
+        style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">
     <div class="catalog-header" :style="{ backgroundImage: `url(${getUtilsUrl('shop04-large.webp')})` }">
         <div class="header-content">
             <span class="since-badge">SINCE 1984</span>
@@ -571,7 +572,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
 
 .info-card {
     background: #ffffff;
-    padding: 40px;
+    padding: 50px;
     border-radius: 20px;
     box-shadow: 0 4px 30px rgba(94, 69, 53, 0.05);
     border: 1px solid rgba(94, 69, 53, 0.1);
@@ -581,7 +582,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
     font-family: 'ZCOOL XiaoWei', serif;
     font-size: 2.2rem;
     color: #5E4535;
-    margin-bottom: 30px;
+    margin: 0 0 22px 0;
 }
 
 .hub-item {
@@ -699,7 +700,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.7
     font-family: 'ZCOOL XiaoWei', serif;
     font-size: 2.2rem;
     color: #5E4535;
-    margin-bottom: 10px;
+    margin: 0 !important;
 }
 
 .form-subtitle {

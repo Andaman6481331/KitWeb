@@ -1,7 +1,7 @@
 <template>
     <div class="partners-reach-page">
         <!-- Hero Section -->
-        <section class="hero" :style="{ backgroundImage: `url(${getUtilsUrl('shop03.png')})` }">
+        <section class="hero" :style="{ backgroundImage: `url(${getUtilsUrl('shop03-large.webp')})` }">
             <div class="hero-content">
                 <h1 v-reveal>{{ $t('partner.heroTitle') }}</h1>
                 <p class="subtitle" v-reveal delay="0.5s">{{ $t('partner.heroSubtitle') }}</p>
@@ -23,8 +23,10 @@
         <!-- Customer Image Wall -->
         <section class="image-wall-section">
             <div class="container-fluid">
-                <h2 class="section-title">{{ wallSection.title }}</h2>
-                <p class="section-subtitle">{{ wallSection.subtitle }}</p>
+                <div class="section-header">
+                    <h2 style="margin: 0;">{{ wallSection.title }}</h2>
+                    <p style="margin: 0;">{{ wallSection.subtitle }}</p>
+                </div>
                 <div class="image-wall-container">
                     <!-- Row 1: Primary Row -->
                     <div class="image-wall-row row-1">
@@ -140,20 +142,20 @@ const wallSection = ref({
 });
 
 const wallImages = [
-    getUtilsUrl('front01.jpg'),
-    getUtilsUrl('front02.jpg'),
-    getUtilsUrl('front03.jpg'),
-    getUtilsUrl('front04.jpg'),
-    getUtilsUrl('front05.jpg'),
-    getUtilsUrl('front06.jpg'),
-    getUtilsUrl('front07.jpg'),
-    getUtilsUrl('front08.jpg'),
-    getUtilsUrl('front09.jpg'),
-    getUtilsUrl('front10.jpg'),
-    getUtilsUrl('front11.jpg'),
-    getUtilsUrl('front12.jpg'),
-    getUtilsUrl('front13.jpg'),
-    getUtilsUrl('front14.jpg')
+    getUtilsUrl('front01-large.webp'),
+    getUtilsUrl('front02-large.webp'),
+    getUtilsUrl('front03-large.webp'),
+    getUtilsUrl('front04-large.webp'),
+    getUtilsUrl('front05-large.webp'),
+    getUtilsUrl('front06-large.webp'),
+    getUtilsUrl('front07-large.webp'),
+    getUtilsUrl('front08-large.webp'),
+    getUtilsUrl('front09-large.webp'),
+    getUtilsUrl('front10-large.webp'),
+    getUtilsUrl('front11-large.webp'),
+    getUtilsUrl('front12-large.webp'),
+    getUtilsUrl('front13-large.webp'),
+    getUtilsUrl('front14-large.webp')
 ];
 
 
@@ -290,6 +292,8 @@ const handleLearnMoreClick = () => {
     z-index: 1;
 }
 
+
+
 h1 {
     font-family: 'Crimson Pro', serif;
     font-size: 3.2rem;
@@ -384,6 +388,18 @@ h1 {
     padding: 5rem 0;
     background: var(--earth-pale);
     overflow: hidden;
+}
+
+.section-header {
+    text-align: center;
+}
+
+.section-header h2 {
+    font-size: 42px;
+    font-weight: 700;
+    color: var(--text-dark-color);
+    margin: 0 0 10px 0;
+    letter-spacing: -0.5px;
 }
 
 .image-wall-container {
@@ -574,7 +590,7 @@ h1 {
     color: var(--text-medium);
 }
 
-.process-section {
+/* .process-section {
     padding: 5rem 2rem;
     background: var(--earth-dark);
     color: var(--earth-cream);
@@ -586,6 +602,18 @@ h1 {
 
 .process-section .section-subtitle {
     color: var(--earth-pale);
+} */
+
+.process-section {
+    text-align: center;
+}
+
+.process-section h2 {
+    font-size: 42px;
+    font-weight: 700;
+    color: var(--text-dark-color);
+    margin: 0 0 10px 0;
+    letter-spacing: -0.5px;
 }
 
 .process-steps {

@@ -33,14 +33,24 @@
   "categories": {
     "title": "Shop by Category",
     "subtitle": "Find exactly what you need",
-    "premiumYarn": "Premium Yarn",
-    "premiumYarnDesc": "High-quality yarns in various colors",
-    "needlesTools": "Needles & Tools",
-    "needlesToolsDesc": "Professional sewing equipment",
-    "buttonsFasteners": "Buttons & Fasteners",
-    "buttonsFastenersDesc": "Decorative and functional buttons",
-    "accessories": "Accessories",
-    "accessoriesDesc": "Everything for your craft"
+    "Yarn": "Yarn",
+    "YarnDesc": "Carefully selected yarns available in a wide range of colors and textures, suitable for knitting, crocheting, weaving, and handmade craft projects. Our yarn collection focuses on reliable quality, comfortable handling, and consistent materials at reasonable prices for both beginners and experienced crafters.",
+    "Needles": "Needles",
+    "NeedlesDesc": "Durable sewing and crafting needles chosen for smooth performance and dependable everyday use. Suitable for hand sewing, embroidery, repairs, and detailed craftwork, with carefully selected materials that provide good strength, comfort, and long-lasting usability.",
+    "Threads": "Threads",
+    "ThreadsDesc": "Strong and consistent sewing threads designed for everyday sewing, repairs, embroidery, and creative projects. Our thread collection is selected for reliable stitching performance, smooth texture, and practical durability while maintaining affordable and reasonable pricing.",
+    "Tools": "Tools",
+    "ToolsDesc": "Practical sewing and crafting tools carefully selected to support everyday creative work and DIY projects. From scissors and glue guns to clips and cutting tools, each item is chosen for dependable quality, ease of use, and lasting value for regular crafting needs.",
+    "Beads": "Beads",
+    "BeadsDesc": "Colorful and decorative beads available in many styles, shapes, and materials for jewelry making and creative handmade projects. Our bead collection is carefully chosen to provide attractive designs, consistent quality, and enjoyable crafting experiences at accessible prices.",
+    "ArtificialFlowers": "Artificial Flowers",
+    "ArtificialFlowersDesc": "Beautiful artificial flowers and decorative floral supplies designed for bouquets, craft projects, displays, and event decoration. Each selection focuses on realistic appearance, good material quality, and versatile styling options suitable for everyday decorative use.",
+    "Ribbons": "Ribbons",
+    "RibbonsDesc": "Soft and decorative ribbons available in various colors, patterns, and finishes for wrapping, crafting, sewing, and floral arrangements. Carefully selected for flexibility, appearance, and dependable quality, making them suitable for both casual and professional creative projects.",
+    "Buttons": "Buttons",
+    "ButtonsDesc": "Decorative and functional buttons offered in assorted shapes, colors, and sizes for sewing, repairs, and DIY crafts. Our button collection is selected to provide practical durability, attractive designs, and reliable everyday usability for different types of garments and accessories.",
+    "Accessories": "Accessories",
+    "AccessoriesDesc": "A trusted collection of crafting and sewing accessories carefully selected to support creative projects, handmade products, and everyday crafting needs. We focus on practical quality, dependable materials, and a wide variety of useful supplies at fair and reasonable prices."
   },
   "about": {
     "eyebrow": "Our Story",
@@ -73,7 +83,7 @@
       "address": "Physical Address",
       "phone": "Phone Number",
       "email": "Email Address",
-      "emailValue": "hello{'@'}kitcharoen.com",
+      "emailValue": "kitcharoen.sampeng{'@'}gmail.com",
       "connect": "Connect With Us",
       "quote": "Honoring the thread that binds generations together."
     },
@@ -201,9 +211,14 @@
     },
     "indicatorLabel": "Go to video {index}"
   },
+  "productstocks": {
+    "tag": "Wholesale & Bulk Supplies",
+    "title": "Wholesal Product",
+    "description": "Good-quality products at wholesale prices, sourced in bulk for businesses and smart buyers."
+  },
   "diyKits": {
-    "tag": "CURATED KITS",
-    "title": "The Maker's Atelier",
+    "tag": "Do it by yourself",
+    "title": "DIY set",
     "description": "Everything you need to begin your next masterpiece, thoughtfully assembled for the modern artisan.",
     "essentialItems": "Essential Items",
     "exploreDetails": "Explore Kit Details"

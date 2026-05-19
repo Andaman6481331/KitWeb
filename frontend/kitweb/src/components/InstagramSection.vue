@@ -53,7 +53,7 @@ const handleStartCrafting = () => {
 </template>
 <style scoped>
 .kitcraft-section {
-    max-width: 1400px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 80px 40px;
     display: flex;
@@ -87,7 +87,7 @@ const handleStartCrafting = () => {
 }
 
 h2 {
-    font-size: 3rem;
+    font-size: 2.5rem;
     color: #1a1a1a;
     line-height: 1.2;
     margin-bottom: 24px;
@@ -95,10 +95,10 @@ h2 {
 }
 
 .subtitle {
-    font-size: 1.3rem;
+    font-size: 1.1rem;
     color: #666;
     line-height: 1.6;
-    margin-bottom: 32px;
+    margin-bottom: 2rem;
 }
 
 .benefits {
@@ -150,6 +150,10 @@ h2 {
 }
 
 .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
     background: linear-gradient(135deg, #e91e63, #f06292);
     color: white;
     border: none;
@@ -168,6 +172,10 @@ h2 {
 }
 
 .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
     background: transparent;
     color: #e91e63;
     border: 2px solid #e91e63;

@@ -10,7 +10,8 @@ const toggleCart = () => {
 </script>
 <template>
     <!-- Page Header -->
-    <img :src="getUtilsUrl('shop06-large.webp')" fetchpriority="high" aria-hidden="true" style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">
+    <img :src="getUtilsUrl('shop06-large.webp')" fetchpriority="high" aria-hidden="true"
+        style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">
     <div class="catalog-header" :style="{ backgroundImage: `url(${getUtilsUrl('shop06-large.webp')})` }">
         <div class="overlay"></div>
         <div class="header-content">
@@ -22,8 +23,25 @@ const toggleCart = () => {
         </div>
     </div>
 
+
+    <div class="section-header" v-reveal style="padding-top: 2rem;">
+        <span class="section-tag">{{ $t('productstocks.tag') }}</span>
+        <h2 class="section-title">{{ $t('productstocks.title') }}</h2>
+        <p class="section-description">
+            {{ $t('productstocks.description') }}
+        </p>
+    </div>
+
     <!-- Main Stock -->
     <ProductStock />
+
+    <div class="section-header" v-reveal>
+        <span class="section-tag">{{ $t('diyKits.tag') }}</span>
+        <h2 class="section-title">{{ $t('diyKits.title') }}</h2>
+        <p class="section-description">
+            {{ $t('diyKits.description') }}
+        </p>
+    </div>
 
     <!--DIY Kit -->
     <DiyProductKit />
@@ -92,6 +110,38 @@ const toggleCart = () => {
     display: block;
 }
 
+.section-header {
+    padding: 0px 0 30px 0;
+    text-align: left;
+    background-color: #FBF7F2;
+    justify-content: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.section-tag {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #8b6f47;
+    letter-spacing: 4px;
+}
+
+.section-title {
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 48px;
+    color: #2D241E;
+    margin: 0;
+}
+
+.section-description {
+    font-size: 18px;
+    color: #6B5D54;
+    line-height: 1.6;
+    margin: 0 auto;
+}
+
 @media (max-width: 768px) {
     .catalog-title {
         font-size: 2.5rem;
@@ -103,6 +153,10 @@ const toggleCart = () => {
 
     .desktop-only {
         display: none;
+    }
+
+    .section-title {
+        font-size: 36px;
     }
 }
 </style>

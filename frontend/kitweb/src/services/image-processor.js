@@ -20,6 +20,19 @@ async function fileToCanvas(file) {
   });
 }
 
+async function cropToSquareCanvas(canvas) {
+  const size = Math.min(canvas.width, canvas.height);
+  const sx = (canvas.width - size) / 2;
+  const sy = (canvas.height - size) / 2;
+
+  const squareCanvas = document.createElement('canvas');
+  squareCanvas.width = size;
+  squareCanvas.height = size;
+  const ctx = squareCanvas.getContext('2d', { alpha: true });
+  ctx.drawImage(canvas, sx, sy, size, size, 0, 0, size, size);
+  return squareCanvas;
+}
+
 async function resizeCanvas(canvas, maxWidthOrHeight) {
   const { width, height } = canvas;
   if (width <= maxWidthOrHeight && height <= maxWidthOrHeight) {
@@ -55,14 +68,15 @@ async function canvasToBlob(canvas, type = 'image/webp', quality = 0.8) {
  */
 export async function processProductImage(file, baseName) {
   const originalCanvas = await fileToCanvas(file);
+  const squareCanvas = await cropToSquareCanvas(originalCanvas);
   
   // 1. Generate Large (800px)
-  const largeCanvas = await resizeCanvas(originalCanvas, 800);
+  const largeCanvas = await resizeCanvas(squareCanvas, 800);
   const largeBlob = await canvasToBlob(largeCanvas, 'image/webp', 0.85);
   const largeFile = new File([largeBlob], `${baseName}-large.webp`, { type: 'image/webp' });
 
   // 2. Generate Thumb (250px)
-  const thumbCanvas = await resizeCanvas(originalCanvas, 250);
+  const thumbCanvas = await resizeCanvas(squareCanvas, 250);
   const thumbBlob = await canvasToBlob(thumbCanvas, 'image/webp', 0.8);
   const thumbFile = new File([thumbBlob], `${baseName}-thumb.webp`, { type: 'image/webp' });
 
