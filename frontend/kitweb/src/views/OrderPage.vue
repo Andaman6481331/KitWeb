@@ -1,12 +1,12 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { api, API_URL } from '../services/api'
+import { api, API_URL, getDiyImageUrl } from '../services/api'
 import { useProducts } from '../composables/useProducts';
 import { cartStore } from '../stores/cartStore';
 import { authStore } from '../stores/authStore';
 
-const { t, locale } = useI18n()
+const { t, te, locale } = useI18n()
 
 // Helper to translate product fields
 const tProduct = (item, field) => {
@@ -31,9 +31,10 @@ const tArray = (item, field) => {
 
 // Sample product data with size and color options
 const { products: rawProducts, isLoading, fetchProducts: revalidateProducts } = useProducts()
+const rawDiyProducts = ref([])
 
 const products = computed(() => {
-    return rawProducts.value.map(p => ({
+    const regularMapped = rawProducts.value.map(p => ({
         ...p,
         sizes: p.sizes ? (typeof p.sizes === 'string' ? p.sizes.split(',').map(s => s.trim()) : p.sizes) : ['Standard'],
         sizes_th: p.sizes_th ? (typeof p.sizes_th === 'string' ? p.sizes_th.split(',').map(s => s.trim()) : p.sizes_th) : null,
@@ -44,23 +45,46 @@ const products = computed(() => {
         inStock: p.stock !== undefined ? p.stock > 0 : true,
         image: p.image_key ? `${API_URL}/images/${p.image_key}-thumb.webp` : 'https://via.placeholder.com/100x100/F9F5F0/3D2B1F?text=Product'
     }))
+
+    const diyMapped = rawDiyProducts.value.map(p => ({
+        ...p,
+        id: `diy-${p.id}`,
+        sizes: ['Default'],
+        sizes_th: null,
+        colors: ['Default'],
+        colors_th: null,
+        varieties: null,
+        varieties_th: null,
+        inStock: p.stock !== undefined ? p.stock > 0 : true,
+        price: p.price_1 || 0,
+        category: 'DIY Kit',
+        image: getDiyImageUrl(p.images && p.images.length > 0 ? p.images[0] : '', 'thumb')
+    }))
+
+    return [...regularMapped, ...diyMapped]
 })
 
-// Initialize selections
-const initSelections = () => {
-    products.value.forEach(product => {
-        if (!productSelections.value[product.id]) {
-            productSelections.value[product.id] = {
-                size: product.sizes[0],
-                color: product.colors[0]
+// Watch products to pre-initialize selections immediately when products are available reactively
+watch(products, (newProducts) => {
+    if (newProducts && newProducts.length > 0) {
+        newProducts.forEach(product => {
+            if (product && product.id && !productSelections.value[product.id]) {
+                productSelections.value[product.id] = {
+                    size: product.sizes ? product.sizes[0] : 'Standard',
+                    color: product.colors ? product.colors[0] : 'Default'
+                }
             }
-        }
-    })
-}
+        })
+    }
+}, { immediate: true })
 
 const fetchProducts = async () => {
     await revalidateProducts()
-    initSelections()
+    try {
+        rawDiyProducts.value = await api.getDiyProducts()
+    } catch (error) {
+        console.error('Failed to fetch DIY products:', error)
+    }
 }
 
 onMounted(() => {
@@ -118,11 +142,24 @@ const getProductImage = (productId) => {
     const product = products.value.find(p => p.id === productId);
     const key = product ? (product.image_key || product.image) : null;
 
-    if (!key) return 'https://via.placeholder.com/100x100/F9F5F0/3D2B1F?text=Product';
+    if (!key) {
+        if (typeof productId === 'string' && productId.startsWith('diy-')) {
+            return 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg';
+        }
+        return 'https://via.placeholder.com/100x100/F9F5F0/3D2B1F?text=Product';
+    }
 
     const keyStr = String(key);
     if (keyStr.startsWith('http')) return keyStr;
-    if (keyStr.includes('.')) return `${API_URL}/images/${keyStr}`;
+    if (keyStr.includes('.')) {
+        if (typeof productId === 'string' && productId.startsWith('diy-')) {
+            return `${API_URL}/kit-image/${keyStr}`;
+        }
+        return `${API_URL}/images/${keyStr}`;
+    }
+    if (typeof productId === 'string' && productId.startsWith('diy-')) {
+        return `${API_URL}/kit-image/${keyStr}-thumb.webp`;
+    }
     return `${API_URL}/images/${keyStr}-thumb.webp`;
 };
 
@@ -141,8 +178,40 @@ const categories = computed(() => {
 })
 
 const tCategory = (cat) => {
+    if (!cat) return '';
     if (cat === 'All') return t('order.all');
-    return cat; // Products usually have branded categories, but could be localized if needed
+    if (cat === 'DIY Kit') return te('diyKits.title') ? t('diyKits.title') : 'DIY Kit';
+
+    const mapping = {
+        'yarn': 'Yarn',
+        'yarns': 'Yarn',
+        'needles': 'Needles',
+        'needle': 'Needles',
+        'threads': 'Threads',
+        'thread': 'Threads',
+        'tools': 'Tools',
+        'tool': 'Tools',
+        'beads': 'Beads',
+        'bead': 'Beads',
+        'ribbons': 'Ribbons',
+        'ribbon': 'Ribbons',
+        'buttons': 'Buttons',
+        'button': 'Buttons',
+        'accessories': 'Accessories',
+        'accessory': 'Accessories',
+        'artificialflowers': 'ArtificialFlowers',
+        'artificialflower': 'ArtificialFlowers',
+        'artificial flowers': 'ArtificialFlowers'
+    };
+    const lower = cat.toLowerCase().trim();
+    const key = mapping[lower];
+    if (key && te(`categories.${key}`)) {
+        return t(`categories.${key}`);
+    }
+    if (te(`categories.${cat}`)) {
+        return t(`categories.${cat}`);
+    }
+    return cat;
 };
 
 // Filtered products
@@ -458,7 +527,7 @@ const closeOrderDetails = () => {
                             <template v-else>
                                 <RecycleScroller class="scroller" :items="filteredProducts" :item-size="160"
                                     key-field="id" v-slot="{ item: product }">
-                                    <div v-memo="[product.id, product.stock, isProductInCart(product.id), locale]"
+                                    <div v-if="product"
                                         class="product-row" :class="{
                                             'out-of-stock': !product.inStock,
                                             'in-cart': isProductInCart(product.id)
@@ -476,28 +545,33 @@ const closeOrderDetails = () => {
 
                                         <!-- Product Info -->
                                         <div class="td-details">
-                                            <span class="product-tag">{{ product.category }}</span>
+                                            <span :class="['product-tag', { 'diy-tag': product.category === 'DIY Kit' }]">{{ product.category }}</span>
                                             <h3 class="product-name">{{ tProduct(product, 'name') }}</h3>
                                             <p class="product-desc">{{ tProduct(product, 'description') }}</p>
                                         </div>
 
                                         <!-- Variations -->
                                         <div class="td-variations" v-if="productSelections[product.id]">
-                                            <select v-model="productSelections[product.id].size"
-                                                @change="updateSize(product.id, $event.target.value)"
-                                                class="variation-select" :disabled="!product.inStock">
-                                                <option v-for="(size, idx) in product.sizes" :key="size" :value="size">
-                                                    {{ tArray(product, 'sizes')[idx] || size }}
-                                                </option>
-                                            </select>
-                                            <select v-model="productSelections[product.id].color"
-                                                @change="updateColor(product.id, $event.target.value)"
-                                                class="variation-select" :disabled="!product.inStock">
-                                                <option v-for="(color, idx) in product.colors" :key="color"
-                                                    :value="color">
-                                                    {{ tArray(product, 'colors')[idx] || color }}
-                                                </option>
-                                            </select>
+                                            <template v-if="product.category === 'DIY Kit'">
+                                                <span class="standard-spec-badge">{{ t('order.standard') || 'Standard' }}</span>
+                                            </template>
+                                            <template v-else>
+                                                <select v-model="productSelections[product.id].size"
+                                                    @change="updateSize(product.id, $event.target.value)"
+                                                    class="variation-select" :disabled="!product.inStock">
+                                                    <option v-for="(size, idx) in product.sizes" :key="size" :value="size">
+                                                        {{ tArray(product, 'sizes')[idx] || size }}
+                                                    </option>
+                                                </select>
+                                                <select v-model="productSelections[product.id].color"
+                                                    @change="updateColor(product.id, $event.target.value)"
+                                                    class="variation-select" :disabled="!product.inStock">
+                                                    <option v-for="(color, idx) in product.colors" :key="color"
+                                                        :value="color">
+                                                        {{ tArray(product, 'colors')[idx] || color }}
+                                                    </option>
+                                                </select>
+                                            </template>
                                         </div>
 
                                         <!-- Price -->
@@ -588,17 +662,19 @@ const closeOrderDetails = () => {
                     <!-- Cart Footer Modern -->
                     <div class="cart-footer-modern" v-if="cart.length > 0">
                         <div class="cart-summary-modern">
-                            <div class="summary-row">
-                                <span>{{ t('order.subtotal') }}</span>
-                                <span>฿{{ cartTotal }}</span>
-                            </div>
-                            <div class="summary-row">
-                                <span>{{ t('order.delivery') }}</span>
-                                <span>฿30</span>
+                            <div style="display: flex; justify-content: center; gap: 2rem;">
+                                <div class="summary-row">
+                                    <span>{{ t('order.subtotal') }}</span>
+                                    <span> ฿{{ cartTotal }}</span>
+                                </div>
+                                <div class="summary-row">
+                                    <span>{{ t('order.delivery') }}</span>
+                                    <span> ฿30</span>
+                                </div>
                             </div>
                             <div class="summary-row total">
                                 <span>{{ t('order.total') }}</span>
-                                <span>฿{{ cartTotal + 30 }}</span>
+                                <span> ฿{{ cartTotal + 30 }}</span>
                             </div>
                         </div>
 
@@ -1053,6 +1129,25 @@ const closeOrderDetails = () => {
     text-transform: uppercase;
     border-radius: 4px;
     letter-spacing: 0.05em;
+}
+
+.product-tag.diy-tag {
+    background: #F5EFEB;
+    color: #8b6f47;
+}
+
+.standard-spec-badge {
+    display: inline-block;
+    width: 140px;
+    padding: 8px 12px;
+    background: #F9F5F0;
+    color: #8C7B6E;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #E6E0D9;
+    box-sizing: border-box;
 }
 
 .product-name {

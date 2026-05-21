@@ -2,10 +2,36 @@
 import { ref } from 'vue';
 import AutoScrollEvent from '../components/auto-scroll-event.vue';
 import { getUtilsUrl } from '@/services/api';
+import comingSoonImg from '../assets/coming_soon_event.png';
+
+const scrollToContact = () => {
+    document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
+};
 
 const pastEvents = ref([
     {
         id: 1,
+        title: 'KitCraft DIY Workshop | Libi Home Cafe',
+        date: 'December 13-14, 2025',
+        image: getUtilsUrl('eventA_tn-large.webp'),
+        participants: '50+',
+        location: 'Libi home cafe, Bangkok',
+        description: 'A fun casual workshow of our DIY beads collection and handcrafted accessories.',
+        gallery: [
+            { type: 'video', src: 'eventA_0.mp4', title: 'KitCraft Weekend Vibes' },
+            { type: 'image', src: 'eventA_1-large.webp', title: '' },
+            { type: 'image', src: 'eventA_2-large.webp', title: '' },
+            { type: 'image', src: 'eventA_3-large.webp', title: '' },
+            { type: 'image', src: 'eventA_4-large.webp', title: '' },
+            { type: 'image', src: 'eventA_5-large.webp', title: '' },
+            { type: 'image', src: 'eventA_6-large.webp', title: '' },
+            { type: 'image', src: 'eventA_7-large.webp', title: '' },
+            { type: 'image', src: 'eventA_8-large.webp', title: '' },
+            { type: 'image', src: 'eventA_9-large.webp', title: '' },
+        ]
+    },
+    {
+        id: 2,
         title: 'KIN KAN CRAFTS | THE LUENRIT STREET CRAFTS',
         date: 'February 7-8, 2026',
         image: getUtilsUrl('eventB_tn-large.webp'),
@@ -18,7 +44,7 @@ const pastEvents = ref([
             { type: 'video', src: 'eventB_0.mp4', title: 'Grand Showcase Walkthrough' },
             { type: 'video', src: 'eventB_1.mp4', title: 'Craft Workshop Highlights (.mp4)' }
         ]
-    }
+    },
 ]);
 
 const selectedEvent = ref(null);
@@ -137,6 +163,35 @@ const handleContactSubmit = () => {
                                     <span class="icon">📍</span>
                                     {{ event.location }}
                                 </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Coming Soon Event Card -->
+                    <div class="event-card coming-soon-card" @click="scrollToContact" style="cursor: pointer;">
+                        <div class="event-image">
+                            <img :src="comingSoonImg" alt="Coming Soon Event" />
+                            <div class="coming-soon-overlay">
+                                <span class="coming-soon-badge">✨ Coming Soon</span>
+                            </div>
+                        </div>
+                        <div class="event-details">
+                            <div class="event-date">Stay Tuned!</div>
+                            <h3>Cozy Crochet & Vibing Workshop</h3>
+                            <p class="event-desc">We are preparing our next intimate DIY workshop! Learn advanced crochet techniques while enjoying premium teas and sweets.</p>
+                            <div class="event-meta">
+                                <span class="meta-item">
+                                    <span class="icon">👥</span>
+                                    Limited Seats
+                                </span>
+                                <span class="meta-item">
+                                    <span class="icon">📍</span>
+                                    Bangkok (Secret Location)
+                                </span>
+                            </div>
+                            <div class="rsvp-teaser">
+                                <span>Get Notified Early</span>
+                                <span class="arrow">→</span>
                             </div>
                         </div>
                     </div>
@@ -480,7 +535,7 @@ const handleContactSubmit = () => {
 
 .events-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    grid-template-columns: repeat(3, minmax(350px, 1fr));
     gap: 32px;
 }
 
@@ -499,7 +554,7 @@ const handleContactSubmit = () => {
 
 .event-image {
     position: relative;
-    height: 220px;
+    height: 400px;
     overflow: hidden;
 }
 
@@ -540,27 +595,103 @@ const handleContactSubmit = () => {
 .event-date {
     color: #ff6b6b;
     font-weight: 600;
-    font-size: 0.9rem;
-    margin-bottom: 8px;
+    font-size: 0.8rem;
 }
 
 .event-details h3 {
-    font-size: 1.4rem;
+    font-size: 1.2rem;
     color: #2d2d2d;
-    margin-bottom: 12px;
+    margin-bottom: 5px;
 }
 
 .event-desc {
-    font-size: 0.95rem;
+    font-size: 0.8rem;
     color: #666;
-    line-height: 1.6;
-    margin-bottom: 16px;
+    line-height: 1.4;
+    margin-bottom: 8px;
 }
 
 .event-meta {
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+.coming-soon-card {
+    position: relative;
+    border: 1px dashed rgba(255, 107, 107, 0.4);
+    background: linear-gradient(to bottom, #ffffff, #fffdfb);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.coming-soon-card:hover {
+    border-style: solid;
+    border-color: #ff6b6b;
+}
+
+.coming-soon-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+    transition: all 0.3s ease;
+}
+
+.coming-soon-card:hover .coming-soon-overlay {
+    background: rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(0px);
+}
+
+.coming-soon-badge {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a6f);
+    color: white;
+    font-weight: 700;
+    padding: 10px 20px;
+    border-radius: 30px;
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+    font-size: 0.95rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    transform: scale(1);
+    transition: transform 0.3s ease;
+}
+
+.coming-soon-card:hover .coming-soon-badge {
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+}
+
+.rsvp-teaser {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid #f3ebd8;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #ff6b6b;
+    transition: color 0.3s ease;
+}
+
+.rsvp-teaser .arrow {
+    transition: transform 0.3s ease;
+}
+
+.coming-soon-card:hover .rsvp-teaser {
+    color: #ee5a6f;
+}
+
+.coming-soon-card:hover .rsvp-teaser .arrow {
+    transform: translateX(6px);
 }
 
 /* Contact Section */
@@ -924,7 +1055,7 @@ const handleContactSubmit = () => {
 }
 
 .event-modal-meta .meta-item {
-    font-size: 14px;
+    font-size: 0.4rem;
     color: #8b6f47;
     font-weight: 600;
     background: rgba(139, 111, 71, 0.08);

@@ -51,8 +51,11 @@ const cancelLogout = () => {
 watch(currentLanguage, (newLang) => {
   if (newLang === 'TH') {
     document.body.classList.add('thai-font')
+  }else if(newLang === 'CN'){
+    document.body.classList.add('chinese-font')
   } else {
     document.body.classList.remove('thai-font')
+    document.body.classList.remove('chinese-font')
   }
 }, { immediate: true })
 </script>
@@ -196,6 +199,10 @@ watch(currentLanguage, (newLang) => {
 body.thai-font * {
   font-family: 'Kanit', sans-serif !important;
   /* font-family: 'Prompt', sans-serif !important; */
+}
+
+body.chinese-font * {
+  font-family: 'Noto Sans SC', sans-serif !important;
 }
 
 body {
