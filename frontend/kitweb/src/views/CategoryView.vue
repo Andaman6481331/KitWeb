@@ -6,10 +6,12 @@ import { categoryHeroImages } from '../services/categoryImages';
 import { useI18n } from 'vue-i18n';
 import translationStore from '../stores/translationStore';
 import { cartStore } from '../stores/cartStore';
+import { codeToPath, defaultLang } from '@/utils/localeRoutes';
 
 const { t, locale } = useI18n();
 const route = useRoute();
 const router = useRouter();
+const currentLang = computed(() => route.params.lang || defaultLang);
 
 // Helper to translate product fields
 const tProduct = (item, field) => {
@@ -223,7 +225,7 @@ const getImageUrl = (key, variant = 'thumb') => {
 };
 
 const backToCatalog = () => {
-    router.push('/catalog');
+    router.push({ name: 'catalog', params: { lang: currentLang } });
 };
 
 const sortedProducts = computed(() => {
@@ -335,7 +337,7 @@ const sortedProducts = computed(() => {
                             <span class="popup-category">{{ tCategory(selectedProduct.category) }}</span>
                             <h2 class="popup-title">{{ tProduct(selectedProduct, 'name') }}</h2>
                         </div>
-                        <p class="popup-description">{{ tProduct(selectedProduct, 'description') }}</p>
+                        <p class="popup-description" v-if="tProduct(selectedProduct, 'description')">{{ tProduct(selectedProduct, 'description') }}</p>
 
                         <div class="detail-section" v-if="tProduct(selectedProduct, 'usage')">
                             <h3 class="detail-heading">
@@ -390,6 +392,9 @@ const sortedProducts = computed(() => {
                                     {{ color.trim() }}
                                 </span>
                             </div>
+                        </div>
+                        <div v-if="!tProduct(selectedProduct, 'description') && !tProduct(selectedProduct, 'usage') && !tProduct(selectedProduct, 'use_for') && !tProduct(selectedProduct, 'varieties') && !tProduct(selectedProduct, 'sizes') && !tProduct(selectedProduct, 'colors')" class="no-details-message">
+                            <p>{{ $t('catalog.noAdditionalDetails') || 'No additional details available for this product.' }}</p>
                         </div>
                     </div>
                 </div>
@@ -654,6 +659,19 @@ const sortedProducts = computed(() => {
     z-index: 2;
 }
 
+.no-details-message {
+    padding: 30px 0;
+    text-align: center;
+    color: #999;
+    font-style: italic;
+}
+
+.no-details-message p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
 .card-content {
     padding: 24px;
     flex: 1;
@@ -821,11 +839,8 @@ const sortedProducts = computed(() => {
 }
 
 .gallery-thumbnails {
-    display: flex;
-    gap: 12px;
-    overflow-x: auto;
-    padding: 5px 2px 15px 2px;
-    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
 }
 
 .thumb {

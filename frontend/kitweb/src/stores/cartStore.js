@@ -2,11 +2,14 @@ import { reactive, watch } from 'vue';
 
 const CART_STORAGE_KEY = 'kitweb_cart';
 
+const isBrowser = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+
 const state = reactive({
-    cart: JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]')
+    cart: isBrowser ? JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]') : []
 });
 
 watch(() => state.cart, (newCart) => {
+    if (!isBrowser) return;
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(newCart));
 }, { deep: true });
 

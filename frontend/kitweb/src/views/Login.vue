@@ -1,16 +1,19 @@
 <script setup>
-import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, onMounted, computed } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { api } from '../services/api';
 import { authStore } from '../stores/authStore';
+import { codeToPath, defaultLang } from '@/utils/localeRoutes';
 
 const router = useRouter();
+const route = useRoute();
+const currentLang = computed(() => route.params.lang || defaultLang);
 const { t } = useI18n();
 
 onMounted(() => {
     if (authStore.isAuthenticated) {
-        router.push('/orderpage');
+        router.push({ name: 'orderpage', params: { lang: currentLang } });
     }
 });
 const isLogin = ref(true);
@@ -54,7 +57,7 @@ const handleLogin = async () => {
 
         if (response.success) {
             authStore.login(response.user, response.token);
-            router.push('/orderpage');
+            router.push({ name: 'orderpage', params: { lang: currentLang } });
         }
     } catch (error) {
         alert(error.message || t('auth.loginFailed'));

@@ -1,11 +1,15 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { api, API_URL, getDiyImageUrl } from '../services/api'
 import { useProducts } from '../composables/useProducts';
 import { cartStore } from '../stores/cartStore';
 import { authStore } from '../stores/authStore';
+import { codeToPath, defaultLang } from '@/utils/localeRoutes';
 
+const route = useRoute();
+const currentLang = computed(() => route.params.lang || defaultLang);
 const { t, te, locale } = useI18n()
 
 // Helper to translate product fields
@@ -654,7 +658,7 @@ const closeOrderDetails = () => {
                         </div>
                         <h3>{{ t('order.cartEmpty') }}</h3>
                         <p>{{ t('order.cartEmptySubtitle') }}</p>
-                        <router-link :to="'/catalog'" class="no-style">
+                        <router-link :to="{ name: 'catalog', params: { lang: route.params.lang || currentLang } }" class="no-style">
                             <button class="browse-collections-btn">{{ t('order.browseCollections') }}</button>
                         </router-link>
                     </div>

@@ -1,12 +1,15 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { api, API_URL } from '../services/api';
 import { categoryHeroImages } from '../services/categoryImages';
 import { useI18n } from 'vue-i18n';
+import { codeToPath, defaultLang } from '@/utils/localeRoutes';
 
 const { t } = useI18n();
 const router = useRouter();
+const route = useRoute();
+const currentLang = computed(() => route.params.lang || defaultLang);
 
 const tCategory = (catName) => {
     if (!catName) return '';
@@ -111,7 +114,7 @@ const categories = computed(() => {
 });
 
 const selectCategory = (categoryName) => {
-    router.push(`/catalog/${categoryName}`);
+    router.push({ name: 'category-products', params: { lang: currentLang, category: categoryName } });
 };
 
 </script>

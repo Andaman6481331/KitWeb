@@ -1,19 +1,116 @@
 <script setup>
-import { RouterLink, RouterView, useRouter } from 'vue-router'
-import { ref, onMounted, watch } from 'vue'
+import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale } from './i18n'
 import { authStore } from './stores/authStore'
+import { api, getUtilsUrl } from './services/api';
+import { localizedRoute, codeToPath, pathToCode } from './utils/localeRoutes'
 
 const isDev = import.meta.env.DEV
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
+const route = useRoute()
+
+const pageTitleMap = {
+  home: 'home.heroTitle',
+  catalog: 'categories.title',
+  'category-products': 'categories.title',
+  contactus: 'contact.title',
+  login: 'admin.loginTitle',
+  event: 'events.heroTagline',
+  partners: 'partner.heroTitle',
+  orderpage: 'order.title',
+  admin: 'admin.loginTitle'
+}
+
+const pageDescriptionMap = {
+  home: 'home.heroSubtitle',
+  catalog: 'home.heroSubtitle',
+  'category-products': 'home.heroSubtitle',
+  contactus: 'contact.subtitle',
+  login: 'auth.signInSubtitle',
+  event: 'events.heroTagline',
+  partners: 'partner.heroSubtitle',
+  orderpage: 'order.heroSubtitle',
+  admin: 'auth.signInSubtitle'
+}
+
+const updateDocumentTitle = () => {
+  if (typeof document === 'undefined') return;
+
+  const routeName = router.currentRoute.value.name || 'home'
+  // Use a fixed site title per locale: Thai shows Thai name, others show English
+  const siteTitle = locale.value === 'th' ? 'กิจเจริญ' : 'Kitcharoen'
+  document.title = siteTitle
+
+  const descriptionKey = pageDescriptionMap[routeName] || 'home.heroSubtitle'
+  const descriptionText = t(descriptionKey) || t('home.heroSubtitle')
+  const existingMeta = document.querySelector('meta[name="description"]')
+  if (existingMeta) {
+    existingMeta.setAttribute('content', descriptionText)
+  } else {
+    const meta = document.createElement('meta')
+    meta.name = 'description'
+    meta.content = descriptionText
+    document.head.appendChild(meta)
+  }
+
+  document.documentElement.lang = locale.value || 'en'
+}
+
+watch([locale, () => router.currentRoute.value.name], updateDocumentTitle, { immediate: true })
+
+const supportedLangs = ['en','th','zh','ja'];
+
+const updateHreflangLinks = () => {
+  if (typeof document === 'undefined' || typeof location === 'undefined') return;
+
+  // remove previously generated hreflang and canonical links
+  document.querySelectorAll('link[data-generated="hreflang"]').forEach(n => n.remove());
+  document.querySelectorAll('link[data-generated="canonical"]').forEach(n => n.remove());
+  const full = router.currentRoute.value.fullPath || '/';
+  const pathWithoutLang = full.replace(/^\/(en|th|zh|ja)/, '') || '/';
+
+  supportedLangs.forEach(l => {
+    const link = document.createElement('link');
+    link.rel = 'alternate';
+    link.hreflang = l;
+    const href = `${location.origin}/${l}${pathWithoutLang}`;
+    link.href = href;
+    link.setAttribute('data-generated', 'hreflang');
+    document.head.appendChild(link);
+  });
+
+  const x = document.createElement('link');
+  x.rel = 'alternate';
+  x.hreflang = 'x-default';
+  x.href = `${location.origin}/en${pathWithoutLang}`;
+  x.setAttribute('data-generated', 'hreflang');
+  document.head.appendChild(x);
+
+  const canonical = document.createElement('link');
+  canonical.rel = 'canonical';
+  canonical.href = `${location.origin}${full}`;
+  canonical.setAttribute('data-generated', 'canonical');
+  document.head.appendChild(canonical);
+}
+
+watch(() => router.currentRoute.value.fullPath, updateHreflangLinks, { immediate: true });
+watch(locale, updateHreflangLinks);
 
 // Get saved language from localStorage or default to 'EN'
-const savedLang = localStorage.getItem('locale') || 'EN'
+const savedLang = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem('locale') || 'EN' : 'EN'
 const currentLanguage = ref(savedLang)
+const currentLang = computed(() => route.params.lang || codeToPath[currentLanguage.value] || 'en')
 const showLanguageMenu = ref(false)
+
+watch(() => route.params.lang, (newLang) => {
+  if (newLang && pathToCode[newLang]) {
+    currentLanguage.value = pathToCode[newLang]
+  }
+})
 const showLogoutConfirm = ref(false)
 
 const languages = [
@@ -25,8 +122,16 @@ const languages = [
 
 const changeLanguage = (langCode) => {
   currentLanguage.value = langCode
+  const targetLang = codeToPath[langCode] || 'en'
   setLocale(langCode)
   showLanguageMenu.value = false
+  router.push({
+    name: route.name || 'home',
+    params: {
+      ...route.params,
+      lang: targetLang
+    }
+  }).catch(() => {})
 }
 
 const toggleLanguageMenu = () => {
@@ -40,7 +145,7 @@ const handleLogout = () => {
 const confirmLogout = () => {
   showLogoutConfirm.value = false
   authStore.logout()
-  router.push('/')
+  router.push({ name: 'home', params: { lang: currentLang.value } }).catch(() => {})
 }
 
 const cancelLogout = () => {
@@ -49,9 +154,25 @@ const cancelLogout = () => {
 
 // Watch for language changes to apply specific fonts
 watch(currentLanguage, (newLang) => {
+  if (typeof document === 'undefined') return;
+
   if (newLang === 'TH') {
     document.body.classList.add('thai-font')
-  }else if(newLang === 'CN'){
+  } else if (newLang === 'CN') {
+    document.body.classList.add('chinese-font')
+  } else {
+    document.body.classList.remove('thai-font')
+    document.body.classList.remove('chinese-font')
+  }
+}, { immediate: true })
+
+// Also watch the i18n locale (e.g. 'th', 'en') to ensure fonts apply
+watch(locale, (newLocale) => {
+  if (typeof document === 'undefined') return;
+
+  if (newLocale === 'th') {
+    document.body.classList.add('thai-font')
+  } else if (newLocale === 'zh') {
     document.body.classList.add('chinese-font')
   } else {
     document.body.classList.remove('thai-font')
@@ -65,20 +186,20 @@ watch(currentLanguage, (newLang) => {
     <div class="NavBar">
       <!-- Left: Logo -->
       <div class="nav-left">
-        <router-link to="/">
-          <img src="./assets/kitWeb_logo.png" alt="KitWeb Logo" class="main-logo">
+        <router-link :to="{ name: 'home', params: { lang: currentLang } }">
+          <img :src="getUtilsUrl('kitWeb_logo1-large.webp')" fetchpriority="high" alt="KitWeb Logo" class="main-logo">
         </router-link>
       </div>
 
       <!-- Center: Links -->
       <div class="nav-center" style="justify-content: center; align-items: center; text-align: center;">
-        <router-link to="/" class="nav-link" active-class="active">{{ $t('nav.home') }}</router-link>
+        <router-link :to="{ name: 'home', params: { lang: currentLang } }" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.home') }}</router-link>
         <template v-if="isDev">
-          <router-link to="/catalog" class="nav-link" active-class="active">{{ $t('nav.products') }}</router-link>
+          <router-link :to="{ name: 'catalog', params: { lang: currentLang } }" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.products') }}</router-link>
         </template>
-        <router-link to="/event" class="nav-link" active-class="active">{{ $t('nav.events') }}</router-link>
-        <router-link to="/partners" class="nav-link" active-class="active">{{ $t('nav.partners') }}</router-link>
-        <router-link to="/contactus" class="nav-link" active-class="active">{{ $t('nav.contactUs') }}</router-link>
+        <router-link :to="{ name: 'event', params: { lang: currentLang } }" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.events') }}</router-link>
+        <router-link :to="{ name: 'partners', params: { lang: currentLang } }" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.partners') }}</router-link>
+        <router-link :to="{ name: 'contactus', params: { lang: currentLang } }" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.contactUs') }}</router-link>
       </div>
 
       <!-- Right: Search & Actions -->
@@ -105,15 +226,15 @@ watch(currentLanguage, (newLang) => {
             </transition>
           </div>
           <template v-if="isDev">
-            <router-link v-if="authStore.isAuthenticated" to="/orderpage" class="order-capsule">
+            <router-link v-if="authStore.isAuthenticated" :to="{ name: 'orderpage', params: { lang: currentLang } }" class="order-capsule">
               {{ $t('nav.startOrder') }}
             </router-link>
 
-            <router-link v-if="!authStore.isAuthenticated" to="/login" class="login-capsule">
+            <router-link v-if="!authStore.isAuthenticated" :to="{ name: 'login', params: { lang: currentLang } }" class="login-capsule">
               {{ $t('nav.login') }}
             </router-link>
             <div v-else class="logged-in-actions">
-              <router-link to="/orderpage" class="login-capsule account-link">
+              <router-link :to="{ name: 'orderpage', params: { lang: currentLang } }" class="login-capsule account-link">
                 <ion-icon name="person-circle-outline"></ion-icon>
                 <span>{{ authStore.user?.businessName || authStore.user?.ownerName || $t('nav.account') }}</span>
               </router-link>
@@ -149,7 +270,7 @@ watch(currentLanguage, (newLang) => {
           <ul>
             <li>📍 376 Wanich 1 Chakkrawat</li>
             <li>📍 Samphantawong Bangkok</li>
-            <li>📞 +66 (0)2-221-1414</li>
+            <li>📞 +66 (0)2-221-1414, (0)2-622-6573</li>
             <li>✉️ kitcharoen.sampeng@gmail.com</li>
           </ul>
         </div>
@@ -237,7 +358,7 @@ body {
 }
 
 .main-logo {
-  height: 45px;
+  height: 75px;
   cursor: pointer;
 }
 

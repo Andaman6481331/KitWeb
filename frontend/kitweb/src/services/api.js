@@ -11,8 +11,11 @@ export const getDiyImageUrl = (filename, variant = 'thumb') => {
   return `${API_URL}/kit-image/${keyStr}-${variant}.webp`;
 };
 
+const isBrowser = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+
 export const api = {
   getToken() {
+    if (!isBrowser) return null;
     return localStorage.getItem('admin_token') || localStorage.getItem('kitweb_auth_token');
   },
 

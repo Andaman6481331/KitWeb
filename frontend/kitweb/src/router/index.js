@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter as createVueRouter, createWebHistory, createMemoryHistory, RouterView } from 'vue-router';
 import Home from '../views/HomeView.vue';
 import Catalog from '../views/CatalogPage.vue';
 import CategoryView from '../views/CategoryView.vue';
@@ -10,84 +10,85 @@ import PartnerPage from '../views/PartnerPage.vue';
 import AdminDashboard from '../views/AdminDashboard.vue';
 
 import { authStore } from '../stores/authStore';
+import { setLocale } from '../i18n';
 
-// Define routes
-const routes = [
-    {
-        path: '/admin',
-        name: 'admin',
-        component: AdminDashboard,
-        meta: { requiresAuth: true }
-    },
-    {
-        path: '/',
-        name: 'home',
-        component: Home
-    },
-    {
-        path: '/catalog',
-        name: 'catalog',
-        component: Catalog
-    },
-    {
-        path: '/catalog/:category',
-        name: 'category-products',
-        component: CategoryView
-    },
-    {
-        path: '/orderpage',
-        name: 'orderpage',
-        component: OrderPage,
-        meta: { requiresAuth: true }
-    },
-    {
-        path: '/contactus',
-        name: 'contactus',
-        component: ContactUsPage
-    },
-    {
-        path: '/login',
-        name: 'login',
-        component: Login
-    },
-    {
-        path: '/event',
-        name: 'event',
-        component: EventPage
-    },
-
-    {
-        path: '/partners',
-        name: 'partners',
-        component: PartnerPage
+const savedMap = { EN: 'en', TH: 'th', CN: 'zh', JP: 'ja' };
+function getSavedLocale() {
+    if (typeof window === 'undefined' || !window.localStorage) {
+        return 'EN';
     }
+    return localStorage.getItem('locale') || 'EN';
+}
+const defaultLang = savedMap[getSavedLocale()] || 'en';
 
+export const routes = [
+    { path: '/', redirect: `/${defaultLang}` },
+    {
+        path: '/:lang',
+        component: RouterView,
+        children: [
+            { path: '', name: 'home', component: Home },
+            { path: 'catalog', name: 'catalog', component: Catalog },
+            { path: 'catalog/:category', name: 'category-products', component: CategoryView },
+            { path: 'orderpage', name: 'orderpage', component: OrderPage, meta: { requiresAuth: true } },
+            { path: 'contactus', name: 'contactus', component: ContactUsPage },
+            { path: 'login', name: 'login', component: Login },
+            { path: 'event', name: 'event', component: EventPage },
+            { path: 'partners', name: 'partners', component: PartnerPage },
+            { path: 'admin', name: 'admin', component: AdminDashboard, meta: { requiresAuth: true } },
+            { path: ':pathMatch(.*)*', redirect: to => `/${to.params.lang}` }
+        ]
+    },
+    // Fallback for paths without locale prefix
+    { path: '/:pathMatch(.*)*', redirect: to => `/${defaultLang}${to.fullPath}` }
 ];
 
-// Create router instance
-const router = createRouter({
-    history: createWebHistory(), // or createWebHistory(process.env.BASE_URL) if needed
-    routes,
-    scrollBehavior(to, from, savedPosition) {
-        if (savedPosition) {
-            return savedPosition;
-        } else {
-            return { top: 0 };
+export function createRouter() {
+    const history = import.meta.env.SSR ? createMemoryHistory() : createWebHistory();
+    return createVueRouter({
+        history,
+        routes,
+        scrollBehavior(to, from, savedPosition) {
+            if (savedPosition) {
+                return savedPosition;
+            } else {
+                return { top: 0 };
+            }
         }
-    }
-});
+    });
+}
 
-// Navigation Guard
+const router = createRouter();
+
+// Navigation Guard - handle locale from path and auth
 router.beforeEach((to, from, next) => {
+    const lang = to.params.lang;
+    const pathToCode = { en: 'EN', th: 'TH', zh: 'CN', ja: 'JP' };
+
+    if (!lang) {
+        // no lang param - allow redirects to apply
+        next();
+        return;
+    }
+
+    if (!pathToCode[lang]) {
+        // invalid lang -> redirect to default
+        next({ path: `/${defaultLang}` });
+        return;
+    }
+
+    // Set i18n locale based on path
+    setLocale(pathToCode[lang]);
+
     const isAuthenticated = authStore.isAuthenticated;
-    const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
+    const requiresAuth = to.matched.some(record => record.meta && record.meta.requiresAuth);
 
     if (requiresAuth && !isAuthenticated) {
-        // Redirect to login if trying to access a protected route without being logged in
-        next({ name: 'login' });
+        // Redirect to localized login
+        next({ path: `/${lang}/login` });
     } else if (to.name === 'login' && isAuthenticated) {
-        // Redirect to orderpage if already logged in and trying to access login page
-        next({ name: 'orderpage' });
+        // Redirect to localized orderpage if already logged in
+        next({ path: `/${lang}/orderpage` });
     } else {
         next();
     }

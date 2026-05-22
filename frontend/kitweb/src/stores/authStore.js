@@ -2,12 +2,15 @@ import { reactive, watch } from 'vue';
 
 const AUTH_STORAGE_KEY = 'kitweb_auth';
 
+const isBrowser = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+
 const state = reactive({
-    token: localStorage.getItem(`${AUTH_STORAGE_KEY}_token`) || null,
-    user: JSON.parse(localStorage.getItem(`${AUTH_STORAGE_KEY}_user`) || 'null')
+    token: isBrowser ? localStorage.getItem(`${AUTH_STORAGE_KEY}_token`) || null : null,
+    user: isBrowser ? JSON.parse(localStorage.getItem(`${AUTH_STORAGE_KEY}_user`) || 'null') : null
 });
 
 watch(() => state.token, (newToken) => {
+    if (!isBrowser) return;
     if (newToken) {
         localStorage.setItem(`${AUTH_STORAGE_KEY}_token`, newToken);
     } else {
@@ -16,6 +19,7 @@ watch(() => state.token, (newToken) => {
 });
 
 watch(() => state.user, (newUser) => {
+    if (!isBrowser) return;
     if (newUser) {
         localStorage.setItem(`${AUTH_STORAGE_KEY}_user`, JSON.stringify(newUser));
     } else {

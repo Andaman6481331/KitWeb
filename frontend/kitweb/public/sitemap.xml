@@ -1,24 +1,89 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <!-- The Main Entry Point -->
+  <!-- Localized home pages -->
   <url>
-    <loc>https://kitcharoensampeng.com/</loc>
+    <loc>https://kitcharoensampeng.com/en/</loc>
     <priority>1.0</priority>
   </url>
-  
-  <!-- Trust & Reliability Pages -->
   <url>
-    <loc>https://kitcharoensampeng.com/event</loc>
+    <loc>https://kitcharoensampeng.com/th/</loc>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://kitcharoensampeng.com/zh/</loc>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://kitcharoensampeng.com/ja/</loc>
+    <priority>1.0</priority>
+  </url>
+
+  <!-- Main language-aware pages -->
+  <url>
+    <loc>https://kitcharoensampeng.com/en/catalog</loc>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://kitcharoensampeng.com/th/catalog</loc>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://kitcharoensampeng.com/zh/catalog</loc>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://kitcharoensampeng.com/ja/catalog</loc>
+    <priority>0.9</priority>
+  </url>
+
+  <url>
+    <loc>https://kitcharoensampeng.com/en/event</loc>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kitcharoensampeng.com/partners</loc>
+    <loc>https://kitcharoensampeng.com/th/event</loc>
     <priority>0.8</priority>
   </url>
-  
-  <!-- Communication Page -->
   <url>
-    <loc>https://kitcharoensampeng.com/contactus</loc>
+    <loc>https://kitcharoensampeng.com/zh/event</loc>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://kitcharoensampeng.com/ja/event</loc>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://kitcharoensampeng.com/en/partners</loc>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://kitcharoensampeng.com/th/partners</loc>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://kitcharoensampeng.com/zh/partners</loc>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://kitcharoensampeng.com/ja/partners</loc>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://kitcharoensampeng.com/en/contactus</loc>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://kitcharoensampeng.com/th/contactus</loc>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://kitcharoensampeng.com/zh/contactus</loc>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://kitcharoensampeng.com/ja/contactus</loc>
     <priority>0.7</priority>
   </url>
 </urlset>

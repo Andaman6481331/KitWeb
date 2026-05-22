@@ -12,12 +12,14 @@ export function useProducts() {
     isLoading.value = true;
     
     // 1. STALE: Load from localStorage immediately
-    const cached = localStorage.getItem(CACHE_KEY);
-    if (cached) {
-      try {
-        products.value = JSON.parse(cached);
-      } catch (e) {
-        console.warn('Cache corrupted, ignoring.');
+    if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        try {
+          products.value = JSON.parse(cached);
+        } catch (e) {
+          console.warn('Cache corrupted, ignoring.');
+        }
       }
     }
 

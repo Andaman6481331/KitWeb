@@ -6,7 +6,7 @@ import zh from './locales/zh.json'
 import ja from './locales/ja.json'
 
 // Get saved language from localStorage or default to 'EN'
-const savedLocale = localStorage.getItem('locale') || 'EN'
+const savedLocale = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem('locale') || 'EN' : 'EN'
 
 // Map language codes to locale files
 const localeMap = {
@@ -32,7 +32,9 @@ const i18n = createI18n({
 export function setLocale(langCode) {
   const locale = localeMap[langCode] || 'en'
   i18n.global.locale.value = locale
-  localStorage.setItem('locale', langCode)
+  if (typeof window !== 'undefined' && window.localStorage) {
+    localStorage.setItem('locale', langCode)
+  }
 }
 
 export default i18n

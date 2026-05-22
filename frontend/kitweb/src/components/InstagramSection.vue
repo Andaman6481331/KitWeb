@@ -1,9 +1,14 @@
 <script setup>
+import { useRoute } from 'vue-router';
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 // Instagram embedding is handled in the instagram-card child component
 import instagramCard from './instragram-card.vue';
+import { codeToPath, defaultLang } from '@/utils/localeRoutes';
 
 const { t } = useI18n();
+const route = useRoute();
+const currentLang = computed(() => route.params.lang || defaultLang);
 
 const handleStartCrafting = () => {
     // Basic logic for the button if needed, otherwise just keeps the @click reference
@@ -43,8 +48,8 @@ const handleStartCrafting = () => {
             </div>
 
             <div class="cta-group">
-                <router-link to="/contactus" class="btn-primary">{{ $t('kitcraft.startCrafting') }}</router-link>
-                <router-link to="/event" class="btn-secondary">{{ $t('kitcraft.learnMore') }}</router-link>
+                <router-link :to="{ name: 'contactus', params: { lang: currentLang } }" class="btn-primary">{{ $t('kitcraft.startCrafting') }}</router-link>
+                <router-link :to="{ name: 'event', params: { lang: currentLang } }" class="btn-secondary">{{ $t('kitcraft.learnMore') }}</router-link>
             </div>
         </div>
 

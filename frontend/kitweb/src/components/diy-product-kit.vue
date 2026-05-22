@@ -1,13 +1,16 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { api, getDiyImageUrl } from '../services/api';
 import { cartStore } from '../stores/cartStore';
 import { useI18n } from 'vue-i18n';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import translationStore from '../stores/translationStore';
+import { codeToPath, defaultLang } from '@/utils/localeRoutes';
 
 const { locale, t } = useI18n();
 const router = useRouter();
+const route = useRoute();
+const currentLang = computed(() => route.params.lang || defaultLang);
 
 const diyProducts = ref([]);
 const isLoading = ref(true);
@@ -85,7 +88,7 @@ const handleAddToCart = (product) => {
 
     cartStore.addToCart(cartProduct, { size: 'Default', color: 'Default' });
     alert(`${tProduct(product, 'name')} added to cart!`);
-    router.push('/orderpage');
+    router.push({ name: 'orderpage', params: { lang: currentLang } });
 };
 </script>
 

@@ -164,30 +164,36 @@ import { getUtilsUrl } from '@/services/api';
 
 /* Responsive */
 @media (max-width: 768px) {
-    .banner-header {
-        flex-direction: column;
-        gap: 16px;
-        text-align: center;
-    }
-
-    .banner-header h3 {
-        font-size: 1.5rem;
+    .banner-section {
+        padding: 1.5rem 0;
     }
 
     .banner-item {
-        width: 200px;
-        height: 120px;
+        width: 190px;
+        height: 110px;
     }
 
     .scroll-track {
-        gap: 12px;
+        gap: 14px;
+    }
+}
+
+@media (max-width: 576px) {
+    .banner-item {
+        width: 160px;
+        height: 95px;
+    }
+
+    .scroll-banner::before,
+    .scroll-banner::after {
+        width: 60px;
     }
 }
 
 @media (max-width: 480px) {
     .banner-item {
-        width: 160px;
-        height: 100px;
+        width: 140px;
+        height: 85px;
     }
 
     .scroll-banner::before,

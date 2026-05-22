@@ -1,5 +1,6 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
+import { useRoute } from 'vue-router';
 import VideoCard from '../components/video-card.vue';
 import InstagramSection from '../components/InstagramSection.vue';
 // import RecommendedItemSlider from '../components/recommended-item-slider.vue';
@@ -9,8 +10,11 @@ import AutoScrollBanner from '../components/auto-scroll-banner.vue';
 import FeaturedCategories from '../components/featured-categories.vue';
 import customerReview from '../components/customer-review.vue';
 import { api, getUtilsUrl } from '../services/api';
+import { codeToPath, defaultLang } from '../utils/localeRoutes';
 
 const products = ref([]);
+const route = useRoute();
+const currentLang = computed(() => route.params.lang || defaultLang);
 const loading = ref(true);
 
 onMounted(async () => {
@@ -31,14 +35,15 @@ onMounted(async () => {
     <section class="hero-section" :style="{ backgroundImage: `url(${getUtilsUrl('shop02-large.webp')})` }">
       <div class="hero-content">
         <div class="hero-text">
+          <div class="hero-eyebrow">{{ $t('home.eyebrow') }}</div>
           <h1 class="hero-title">{{ $t('home.heroTitle') }}</h1>
           <p class="hero-subtitle">{{ $t('home.heroSubtitle') }}
           </p>
           <div class="hero-buttons">
-            <router-link :to="'/orderpage'" class="no-style">
+            <router-link :to="{ name: 'orderpage', params: { lang: currentLang } }" class="no-style">
               <button class="cta-primary">{{ $t('home.shopNow') }}</button>
             </router-link>
-            <router-link :to="'/catalog'" class="no-style">
+            <router-link :to="{ name: 'catalog', params: { lang: currentLang } }" class="no-style">
               <button class="cta-secondary">{{ $t('home.viewCatalog') }}</button>
             </router-link>
           </div>
@@ -130,14 +135,17 @@ onMounted(async () => {
 /* ===== HERO SECTION ===== */
 .hero-section {
     /* background: url('../assets/shop02.jpg'); */
-    background-size: contain;
-    background-repeat: repeat;
-    background-position: center;
-  height: 600px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center center;
+    min-height: 600px;
+    height: auto;
+    padding: 60px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
 }
 
 .hero-section::before {
@@ -147,46 +155,60 @@ onMounted(async () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(to right, rgba(53, 35, 29, 0.703) 0%, rgba(53, 35, 29, 0.5) 40%, transparent 100%);
+  background: linear-gradient(to right, rgba(53, 35, 29, 0.85) 0%, rgba(53, 35, 29, 0.5) 35%, transparent 100%);
   z-index: 1;
 }
 
 .hero-content {
-  max-width: 1300px;
+  max-width: 1180px;
   width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 4fr 1fr;
   gap: 40px;
   position: relative;
   z-index: 2;
+  padding: 0 40px;
 }
 
 .hero-text {
   flex: 1;
+  min-width: 280px;
   color: #ffffff;
+  padding-right: 16px;
+}
+.hero-eyebrow {
+  color: #ffffff;
+  font-weight: 600;
+  font-size: clamp(1rem, 2.2vw, 1.35rem);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .hero-title {
   font-family: 'Crimson Pro', serif;
-  font-size: clamp(2.5rem, 8vw, 4.5rem);
+  font-size: clamp(2.2rem, 6vw, 3.6rem);
   font-weight: 600;
   line-height: 1.1;
-  margin: 0 0 24px 0;
+  margin: 0 0 20px 0;
   text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
   animation: fadeInUp 0.8s ease;
-  max-width: 900px;
+  max-width: 720px;
 }
 
 .hero-subtitle {
   font-family: 'Work Sans', sans-serif;
-  font-size: 1.4rem;
+  font-size: clamp(0.9rem, 2.0vw, 1.2rem);
   font-weight: 400;
-  line-height: 1.5;
-  margin: 0 0 40px 0;
+  line-height: 1.6;
+  margin: 0 0 32px 0;
   opacity: 0.95;
   animation: fadeInUp 0.8s ease 0.2s backwards;
-  max-width: 700px;
+  max-width: 620px;
+  text-indent: 1rem;
 }
 
 .hero-buttons {
@@ -220,7 +242,6 @@ onMounted(async () => {
 .cta-secondary {
   background: rgba(255, 255, 255, 0.2);
   color: white;
-  border: 2px solid white;
   backdrop-filter: blur(10px);
 }
 
@@ -468,25 +489,35 @@ onMounted(async () => {
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1200px) {
   .hero-content {
-    padding: 0 40px;
-    gap: 20px;
+    padding: 0 32px;
+    gap: 24px;
+  }
+
+  .hero-decoration {
+    flex: 0.9;
   }
 }
 
 @media (max-width: 992px) {
   .hero-section {
-    height: 500px;
+    min-height: 520px;
+    padding: 50px 0;
+  }
+
+  .hero-content {
+    align-items: flex-start;
   }
 
   .hero-decoration {
-    transform: scale(0.8);
-    flex: 0.8;
+    transform: scale(0.75);
+    flex: 0.85;
   }
 }
 
 @media (max-width: 768px) {
   .hero-section {
-    height: 450px;
+    min-height: 470px;
+    padding: 40px 0;
   }
 
   .hero-content {
@@ -495,13 +526,18 @@ onMounted(async () => {
     padding: 0 20px;
   }
 
+  .hero-text {
+    padding-right: 0;
+  }
+
   .hero-title {
-    font-size: 2.5rem;
+    font-size: clamp(1.9rem, 7vw, 2.6rem);
+    margin-bottom: 18px;
   }
 
   .hero-subtitle {
-    font-size: 1.1rem;
-    margin-bottom: 30px;
+    font-size: clamp(0.95rem, 3.2vw, 1.2rem);
+    margin-bottom: 26px;
   }
 
   .hero-decoration {
@@ -510,18 +546,19 @@ onMounted(async () => {
 
   .hero-buttons {
     justify-content: center;
+    flex-wrap: wrap;
   }
 
   .cta-primary,
   .cta-secondary {
-    padding: 12px 30px;
+    padding: 12px 28px;
     font-size: 15px;
   }
 }
 
 @media (max-width: 480px) {
   .hero-title {
-    font-size: 2rem;
+    font-size: 1.85rem;
   }
 
   .hero-buttons {

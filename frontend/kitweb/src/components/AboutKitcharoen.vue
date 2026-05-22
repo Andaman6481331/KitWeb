@@ -1,10 +1,13 @@
 <script setup>
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRoute } from 'vue-router';
 import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { getUtilsUrl } from '@/services/api';
+import { codeToPath, defaultLang } from '@/utils/localeRoutes';
 
 const { t } = useI18n();
+const route = useRoute();
+const currentLang = computed(() => route.params.lang || defaultLang);
 
 const aboutInfo = computed(() => ({
     title: t('about.title'),
@@ -51,10 +54,10 @@ const aboutInfo = computed(() => ({
                     <p>{{ aboutInfo.mission }}</p>
                 </div>
                 <div v-reveal class="cta-buttons">
-                    <router-link :to="'/orderpage'" class="no-style">
+                    <router-link :to="{ name: 'orderpage', params: { lang: currentLang } }" class="no-style">
                         <button class="cta-primary">{{ $t('home.shopNow') }}</button>
                     </router-link>
-                    <router-link :to="'/catalog'" class="no-style">
+                    <router-link :to="{ name: 'catalog', params: { lang: currentLang } }" class="no-style">
                         <button class="cta-primary">{{ $t('home.viewCatalog') }}</button>
                     </router-link>
                 </div>
@@ -94,7 +97,7 @@ const aboutInfo = computed(() => ({
     font-size: 0.9rem;
     letter-spacing: 2px;
     text-transform: uppercase;
-    margin-bottom: 16px;
+    margin-bottom: 8px;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -111,14 +114,14 @@ const aboutInfo = computed(() => ({
     font-size: 3rem;
     font-weight: 700;
     color: #2d2d2d;
-    margin: 24px 0 16px;
+    margin: 16px 0 8px;
     line-height: 1.2;
 }
 
 .subtitle {
     font-size: 1.3rem;
     color: #8b6f47;
-    margin-bottom: 24px;
+    margin: 0;
     font-weight: 500;
 }
 

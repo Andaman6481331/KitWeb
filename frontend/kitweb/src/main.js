@@ -1,59 +1,67 @@
-//standard import
-import { createApp } from 'vue'
+import { ViteSSG } from 'vite-ssg'
 import App from './App.vue'
-import router from './router'
+import { routes } from './router'
 import i18n from './i18n'
 import VueVirtualScroller from 'vue-virtual-scroller'
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
 
+const supportedLocales = ['en', 'th', 'zh', 'ja']
 
-//UI import
-// import FomanticUI from 'vue-fomantic-ui'
-// import 'fomantic-ui-css/semantic.min.css'
+export function includedRoutes(paths = []) {
+  const expanded = []
 
+  for (const path of paths) {
+    if (path.startsWith('/:lang')) {
+      const suffix = path.replace('/:lang', '')
+      if (suffix.includes(':') || suffix.includes('*')) {
+        continue
+      }
+      supportedLocales.forEach((lang) => {
+        expanded.push(`/${lang}${suffix}`)
+      })
+      continue
+    }
 
-//backend
-// import { initializeApp } from "firebase/app";
+    if (path.includes(':') || path.includes('*')) {
+      continue
+    }
 
-// const firebaseConfig = {
-//     apiKey: "AIzaSyBNvUSZplbpPebD_UbCZ2EBEDknrZq7hok",
-//     authDomain: "hello-7f9eb.firebaseapp.com",
-//     projectId: "hello-7f9eb",
-//     storageBucket: "hello-7f9eb.appspot.com",
-//     messagingSenderId: "374219009585",
-//     appId: "1:374219009585:web:090f81ec32f9d81dca6f10"
-//   };
-
-// const firebaseApp = initializeApp(firebaseConfig);
-
-
-//initializing app
-const app = createApp(App)
-
-// Global development flag
-app.config.globalProperties.$isDev = import.meta.env.DEV;
-
-
-app.use(router)
-app.use(i18n)
-app.use(VueVirtualScroller)
-
-app.directive('reveal', {
-  mounted(el) {
-    el.classList.add('reveal-hidden'); // Initial state
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-          observer.unobserve(entry.target); // Runs only once
-        }
-      });
-    }, { threshold: 0.1 });
-    observer.observe(el);
+    expanded.push(path)
   }
-});
 
-app.mount('#app')
+  return Array.from(new Set(expanded))
+}
+
+export const createApp = ViteSSG(
+  App,
+  { routes },
+  async ({ app, router, isClient }) => {
+    app.use(router)
+    app.use(i18n)
+    app.use(VueVirtualScroller)
+
+    app.config.globalProperties.$isDev = import.meta.env.DEV;
+
+    if (isClient) {
+      await import('ionicons')
+    }
+
+    app.directive('reveal', {
+      mounted(el) {
+        el.classList.add('reveal-hidden'); // Initial state
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('visible');
+              observer.unobserve(entry.target); // Runs only once
+            }
+          });
+        }, { threshold: 0.1 });
+        observer.observe(el);
+      }
+    });
+  }
+)
 
 
 
