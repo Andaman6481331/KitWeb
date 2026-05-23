@@ -62,9 +62,9 @@
   },
   "contact": {
     "eyebrow": "Talk to Us",
-    "title": "Contact Kitcharoen",
-    "subtitle": "Your Trusted Handicraft Partner Since 1984",
-    "description": "At Kitcharoen, we believe in the beauty of handmade artistry. For over 25 years, we have been providing quality yarns, beads, and craft supplies to artisans, hobbyists, and creative souls across Bangkok and beyond.",
+    "title": "Contact Kitcharoen | Sampeng Wholesale Yarn & Craft Supplies",
+    "subtitle": "Reach Kitcharoen for wholesale yarn, ribbons, beads, and craft material support from Sampeng Market, Bangkok.",
+    "description": "At Kitcharoen, we believe in the beauty of handmade artistry. For over 25 years, we have supplied quality yarns, beads, ribbons, and wholesale craft materials to creative makers across Bangkok.",
     "mission": "Our mission is to inspire creativity and preserve the art of traditional handicrafts while embracing modern techniques. We curate the finest materials from around the world, ensuring every project you create is a masterpiece.",
     "visitUs": "Visit Us",
     "findUsHere": "Find Us Here",
@@ -111,8 +111,8 @@
     }
   },
   "events": {
-    "heroTagline": "Create. Learn. Connect.",
-    "heroSubtitle": "Discover the joy of handmade crafts with our DIY kits and workshops",
+    "heroTagline": "DIY Craft Workshops & Events",
+    "heroSubtitle": "Join hands-on Sampeng workshops for yarn, ribbon, bead, and sewing craft lovers.",
     "joinNextEvent": "Join Our Next Event",
     "pastEvents": "Past Events & Workshops",
     "pastEventsSubtitle": "Join our creative community - see what we've been crafting together",
@@ -317,7 +317,7 @@
         "name": "Yarn",
         "description": "Premium organic fibers available in a curated palette of artisanal tones."
       },
-      "accessories": {
+      "tools": {
         "name": "Accessories",
         "description": "Professional-grade scissors, tapes, and tools for the meticulous crafter."
       },

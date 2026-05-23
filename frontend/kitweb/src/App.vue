@@ -1,6 +1,7 @@
 <script setup>
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { ref, onMounted, watch, computed } from 'vue'
+import { useHead } from '@unhead/vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale } from './i18n'
 import { authStore } from './stores/authStore'
@@ -31,74 +32,98 @@ const pageDescriptionMap = {
   'category-products': 'home.heroSubtitle',
   contactus: 'contact.subtitle',
   login: 'auth.signInSubtitle',
-  event: 'events.heroTagline',
+  event: 'events.heroSubtitle',
   partners: 'partner.heroSubtitle',
   orderpage: 'order.heroSubtitle',
   admin: 'auth.signInSubtitle'
 }
 
-const updateDocumentTitle = () => {
-  if (typeof document === 'undefined') return;
+const routeLang = computed(() => route.params.lang || 'en')
+const routeName = computed(() => router.currentRoute.value.name || 'home')
+const pathWithoutLang = computed(() => {
+  const full = router.currentRoute.value.fullPath || '/'
+  const cleaned = full.replace(/^\/(en|th|zh|ja)/, '')
+  return cleaned || '/'
+})
+const origin = typeof window !== 'undefined' ? window.location.origin : ''
+const siteTitle = computed(() => routeLang.value === 'th' ? 'กิจเจริญ' : 'Kitcharoen')
 
-  const routeName = router.currentRoute.value.name || 'home'
-  // Use a fixed site title per locale: Thai shows Thai name, others show English
-  const siteTitle = locale.value === 'th' ? 'กิจเจริญ' : 'Kitcharoen'
-  document.title = siteTitle
+const pageSeoTitle = computed(() => {
+  const lang = routeLang.value
+  const route = routeName.value
 
-  const descriptionKey = pageDescriptionMap[routeName] || 'home.heroSubtitle'
-  const descriptionText = t(descriptionKey) || t('home.heroSubtitle')
-  const existingMeta = document.querySelector('meta[name="description"]')
-  if (existingMeta) {
-    existingMeta.setAttribute('content', descriptionText)
-  } else {
-    const meta = document.createElement('meta')
-    meta.name = 'description'
-    meta.content = descriptionText
-    document.head.appendChild(meta)
+  if (lang === 'th') {
+  switch (route) {
+    case 'home':
+      return 'ไหมพรม อุปกรณ์งานฝีมือ ขายส่งสำเพ็ง ราคาถูก | กิจเจริญ';
+    case 'contactus':
+      return 'ติดต่อสอบถาม สั่งซื้อไหมพรม ริบบิ้น ลูกปัด | กิจเจริญ สำเพ็ง';
+    case 'event':
+      return 'เวิร์คช็อป DIY และกิจกรรมงานฝีมือ | กิจเจริญ';
+    case 'partners':
+      return 'ตัวแทนจำหน่ายและลูกค้าขายส่ง อุปกรณ์งานฝีมือ | กิจเจริญ';
+    case 'catalog':
+      return 'แคตตาล็อกสินค้า ไหมพรม ริบบิ้น ลูกปัด ขายส่ง | กิจเจริญ';
+    case 'category-products':
+      // Ideally, you'd want to inject the category name here dynamically
+      return 'รวมสินค้าไหมพรมและอุปกรณ์งานฝีมือคุณภาพ | กิจเจริญ';
+    case 'login':
+      return 'เข้าสู่ระบบสมาชิก | กิจเจริญ';
+    case 'orderpage':
+      return 'เช็ครายการสั่งซื้อ ไหมพรมและอุปกรณ์ DIY | กิจเจริญ';
+    default:
+      return `${t(pageTitleMap[route] || 'home.heroTitle')} | ${siteTitle.value}`;
   }
-
-  document.documentElement.lang = locale.value || 'en'
 }
-
-watch([locale, () => router.currentRoute.value.name], updateDocumentTitle, { immediate: true })
-
-const supportedLangs = ['en','th','zh','ja'];
-
-const updateHreflangLinks = () => {
-  if (typeof document === 'undefined' || typeof location === 'undefined') return;
-
-  // remove previously generated hreflang and canonical links
-  document.querySelectorAll('link[data-generated="hreflang"]').forEach(n => n.remove());
-  document.querySelectorAll('link[data-generated="canonical"]').forEach(n => n.remove());
-  const full = router.currentRoute.value.fullPath || '/';
-  const pathWithoutLang = full.replace(/^\/(en|th|zh|ja)/, '') || '/';
-
-  supportedLangs.forEach(l => {
-    const link = document.createElement('link');
-    link.rel = 'alternate';
-    link.hreflang = l;
-    const href = `${location.origin}/${l}${pathWithoutLang}`;
-    link.href = href;
-    link.setAttribute('data-generated', 'hreflang');
-    document.head.appendChild(link);
-  });
-
-  const x = document.createElement('link');
-  x.rel = 'alternate';
-  x.hreflang = 'x-default';
-  x.href = `${location.origin}/en${pathWithoutLang}`;
-  x.setAttribute('data-generated', 'hreflang');
-  document.head.appendChild(x);
-
-  const canonical = document.createElement('link');
-  canonical.rel = 'canonical';
-  canonical.href = `${location.origin}${full}`;
-  canonical.setAttribute('data-generated', 'canonical');
-  document.head.appendChild(canonical);
+switch (route) {
+  case 'home':
+    return 'Wholesale Yarn & Craft Supplies Sampeng | Kitcharoen';
+  case 'contactus':
+    return 'Contact Us for Wholesale Yarn, Ribbons & Beads | Kitcharoen';
+  case 'event':
+    return 'DIY Craft Workshops & Events in Bangkok | Kitcharoen';
+  case 'partners':
+    return 'Our Partners & Wholesale Craft Supply Clients | Kitcharoen';
+  case 'catalog':
+    return 'Wholesale Catalog: Yarn, Ribbons & Sewing Supplies | Kitcharoen';
+  case 'category-products':
+    return 'Premium Yarn, Beads & Craft Accessories | Kitcharoen';
+  case 'login':
+    return 'Customer Login | Kitcharoen';
+  case 'orderpage':
+    return 'Your Orders - Craft & Sewing Supplies | Kitcharoen';
+  default:
+    return `${t(pageTitleMap[route] || 'home.heroTitle')} | ${siteTitle.value}`;
 }
+})
 
-watch(() => router.currentRoute.value.fullPath, updateHreflangLinks, { immediate: true });
-watch(locale, updateHreflangLinks);
+const pageTitleKey = computed(() => pageTitleMap[routeName.value] || 'home.heroTitle')
+const pageDescriptionKey = computed(() => pageDescriptionMap[routeName.value] || 'home.heroSubtitle')
+
+useHead(() => {
+  const title = pageSeoTitle.value || `${t(pageTitleKey.value) || t('home.heroTitle')} | ${siteTitle.value}`
+  const description = t(pageDescriptionKey.value) || t('home.heroSubtitle')
+
+  const links = origin ? [
+    { rel: 'alternate', hreflang: 'en', href: `${origin}/en${pathWithoutLang.value}` },
+    { rel: 'alternate', hreflang: 'th', href: `${origin}/th${pathWithoutLang.value}` },
+    { rel: 'alternate', hreflang: 'zh', href: `${origin}/zh${pathWithoutLang.value}` },
+    { rel: 'alternate', hreflang: 'ja', href: `${origin}/ja${pathWithoutLang.value}` },
+    { rel: 'alternate', hreflang: 'x-default', href: `${origin}/en${pathWithoutLang.value}` },
+    { rel: 'canonical', href: `${origin}${router.currentRoute.value.fullPath || '/'}` }
+  ] : []
+
+  return {
+    title,
+    htmlAttrs: {
+      lang: routeLang.value || 'en'
+    },
+    meta: [
+      { name: 'description', content: description }
+    ],
+    link: links
+  }
+})
 
 // Get saved language from localStorage or default to 'EN'
 const savedLang = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem('locale') || 'EN' : 'EN'

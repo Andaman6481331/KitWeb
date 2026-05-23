@@ -1,7 +1,12 @@
 <script setup>
-import { ref } from 'vue';
+import { useRoute } from 'vue-router';
+import { defaultLang } from '../utils/localeRoutes';
+import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { getUtilsUrl } from '@/services/api';
+
+const route = useRoute();
+const currentLang = computed(() => route.params.lang || defaultLang);
 
 const { t } = useI18n();
 const activeCat = ref(null);
@@ -10,22 +15,22 @@ const categories = [
     {
         id: 1,
         key: 'needles',
-        image: getUtilsUrl('card-img06-large.webp')
+        image: getUtilsUrl('card-img06-large.webp'),
     },
     {
         id: 2,
         key: 'yarn',
-        image: getUtilsUrl('card-img01-large.webp')
+        image: getUtilsUrl('card-img01-large.webp'),
     },
     {
         id: 3,
-        key: 'accessories',
-        image: getUtilsUrl('card-img10-large.webp')
+        key: 'tools',
+        image: getUtilsUrl('card-img10-large.webp'),
     },
     {
         id: 4,
         key: 'beads',
-        image: getUtilsUrl('card-img04-large.webp')
+        image: getUtilsUrl('card-img04-large.webp'),
     }
 ];
 </script>
@@ -56,10 +61,10 @@ const categories = [
                     <div class="cat-details">
                         <h3 class="cat-name">{{ $t(`featuredCategories.items.${cat.key}.name`) }}</h3>
                         <p class="cat-desc">{{ $t(`featuredCategories.items.${cat.key}.description`) }}</p>
-                        <button class="explore-btn">
+                        <router-link :to="{ path: `/${currentLang}/catalog/${cat.key}`, params: { lang: currentLang } }" class="explore-btn">
                             {{ $t('featuredCategories.explore') }}
                             <span class="btn-arrow">→</span>
-                        </button>
+                        </router-link>
                     </div>
                 </div>
             </div>
@@ -233,6 +238,7 @@ const categories = [
     align-items: center;
     gap: 15px;
     transition: all 0.3s ease;
+    width: fit-content;
 }
 
 .explore-btn:hover {

@@ -10,35 +10,64 @@ const aboutInfo = computed(() => ({
     subtitle: t('contact.subtitle'),
     description: t('contact.description'),
     mission: t('contact.mission'),
-    features: [
-        {
-            icon: '🧶',
-            title: t('contact.premiumMaterials'),
-            description: t('contact.premiumMaterialsDesc')
-        },
-        {
-            icon: '🎨',
-            title: t('contact.expertGuidance'),
-            description: t('contact.expertGuidanceDesc')
-        },
-        {
-            icon: '💝',
-            title: t('contact.communityFocus'),
-            description: t('contact.communityFocusDesc')
-        },
-        {
-            icon: '🌟',
-            title: t('contact.qualityAssured'),
-            description: t('contact.qualityAssuredDesc')
-        }
-    ],
     contact: {
         address: '376 Wanich 1, Chakkrawat, Samphantawong, Bangkok 10100',
-        phone: '+66 2 221 1414',
-        line: 'https://lin.ee/8pn4sZi',
-        hours: 'Mon-Sat: 8:00 AM - 5:30 PM'
+        phone: '+66 2-622-6573, 2-223-9552',
+        hours: 'Mon-Sat: 8:00 AM - 5:30 PM',
     }
 }));
+
+const contactInfo = {
+    email:'kitsampeng@gmail.com',
+    lineUrl: 'https://line.me/ti/p/@oar4837p',
+    lineQrThumb: 'LineOfficialQR-large.webp',
+    lineId: '@oar4837p',
+    facebookUrl: 'https://www.facebook.com/kit.sampeng',
+    facebookText: '@kit.sampeng',
+    instagramUrl: 'https://www.instagram.com/kit_craft376/',
+    instagramText: '@kit_craft376',
+    wechatId: 'wxid_y3hc2qgld49112',
+    wechatQrThumb: 'WeChatQR-large.webp'
+};
+
+const lineCopied = ref(false);
+const wechatCopied = ref(false);
+const gmailCopied = ref(false);
+
+const copyGmail = async () => {
+    try {
+        await navigator.clipboard.writeText(contactInfo.email);
+        gmailCopied.value = true;
+        setTimeout(() => {
+            gmailCopied.value = false;
+        }, 2000);
+    } catch (error) {
+        console.warn('Copy failed', error);
+    }
+};
+const copyLineId = async () => {
+    try {
+        await navigator.clipboard.writeText(contactInfo.lineId);
+        lineCopied.value = true;
+        setTimeout(() => {
+            lineCopied.value = false;
+        }, 2000);
+    } catch (error) {
+        console.warn('Copy failed', error);
+    }
+};
+
+const copyWeChatId = async () => {
+    try {
+        await navigator.clipboard.writeText(contactInfo.wechatId);
+        wechatCopied.value = true;
+        setTimeout(() => {
+            wechatCopied.value = false;
+        }, 2000);
+    } catch (error) {
+        console.warn('Copy failed', error);
+    }
+};
 
 // Form state
 const form = ref({
@@ -162,45 +191,102 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
                             </div>
                             <div class="hub-text">
                                 <strong>{{ $t('contact.hub.email') }}</strong>
-                                <p>{{ $t('contact.hub.emailValue') }}</p>
+                                <div style="display: flex; gap: 20px;">
+                                    <p><a class="contact-link" :href="`mailto:${contactInfo.email}?subject=Inquiry from Website`">{{ contactInfo.email }}</a></p>
+                                    <button type="button" class="copy-btn2" @click="copyGmail">
+                                        Copy
+                                    </button>
+                                    <span v-if="gmailCopied" class="copy-feedback">Copied</span>
+                                </div>
                             </div>
                         </div>
-
-                        <div class="social-connect">
-                            <strong>{{ $t('contact.hub.connect') }}</strong>
-                            <div class="social-icons">
-                                <a href="#" class="social-btn">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <div class="hub-item" name="facebook">
+                                <div class="hub-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                         stroke-width="2">
-                                        <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z">
-                                        </path>
+                                        <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
                                     </svg>
-                                </a>
-                                <a href="#" class="social-btn">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                </div>
+                                <div class="hub-text">
+                                    <strong>Facebook</strong>
+                                    <p><a class="contact-link" :href="contactInfo.facebookUrl" target="_blank" rel="noreferrer">{{ contactInfo.facebookText }}</a></p>
+                                </div>
+                            </div>
+                            <div class="hub-item" name="instragram">
+                                <div class="hub-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                         stroke-width="2">
                                         <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
                                         <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
                                         <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
                                     </svg>
-                                </a>
-                                <a href="#" class="social-btn">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2">
-                                        <path
-                                            d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z">
-                                        </path>
-                                    </svg>
-                                </a>
+                                </div>
+                                <div class="hub-text">
+                                    <strong>Instagram</strong>
+                                    <p><a class="contact-link" :href="contactInfo.instagramUrl" target="_blank" rel="noreferrer">{{ contactInfo.instagramText }}</a></p>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;"> 
+                            <div class="hub-item" name="wechat">
+                                <div class="hub-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M9 22c-2 0-4-2-5-5 0-3 2-5 5-5h6c3 0 5 2 5 5 0 3-2 5-5 5H9z"></path>
+                                        <path d="M8 7a4 4 0 0 1 8 0v3"></path>
+                                    </svg>
+                                </div>
+                                <div class="hub-text">
+                                    <strong>WeChat</strong>
+                                    <p><span class="contact-text">{{ contactInfo.wechatId }}</span></p>
+                                </div>
+                            </div>
+                            <div class="hub-item" name="line">
+                                <div class="hub-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                                    </svg>
+                                </div>
+                                <div class="hub-text">
+                                    <strong>Line (KitSampeng)</strong>
+                                    <p><a class="contact-link" :href="contactInfo.lineUrl" target="_blank" rel="noreferrer">{{ contactInfo.lineId }}</a></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="social-connect">
+                            <strong>{{ $t('contact.hub.connect') }}</strong>
+                            <div class="social-grid">
+                                <div class="social-card qr-card">
+                                    <a class="qr-link" :href="contactInfo.lineUrl" target="_blank" rel="noreferrer">
+                                        <img :src="getUtilsUrl(contactInfo.lineQrThumb)" alt="Line Official QR" />
+                                    </a>
+                                    <div class="qr-card-body">
+                                        <span class="social-label">Line Official</span>
+                                        <a class="social-handle" :href="contactInfo.lineUrl" target="_blank" rel="noreferrer">{{ contactInfo.lineId }}</a>
+                                        <button type="button" class="copy-btn" @click="copyLineId">
+                                            Copy
+                                        </button>
+                                        <span v-if="lineCopied" class="copy-feedback">Copied</span>
+                                    </div>
+                                </div>
 
-                    <!-- Quote Image Card -->
-                    <div class="quote-card">
-                        <img :src="getUtilsUrl('shop02-large.webp')" alt="Heritage Store" class="quote-bg" />
-                        <div class="quote-overlay">
-                            <p>"{{ $t('contact.hub.quote') }}"</p>
+                                <div class="social-card qr-card">
+                                    <div class="qr-link">
+                                        <img :src="getUtilsUrl(contactInfo.wechatQrThumb)" alt="WeChat QR" />
+                                    </div>
+                                    <div class="qr-card-body">
+                                        <span class="social-label">WeChat</span>
+                                        <strong class="social-handle">{{ contactInfo.wechatId }}</strong>
+                                        <button type="button" class="copy-btn" @click="copyWeChatId">
+                                            Copy
+                                        </button>
+                                        <span v-if="wechatCopied" class="copy-feedback">Copied</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -252,6 +338,14 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
                             <span class="response-time">{{ $t('contact.form.responseTime') }}</span>
                         </div>
                     </form>
+                    
+                    <!-- Quote Image Card -->
+                    <div class="quote-card">
+                        <img :src="getUtilsUrl('shop02-large.webp')" alt="Heritage Store" class="quote-bg" />
+                        <div class="quote-overlay">
+                            <p>"{{ $t('contact.hub.quote') }}"</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -558,7 +652,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 
 .contact-grid {
     display: grid;
-    grid-template-columns: 400px 1fr;
+    grid-template-columns: 500px 1fr;
     gap: 30px;
     align-items: stretch;
 }
@@ -572,8 +666,8 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 
 .info-card {
     background: #ffffff;
-    padding: 50px;
-    border-radius: 20px;
+    padding: 1.5rem;
+    border-radius: 1rem;
     box-shadow: 0 4px 30px rgba(94, 69, 53, 0.05);
     border: 1px solid rgba(94, 69, 53, 0.1);
 }
@@ -587,8 +681,8 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 
 .hub-item {
     display: flex;
-    gap: 20px;
-    margin-bottom: 25px;
+    gap: 16px;
+    margin-bottom: 1.5rem;
 }
 
 .hub-icon {
@@ -606,23 +700,31 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 
 .hub-text strong {
     display: block;
-    font-size: 1rem;
+    font-size: 0.8rem;
     color: #5E4535;
-    margin-bottom: 4px;
     text-transform: none;
 }
 
 .hub-text p {
-    font-size: 0.95rem;
+    font-size: 0.7rem;
     color: #7a7a7a;
     line-height: 1.5;
     margin: 0;
 }
 
+.contact-link {
+    color: #7a7a7a;
+    text-decoration: underline;
+    font-weight: 500;
+}
+
 .social-connect {
-    margin-top: 40px;
-    padding-top: 30px;
+    margin-top: 0.5rem;
+    padding-top: 0.2rem;
     border-top: 1px solid #f0f0f0;
+}
+.social-connect * {
+    box-sizing: border-box;
 }
 
 .social-connect strong {
@@ -630,6 +732,113 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
     font-size: 1rem;
     color: #5E4535;
     margin-bottom: 15px;
+}
+
+.social-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.social-link,
+.social-card {
+    display: block;
+    width: 100%;
+    padding: 18px 18px;
+    border-radius: 18px;
+    background: #faf9f6;
+    border: 1px solid #f0f0f0;
+    text-decoration: none;
+    color: #5e4535;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.social-link:hover,
+.social-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 35px rgba(0, 0, 0, 0.08);
+    border-color: #d8cfc4;
+}
+
+.social-card {
+    display: grid;
+    gap: 0.2rem;
+}
+
+.qr-link {
+    display: block;
+    overflow: hidden;
+    border-radius: 16px;
+}
+
+.qr-link img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 16px;
+    transition: transform 0.25s ease;
+}
+
+.qr-card:hover .qr-link img {
+    transform: scale(1.1);
+}
+
+.qr-card-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.social-label {
+    display: block;
+    font-size: 0.95rem;
+    color: #7a7a7a;
+}
+
+.social-handle {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #5e4535;
+    text-decoration: none;
+    word-break: break-word;
+}
+
+.copy-btn {
+    border: none;
+    background: #006064;
+    color: #ffffff;
+    border-radius: 999px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s ease;
+}
+
+.copy-btn:hover {
+    background: #004d55;
+}
+
+.copy-btn2 {
+    border: none;
+    background: #479396;
+    color: #ffffff;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    font-size: 0.7rem;
+    align-self: center;
+}
+
+.copy-btn2:hover {
+    background: #52a3a5;
+}
+
+.copy-feedback {
+    font-size: 0.85rem;
+    color: #006064;
+    min-width: 48px;
 }
 
 .social-icons {
@@ -658,10 +867,11 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 /* Quote Card Styling */
 .quote-card {
     position: relative;
-    height: 240px;
+    height: 240px;  
     border-radius: 20px;
     overflow: hidden;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    margin-top: 2rem;
 }
 
 .quote-bg {
@@ -690,7 +900,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 /* Inquiry Form Styling */
 .inquiry-form-card {
     background: #ffffff;
-    padding: 50px;
+    padding: 1.5rem;
     border-radius: 20px;
     box-shadow: 0 4px 30px rgba(94, 69, 53, 0.05);
     border: 1px solid rgba(94, 69, 53, 0.1);
@@ -705,7 +915,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 
 .form-subtitle {
     color: #7a7a7a;
-    font-size: 1.1rem;
+    font-size: 1rem;
     margin-bottom: 40px;
     line-height: 1.5;
 }
@@ -713,7 +923,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 .hub-form {
     display: flex;
     flex-direction: column;
-    gap: 25px;
+    gap: 0.2rem;
 }
 
 .form-row {

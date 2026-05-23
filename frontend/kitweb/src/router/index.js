@@ -94,5 +94,30 @@ router.beforeEach((to, from, next) => {
     }
 });
 
+// 🌟 ADD THIS ROUTER GUARD FOR THE TITLES 🌟
+router.afterEach((to) => {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    const isThai = to.path.startsWith('/th');
+    const engTitle = 'Kitcharoen - Premium Yarn & Sewing Supplies';
+    const thaiTitle = 'กิจเจริญ - ไหมพรมและอุปกรณ์เย็บปักถักร้อยเกรดพรีเมียม สำเพ็ง';
+
+    const engDesc = 'Kitcharoen craft and sewing supplies from Bangkok\'s Sampeng Market. Trusted materials, honest prices, and friendly service since 1984.';
+    const thaiDesc = 'กิจเจริญ ร้านขายอุปกรณ์งานฝีมือแบบครอบครัวในตลาดสำเพ็ง กรุงเทพฯ ใกล้เยาวราช จำหน่ายไหมพรม คุณภาพสูง และอุปกรณ์ตัดเย็บครบวงจร ราคาเป็นกันเอง';
+
+    document.title = isThai ? thaiTitle : engTitle;
+    document.documentElement.lang = isThai ? 'th' : 'en';
+
+    let descriptionMeta = document.querySelector('meta[name="description"]');
+    if (!descriptionMeta) {
+        descriptionMeta = document.createElement('meta');
+        descriptionMeta.setAttribute('name', 'description');
+        document.head.appendChild(descriptionMeta);
+    }
+    descriptionMeta.setAttribute('content', isThai ? thaiDesc : engDesc);
+});
+
 // Export the router instance as default
 export default router;

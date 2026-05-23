@@ -2,7 +2,7 @@
 import { ref } from 'vue';
 import AutoScrollEvent from '../components/auto-scroll-event.vue';
 import { getUtilsUrl } from '@/services/api';
-import comingSoonImg from '../assets/coming_soon_event.png';
+import comingSoonImg from '../assets/card-img05.webp';
 
 const scrollToContact = () => {
     document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
