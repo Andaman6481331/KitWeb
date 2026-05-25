@@ -216,7 +216,7 @@ const handleAttributeClick = (type, value) => {
     }
 };
 
-const getImageUrl = (key, variant = 'thumb') => {
+const getImageUrl = (key, variant = 'large') => {
     if (!key) return 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg';
     const keyStr = String(key);
     if (keyStr.startsWith('http')) return keyStr;

@@ -55,25 +55,25 @@ const pageSeoTitle = computed(() => {
   if (lang === 'th') {
   switch (route) {
     case 'home':
-      return 'ไหมพรม อุปกรณ์งานฝีมือ ขายส่งสำเพ็ง ราคาถูก | กิจเจริญ';
+      return 'ไหมพรม อุปกรณ์งานฝีมือ ขายส่งสำเพ็ง ราคาถูก | กิจเจริญ สำเพ็ง';
     case 'contactus':
       return 'ติดต่อสอบถาม สั่งซื้อไหมพรม ริบบิ้น ลูกปัด | กิจเจริญ สำเพ็ง';
     case 'event':
-      return 'เวิร์คช็อป DIY และกิจกรรมงานฝีมือ | กิจเจริญ';
+      return 'เวิร์คช็อป DIY และกิจกรรมงานฝีมือ | กิจเจริญ สำเพ็ง';
     case 'partners':
-      return 'ตัวแทนจำหน่ายและลูกค้าขายส่ง อุปกรณ์งานฝีมือ | กิจเจริญ';
+      return 'ตัวแทนจำหน่ายและลูกค้าขายส่ง อุปกรณ์งานฝีมือ | กิจเจริญ สำเพ็ง';
     case 'catalog':
-      return 'แคตตาล็อกสินค้า ไหมพรม ริบบิ้น ลูกปัด ขายส่ง | กิจเจริญ';
+      return 'แคตตาล็อกสินค้า ไหมพรม ริบบิ้น ลูกปัด ขายส่ง | กิจเจริญ สำเพ็ง';
     case 'category-products':
       // Ideally, you'd want to inject the category name here dynamically
-      return 'รวมสินค้าไหมพรมและอุปกรณ์งานฝีมือคุณภาพ | กิจเจริญ';
+      return 'รวมสินค้าไหมพรมและอุปกรณ์งานฝีมือคุณภาพ | กิจเจริญ สำเพ็ง';
     case 'login':
-      return 'เข้าสู่ระบบสมาชิก | กิจเจริญ';
+      return 'เข้าสู่ระบบสมาชิก | กิจเจริญ สำเพ็ง';
     case 'orderpage':
-      return 'เช็ครายการสั่งซื้อ ไหมพรมและอุปกรณ์ DIY | กิจเจริญ';
+      return 'เช็ครายการสั่งซื้อ ไหมพรมและอุปกรณ์ DIY | กิจเจริญ สำเพ็ง';
     default:
       return `${t(pageTitleMap[route] || 'home.heroTitle')} | ${siteTitle.value}`;
-  }
+  } 
 }
 switch (route) {
   case 'home':
@@ -264,7 +264,11 @@ watch(locale, (newLocale) => {
                 <span>{{ authStore.user?.businessName || authStore.user?.ownerName || $t('nav.account') }}</span>
               </router-link>
               <button class="logout-btn-nav" @click="handleLogout" :title="$t('order.logout')">
-                <ion-icon name="log-out-outline"></ion-icon>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                  </svg>
               </button>
             </div>
           </template>
@@ -319,7 +323,11 @@ watch(locale, (newLocale) => {
       <div v-if="showLogoutConfirm" class="confirm-overlay" @click.self="cancelLogout">
         <div class="confirm-card">
           <div class="confirm-icon logout-icon">
-            <ion-icon name="log-out-outline"></ion-icon>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+      <polyline points="16 17 21 12 16 7"></polyline>
+      <line x1="21" y1="12" x2="9" y2="12"></line>
+    </svg>
           </div>
           <h3>{{ $t('auth.logoutConfirmTitle') }}</h3>
           <p>{{ $t('auth.logoutConfirmMessage') }}</p>
@@ -729,11 +737,15 @@ body {
   }
 
   .nav-link {
-    font-size: 15px;
+    font-size: 13px;
   }
 
   .search-capsule {
-    width: 180px;
+    width: 120px;
+  }
+
+  .action-icons {
+    gap: 10px;
   }
 
   .login-capsule,
@@ -749,7 +761,7 @@ body {
     padding: 15px 3%;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 15px;
+    gap: 0.1rem;
   }
 
   .nav-left {

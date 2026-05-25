@@ -132,7 +132,7 @@ import { getUtilsUrl } from '@/services/api';
 const stats = ref([
     { number: '180+', label: 'Retail Partners' },
     { number: '42', label: 'Thai Provinces' },
-    { number: '12', label: 'Years Operating' },
+    { number: '40+', label: 'Years Operating' },
     { number: '8', label: 'Countries Served' }
 ]);
 
