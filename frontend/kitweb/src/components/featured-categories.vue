@@ -43,32 +43,40 @@ const categories = [
         </div>
 
         <div class="categories-accordion" v-reveal>
-            <div v-for="cat in categories" :key="cat.id" class="accordion-item"
-                :class="{ active: activeCat === cat.id }" @mouseenter="activeCat = cat.id"
-                @mouseleave="activeCat = null">
+    <div v-for="cat in categories" :key="cat.id" class="accordion-item"
+        :class="{ active: activeCat === cat.id }" 
+        
+        @mouseenter="activeCat = cat.id"
+        @mouseleave="activeCat = null"
+        
+        @touchstart.passive="handleTouch(cat.id)">
 
-                <div class="cat-image-wrapper">
-                    <img :src="cat.image" :alt="$t(`featuredCategories.items.${cat.key}.name`)" class="cat-bg" />
-                    <div class="cat-overlay"></div>
-                </div>
+        <div class="cat-image-wrapper">
+            <img :src="cat.image" :alt="$t(`featuredCategories.items.${cat.key}.name`)" class="cat-bg" />
+            <div class="cat-overlay"></div>
+        </div>
 
-                <div class="cat-content">
-                    <div class="cat-icon-container">
-                        <span class="cat-icon">{{ cat.icon }}</span>
-                        <h3 class="cat-name-vertical">{{ $t(`featuredCategories.items.${cat.key}.name`) }}</h3>
-                    </div>
+        <div class="cat-content">
+            <div class="cat-icon-container">
+                <span class="cat-icon">{{ cat.icon }}</span>
+                <h3 class="cat-name-vertical">{{ $t(`featuredCategories.items.${cat.key}.name`) }}</h3>
+            </div>
 
-                    <div class="cat-details">
-                        <h3 class="cat-name">{{ $t(`featuredCategories.items.${cat.key}.name`) }}</h3>
-                        <p class="cat-desc">{{ $t(`featuredCategories.items.${cat.key}.description`) }}</p>
-                        <router-link :to="{ path: `/${currentLang}/catalog/${cat.key}`, params: { lang: currentLang } }" class="explore-btn">
-                            {{ $t('featuredCategories.explore') }}
-                            <span class="btn-arrow">→</span>
-                        </router-link>
-                    </div>
-                </div>
+            <div class="cat-details">
+                <h3 class="cat-name">{{ $t(`featuredCategories.items.${cat.key}.name`) }}</h3>
+                <p class="cat-desc">{{ $t(`featuredCategories.items.${cat.key}.description`) }}</p>
+                
+                <router-link 
+                    :to="{ path: `/${currentLang}/catalog/${cat.key}` }" 
+                    class="explore-btn"
+                    :style="{ pointerEvents: activeCat === cat.id ? 'auto' : 'none' }">
+                    {{ $t('featuredCategories.explore') }}
+                    <span class="btn-arrow">→</span>
+                </router-link>
             </div>
         </div>
+    </div>
+</div>
     </section>
 </template>
 

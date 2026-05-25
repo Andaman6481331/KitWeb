@@ -38,6 +38,19 @@ const pageDescriptionMap = {
   admin: 'auth.signInSubtitle'
 }
 
+const contactInfo = {
+    email:'kitsampeng@gmail.com',
+    lineUrl: 'https://line.me/ti/p/@oar4837p',
+    lineQrThumb: 'LineOfficialQR-large.webp',
+    lineId: '@oar4837p',
+    facebookUrl: 'https://www.facebook.com/kit.sampeng',
+    facebookText: '@kit.sampeng',
+    instagramUrl: 'https://www.instagram.com/kit_craft376/',
+    instagramText: '@kit_craft376',
+    wechatId: 'wxid_y3hc2qgld49112',
+    wechatQrThumb: 'WeChatQR-large.webp'
+};
+
 const routeLang = computed(() => route.params.lang || 'en')
 const routeName = computed(() => router.currentRoute.value.name || 'home')
 const pathWithoutLang = computed(() => {
@@ -322,16 +335,41 @@ const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
             <li>📍 376 Wanich 1 Chakkrawat</li>
             <li>📍 Samphantawong Bangkok</li>
             <li>📞 +66 (0)2-221-1414, (0)2-622-6573</li>
-            <li>✉️ kitcharoen.sampeng@gmail.com</li>
+            <li>✉️ kitsampeng@gmail.com</li>
           </ul>
         </div>
         <div class="footer-column">
           <h4>{{ $t('footer.followUs') }}</h4>
           <div class="social-links">
-            <a href="#" class="social-icon">📘</a>
-            <a href="#" class="social-icon">📷</a>
-            <a href="#" class="social-icon">🐦</a>
-            <a href="#" class="social-icon">📺</a>
+ <!-- Facebook -->
+<a :href="contactInfo.facebookUrl" class="social-icon facebook" aria-label="Facebook">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+  </svg>
+</a>
+
+<!-- Instagram -->
+<a :href="contactInfo.instagramUrl" class="social-icon instagram" aria-label="Instagram">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="2" width="20" height="20" rx="5"/>
+    <circle cx="12" cy="12" r="4"/>
+    <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>
+  </svg>
+</a>
+
+<!-- WeChat -->
+<a :href="contactInfo.wechatUrl" class="social-icon wechat" aria-label="WeChat">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+    <path d="M9.5 4C5.36 4 2 6.92 2 10.5c0 1.9.93 3.6 2.4 4.8l-.65 2 2.35-1.15c.76.21 1.56.35 2.4.35.18 0 .36 0 .54-.02A5.3 5.3 0 0 1 9 15c0-2.97 2.69-5.38 6-5.38.2 0 .4.01.6.03C15.07 7.14 12.53 4 9.5 4zm-2 4.5a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5zm4 0a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5zM15 11c-2.76 0-5 1.79-5 4s2.24 4 5 4c.6 0 1.17-.09 1.7-.25L19 20l-.78-2.34C19.32 16.8 20 15.46 20 15c0-2.21-2.24-4-5-4zm-1.5 2.75a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5zm3 0a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5z"/>
+  </svg>
+</a>
+
+<!-- LINE Official -->
+<a :href="contactInfo.lineUrl" class="social-icon line-official" aria-label="LINE Official">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+    <path d="M12 2C6.48 2 2 5.86 2 10.6c0 3.1 1.87 5.83 4.7 7.43L6 21l3.27-1.7c.87.24 1.78.37 2.73.37 5.52 0 10-3.86 10-8.6S17.52 2 12 2zm-3.5 10.5H7v-5h1v4h.5a.5.5 0 0 1 0 1zm2 0a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 1 0v5zm4.5 0h-2.5a.5.5 0 0 1-.5-.5v-5a.5.5 0 0 1 1 0V12H15a.5.5 0 0 1 0 1zm3.5-3.5h-1.5v.75H18a.5.5 0 0 1 0 1h-1.5v.75H18a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5v-4a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1z"/>
+  </svg>
+</a>
           </div>
         </div>
       </div>
@@ -367,8 +405,19 @@ const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
 @import url('https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@100;200;300;400;500;600;700&display=swap');
 
+html, body {
+  width: 100%;
+  overflow-x: clip;
+  margin: 0;
+  padding: 0;
+}
+
 * {
   font-family: 'ZCOOL XiaoWei', serif !important;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 
 /* Override font for Thai language */
@@ -404,6 +453,7 @@ body {
   padding: 0 5%;
   z-index: 1000;
   border-bottom: 1px solid #f0f0f0;
+  align-self: flex-start;
 }
 
 /* Left: Logo */

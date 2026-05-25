@@ -308,24 +308,24 @@
     "title": "Artisan Collections",
     "subtitle": "Discover the finest materials for your next masterpiece.",
     "explore": "Explore Collection",
-    "items": {
-      "needles": {
-        "name": "Needles",
-        "description": "Hand-polished precision tools designed for comfort and durability."
-      },
-      "yarn": {
-        "name": "Yarn",
-        "description": "Premium organic fibers available in a curated palette of artisanal tones."
-      },
-      "tools": {
-        "name": "Accessories",
-        "description": "Professional-grade scissors, tapes, and tools for the meticulous crafter."
-      },
-      "beads": {
-        "name": "Beads",
-        "description": "Exquisite glass and crystal beads to add a touch of brilliance to any project."
-      }
+  "items": {
+    "needles": {
+      "name": "Needles",
+      "description": "Precision-engineered and hand-polished tools crafted for lasting durability and ergonomic comfort."
+    },
+    "yarn": {
+      "name": "Yarn",
+      "description": "Premium organic fibers dyed in a curated palette of artisanal tones for a superior tactile experience."
+    },
+    "tools": {
+      "name": "Accessories",
+      "description": "Professional-grade essentials, including scissors and tapes, designed for the most meticulous crafter."
+    },
+    "beads": {
+      "name": "Beads",
+      "description": "Exquisite glass and crystal accents curated to bring brilliance and fine detail to any creative project."
     }
+  }
   },
   "kitcraft": {
     "eyebrow": "Handmade Crafts",
