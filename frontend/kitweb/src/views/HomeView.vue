@@ -59,9 +59,6 @@ onMounted(async () => {
             <div class="floating-card card-3">
               <img :src="getUtilsUrl('card-img07-thumb.webp')" alt="">
             </div>
-            <!-- <div class="floating-card card-4">
-              <img src="../assets/card-img06.webp" alt="">
-            </div> -->
           </div>
           <div class="floating-card-container container-group-2">
             <div class="floating-card card-5">
@@ -174,7 +171,7 @@ onMounted(async () => {
   flex: 1;
   min-width: 280px;
   color: #ffffff;
-  padding-right: 16px;
+  margin-top: 4rem;
 }
 .hero-eyebrow {
   color: #ffffff;

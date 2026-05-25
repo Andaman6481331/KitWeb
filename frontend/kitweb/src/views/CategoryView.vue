@@ -327,7 +327,7 @@ const sortedProducts = computed(() => {
                             <div v-for="img in selectedProduct.images" :key="img.id" class="thumb"
                                 :class="{ active: currentImageKey === img.image_key }"
                                 @click="setMainImage(img.image_key)">
-                                <img :src="getImageUrl(img.image_key)" :alt="img.attribute_value || 'Gallery'">
+                                <img :src="getImageUrl(img.image_key, 'thumb')" :alt="img.attribute_value || 'Gallery'">
                             </div>
                         </div>
                     </div>

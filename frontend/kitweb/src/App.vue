@@ -128,7 +128,11 @@ useHead(() => {
 // Get saved language from localStorage or default to 'EN'
 const savedLang = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem('locale') || 'EN' : 'EN'
 const currentLanguage = ref(savedLang)
-const currentLang = computed(() => route.params.lang || codeToPath[currentLanguage.value] || 'en')
+const currentLang = computed(() => {
+  const lang = route.params?.lang
+  if (typeof lang === 'string' && lang.length === 2) return lang
+  return codeToPath[currentLanguage.value] || 'en'
+})
 const showLanguageMenu = ref(false)
 
 watch(() => route.params.lang, (newLang) => {
@@ -204,6 +208,8 @@ watch(locale, (newLocale) => {
     document.body.classList.remove('chinese-font')
   }
 }, { immediate: true })
+
+const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
 </script>
 
 <template>
@@ -211,20 +217,20 @@ watch(locale, (newLocale) => {
     <div class="NavBar">
       <!-- Left: Logo -->
       <div class="nav-left">
-        <router-link :to="{ name: 'home', params: { lang: currentLang } }">
+        <router-link :to="{ name: 'home', params: { lang: currentLang } }"  @click="scrollToTop">
           <img :src="getUtilsUrl('kitWeb_logo1-large.webp')" fetchpriority="high" alt="KitWeb Logo" class="main-logo">
         </router-link>
       </div>
 
       <!-- Center: Links -->
       <div class="nav-center" style="justify-content: center; align-items: center; text-align: center;">
-        <router-link :to="{ name: 'home', params: { lang: currentLang } }" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.home') }}</router-link>
+        <router-link :to="{ name: 'home', params: { lang: currentLang } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.home') }}</router-link>
         <template v-if="isDev">
-          <router-link :to="{ name: 'catalog', params: { lang: currentLang } }" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.products') }}</router-link>
+          <router-link :to="{ name: 'catalog', params: { lang: currentLang } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.products') }}</router-link>
         </template>
-        <router-link :to="{ name: 'event', params: { lang: currentLang } }" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.events') }}</router-link>
-        <router-link :to="{ name: 'partners', params: { lang: currentLang } }" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.partners') }}</router-link>
-        <router-link :to="{ name: 'contactus', params: { lang: currentLang } }" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.contactUs') }}</router-link>
+        <router-link :to="{ name: 'event', params: { lang: currentLang } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.events') }}</router-link>
+        <router-link :to="{ name: 'partners', params: { lang: currentLang } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.partners') }}</router-link>
+        <router-link :to="{ name: 'contactus', params: { lang: currentLang } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.contactUs') }}</router-link>
       </div>
 
       <!-- Right: Search & Actions -->
@@ -251,15 +257,15 @@ watch(locale, (newLocale) => {
             </transition>
           </div>
           <template v-if="isDev">
-            <router-link v-if="authStore.isAuthenticated" :to="{ name: 'orderpage', params: { lang: currentLang } }" class="order-capsule">
+            <router-link v-if="authStore.isAuthenticated" :to="{ name: 'orderpage', params: { lang: currentLang } }" @click="scrollToTop" class="order-capsule">
               {{ $t('nav.startOrder') }}
             </router-link>
 
-            <router-link v-if="!authStore.isAuthenticated" :to="{ name: 'login', params: { lang: currentLang } }" class="login-capsule">
+            <router-link v-if="!authStore.isAuthenticated" :to="{ name: 'login', params: { lang: currentLang } }" @click="scrollToTop" class="login-capsule">
               {{ $t('nav.login') }}
             </router-link>
             <div v-else class="logged-in-actions">
-              <router-link :to="{ name: 'orderpage', params: { lang: currentLang } }" class="login-capsule account-link">
+              <router-link :to="{ name: 'orderpage', params: { lang: currentLang } }" @click="scrollToTop" class="login-capsule account-link">
                 <ion-icon name="person-circle-outline"></ion-icon>
                 <span>{{ authStore.user?.businessName || authStore.user?.ownerName || $t('nav.account') }}</span>
               </router-link>
@@ -286,14 +292,30 @@ watch(locale, (newLocale) => {
           <p>{{ $t('footer.companyDesc') }}</p>
         </div>
         <div class="footer-column">
-          <h4>{{ $t('footer.quickLinks') }}</h4>
-          <ul>
-            <li><a href="#">{{ $t('footer.aboutUs') }}</a></li>
-            <li><a href="#">{{ $t('footer.products') }}</a></li>
-            <li><a href="#">{{ $t('footer.contact') }}</a></li>
-            <li><a href="#">{{ $t('footer.faq') }}</a></li>
-          </ul>
-        </div>
+  <h4>{{ $t('footer.quickLinks') }}</h4>
+  <ul>
+    <li>
+      <router-link :to="{ name: 'home', params: { lang: currentLang } }" @click="scrollToTop">
+        {{ $t('footer.aboutUs') }}
+      </router-link>
+    </li>
+    <li>
+      <router-link :to="{ name: 'catalog', params: { lang: currentLang } }" @click="scrollToTop">
+        {{ $t('footer.products') }}
+      </router-link>
+    </li>
+    <li>
+      <router-link :to="{ name: 'contactus', params: { lang: currentLang } }" @click="scrollToTop">
+        {{ $t('footer.contact') }}
+      </router-link>
+    </li>
+    <li>
+      <!-- <router-link :to="{ name: 'faq', params: { lang: currentLang } }">
+        {{ $t('footer.faq') }}
+      </router-link> -->
+    </li>
+  </ul>
+</div>
         <div class="footer-column">
           <h4>{{ $t('footer.contactInfo') }}</h4>
           <ul>

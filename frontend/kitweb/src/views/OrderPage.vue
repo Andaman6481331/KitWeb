@@ -340,21 +340,21 @@ const generateOrderId = () => {
 
 const formatOrderMessage = (orderId) => {
     let message = `🧾 New Order (Website)\n`
-    message += `Order ID: ${orderId}\n`
-    message += `Customer: ${customerName.value || 'Guest'}\n\n`
+    message += `รหัส Order: ${orderId}\n`
+    message += `ชื่อลูกค้า: ${customerName.value || 'Guest'}\n\n`
 
     cart.value.forEach((item, index) => {
         message += `${index + 1}) ${item.name}\n`
-        message += `   Size: ${item.selectedSize} | Color: ${item.selectedColor}\n`
-        message += `   Qty: ${item.quantity}\n`
-        message += `   Unit: ${item.price.toFixed(2)}\n`
-        message += `   Subtotal: ${(item.price * item.quantity).toFixed(2)}\n\n`
+        message += `   ขนาด: ${item.selectedSize} | สี: ${item.selectedColor}\n`
+        message += `   จำนวน: ${item.quantity}\n`
+        message += `   ชิ้น: ${item.price.toFixed(2)}\n`
+        message += `   ราคารวม: ${(item.price * item.quantity).toFixed(2)}\n\n`
     })
 
-    message += `Total: ${cartTotal.value.toFixed(2)}\n`
-    message += `Payment: ${paymentMethod.value}\n`
+    message += `รวมทั้งหมด: ${cartTotal.value.toFixed(2)}\n`
+    message += `วิธีการชำระเงิน: ${paymentMethod.value}\n`
     if (orderNote.value) {
-        message += `Note: ${orderNote.value}\n`
+        message += `หมายเหตุ: ${orderNote.value}\n`
     }
 
     return message

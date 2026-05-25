@@ -51,9 +51,12 @@ export function createRouter() {
         scrollBehavior(to, from, savedPosition) {
             if (savedPosition) {
                 return savedPosition;
-            } else {
-                return { top: 0 };
-            }
+            } 
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve({ top: 0, left: 0 });
+                }, 0); 
+            });
         }
     });
 }

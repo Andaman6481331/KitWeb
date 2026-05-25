@@ -4,8 +4,11 @@ import AutoScrollEvent from '../components/auto-scroll-event.vue';
 import { getUtilsUrl } from '@/services/api';
 import comingSoonImg from '../assets/card-img05.webp';
 
+const contactFormLoc = ref(null); // Create the template ref
+
 const scrollToContact = () => {
-    document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
+    // contactForm.value points directly to the DOM element once rendered
+    contactFormLoc.value?.scrollIntoView({ behavior: 'smooth' });
 };
 
 const pastEvents = ref([
@@ -112,8 +115,7 @@ const handleContactSubmit = () => {
                 <p class="tagline" v-reveal style="animation-delay: 0.2s;">{{ $t('events.heroTagline') }}</p>
                 <p class="subtitle" v-reveal style="animation-delay: 0.4s;">{{ $t('events.heroSubtitle') }}</p>
                 <button class="cta-btn" v-reveal style="animation-delay: 0.6s;"
-                    @click="document.getElementById('contact').scrollIntoView({ behavior: 'smooth' })">
-                    {{ $t('events.joinNextEvent') }}
+                    @click="scrollToContact">{{ $t('events.contactUs') }}
                 </button>
             </div>
         </section>
@@ -250,19 +252,19 @@ const handleContactSubmit = () => {
                                 <span class="icon">📞</span>
                                 +66 2 221 1414
                             </a>
-                            <a href="mailto:events@kitcraft.com" class="contact-link">
+                            <a href="mailto:kitsampeng@gmail.com" class="contact-link">
                                 <span class="icon">✉️</span>
-                                kitcharoen.sampeng@gmail.com
+                                kitsampeng@gmail.com
                             </a>
                             <a href="#" class="contact-link">
                                 <span class="icon">💬</span>
-                                Line: @kitcraft
+                                IG: @kit_craft376
                             </a>
                         </div>
                     </div>
 
                     <!-- Right - Contact Form -->
-                    <div class="contact-form">
+                    <div class="contact-form" ref="contactFormLoc">
                         <h3>{{ $t('events.requestEvent') }}</h3>
                         <form @submit.prevent="handleContactSubmit">
                             <div class="form-group">
@@ -1079,6 +1081,12 @@ const handleContactSubmit = () => {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 20px;
+}
+
+@media (max-width: 1024px) {
+    .events-grid {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 
 @media (max-width: 768px) {
