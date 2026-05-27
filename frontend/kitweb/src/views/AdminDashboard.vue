@@ -296,7 +296,7 @@ const editProduct = (product) => {
     sizeVariants.value = [];
   }
 
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  // window.scrollTo({ top: 0, behavior: 'smooth' });
   stockAdjustment.value = 0;
 };
 
@@ -899,7 +899,7 @@ const deleteDiyProduct = async (id) => {
                     </div>
                   </div>
                 </div>
-                <p v-else class="gallery-empty">No DIY images added yet. Click Add Images above to upload.</p>
+                <p v-else class="gallery-empty">{{$t('admin.gImagesEmpty')}}</p>
               </div>
 
               <button type="submit" :disabled="uploading" :class="['submit-btn', isDiyEditing ? 'update' : '']">
@@ -941,7 +941,7 @@ const deleteDiyProduct = async (id) => {
         <section class="list-section">
           <template v-if="activeAdminSection === 'standard'">
             <div class="list-header">
-              <h2>{{ $t('admin.inventory') }}</h2>
+              <h2 style="padding: 0; margin: 0 0 30px 0;">{{ $t('admin.inventory') }}</h2>
               <!-- Filter Tabs -->
               <div class="filter-tabs">
                 <button :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'">{{ $t('admin.all')
@@ -1016,9 +1016,9 @@ const deleteDiyProduct = async (id) => {
       <transition name="slide-fade">
         <section class="gallery-variant-manager" v-if="activeAdminSection === 'standard'">
           <div class="workspace-header">
-            <h2><ion-icon name="images-outline"></ion-icon> Gallery & Variant Manager</h2>
+            <h2><ion-icon name="images-outline"></ion-icon>{{$t('admin.galleryTitle')}}</h2>
             <button type="button" class="add-gallery-btn" @click="triggerGalleryUpload">
-              <ion-icon name="cloud-upload-outline"></ion-icon> Add Images
+              <ion-icon name="cloud-upload-outline"></ion-icon> {{$t('admin.addImages')}}
             </button>
             <input type="file" ref="galleryFileInput" class="hidden-input" @change="handleGalleryUpload" accept="image/*" multiple />
           </div>
@@ -1033,9 +1033,9 @@ const deleteDiyProduct = async (id) => {
               <div class="card-controls">
                 <label>Link Role</label>
                 <select v-model="img.attribute_type">
-                  <option value="gallery">Gallery Only</option>
-                  <option value="color">Color Link</option>
-                  <option value="size">Size Link</option>
+                  <option value="gallery">{{$t('admin.galleryOnly')}}</option>
+                  <option value="color">{{$t('admin.colorLink')}}</option>
+                  <option value="size">{{$t('admin.sizeLink')}}</option>
                 </select>
                 <input v-if="img.attribute_type !== 'gallery'" v-model="img.attribute_value" 
                   :placeholder="img.attribute_type === 'color' ? 'e.g. Red' : 'e.g. 4 inches'" class="card-input" />
@@ -1045,26 +1045,26 @@ const deleteDiyProduct = async (id) => {
           <!-- Pricing & Stock Matrix -->
           <div class="pricing-matrix-workspace">
             <div class="matrix-header-row">
-              <h3>Pricing & Stock Configuration</h3>
+              <h3>{{$t('admin.pricingStockConfig')}}</h3>
               <button type="button" class="config-btn" @click="showFormulaPopup = true">
                 <ion-icon name="settings-outline"></ion-icon> {{ $t('admin.config') }}
               </button>
             </div>
             <p class="matrix-info-text">
-              Configure wholesale pricing and stock. 
-              <span v-if="sizeVariants.length > 0">Colors will automatically inherit these price levels.</span>
+              {{$t('admin.matrixInfoText')}}
+              <span v-if="sizeVariants.length > 0">{{$t('admin.matrixInfoTextColors')}}</span>
             </p>
             <div class="matrix-scrollable">
               <table class="matrix-table">
                 <thead>
                   <tr>
-                    <th>Variant Name</th>
-                    <th>Level 1</th>
-                    <th>Level 2</th>
-                    <th>Level 3</th>
-                    <th>Level 4</th>
-                    <th>Level 5</th>
-                    <th>Stock</th>
+                    <th>{{$t('admin.variantName')}}</th>
+                    <th>{{$t('admin.level1')}}</th>
+                    <th>{{$t('admin.level2')}}</th>
+                    <th>{{$t('admin.level3')}}</th>
+                    <th>{{$t('admin.level4')}}</th>
+                    <th>{{$t('admin.level5')}}</th>
+                    <th>{{$t('admin.stock')}}</th>
                     <th style="width: 50px;"></th>
                   </tr>
                 </thead>
@@ -1092,7 +1092,7 @@ const deleteDiyProduct = async (id) => {
                   <template v-else>
                     <tr>
                       <td class="variant-name-cell">
-                        <strong>Base Product</strong>
+                        <strong>{{$t('admin.baseProduct')}}</strong>
                       </td>
                       <td><input type="number" step="0.01" v-model="newProduct.price_1" class="matrix-input" /></td>
                       <td><input type="number" step="0.01" v-model="newProduct.price_2" class="matrix-input" /></td>
@@ -1325,9 +1325,14 @@ header {
 .list-section {
   background: white;
   padding: 30px;
-  border-radius: 24px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
   min-width: 0;
+  /* Important for grid items */
+}
+
+.list-section {
+  height: 760px;
+  overflow-y: scroll;
   /* Important for grid items */
 }
 
@@ -1641,9 +1646,6 @@ select {
   box-shadow: 0 4px 12px rgba(255, 118, 117, 0.2);
 }
 
-.list-header {
-  margin-bottom: 15px;
-}
 
 .filter-tabs {
   display: flex;

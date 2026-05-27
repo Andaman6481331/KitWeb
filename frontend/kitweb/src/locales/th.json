@@ -150,7 +150,9 @@
         "addToCart": "เพิ่มลงตะกร้า",
         "contactUs": "ติดต่อเรา",
         "thankyou": "ขอบพระคุณสำหรับข้อมูล ทางเซลของเราจะติดต่อกลับภายใน 24 ชั่วโมง",
-        "requiredFields": "กรุณากรอกข้อมูลในช่องที่จำเป็นทั้งหมด"
+        "requiredFields": "กรุณากรอกข้อมูลในช่องที่จำเป็นทั้งหมด",
+        "images": "รูปภาพ",
+        "videos": "วิดีโอ"
     },
     "catalog": {
         "since": "ตั้งแต่ปี 2527",
@@ -305,7 +307,30 @@
         "placeholderUseFor": "เช่น เสื้อผ้า, ของตกแต่งบ้าน",
         "placeholderVarieties": "เช่น คอตตอน, ไหม, ขนสัตว์",
         "placeholderSizes": "เช่น 50ก., 100ม., เล็ก",
-        "placeholderColors": "เช่น แดง, ฟ้าสดใส, เขียว"
+        "placeholderColors": "เช่น แดง, ฟ้าสดใส, เขียว",
+        "pricingStockConfig": "ตั้งค่าราคาและสต็อก",
+        "matrixInfoText": "ตั้งค่าราคาขายส่งและสต็อก สีจะถูกนำมาใช้ตามระดับราคา",
+        "matrixInfoTextColors": "สีจะถูกนำมาใช้ตามระดับราคา",
+        "variantName": "ชื่อตัวเลือก",
+        "level1": "L1 (ราคาหน้าร้าน)",
+        "level2": "L2 (ราคาส่งทั่วไป)",
+        "level3": "L3 (ลูกค้าซื้อเยอะ)",
+        "level4": "L4 (ลูกค้าประจำเก่าแก่)",
+        "level5": "L5",
+        "stock": "สต็อกของสินค้า",
+        "baseProduct": "สินค้าหลัก",
+        "galleryOnly": "คลังรูปภาพเท่านั้น",
+        "colorLink": "ตัวเลือกสี",
+        "sizeLink": "ตัวเลือกขนาด",
+        "addDiyProduct": "เพิ่มสินค้า DIY",
+        "updateDiyProduct": "อัปเดตสินค้า DIY",
+        "diyImages": "รูปภาพ DIY",
+        "diyImagesPlaceholder": "เพิ่มรูปภาพ DIY (รูปภาพแรกเป็นรูปภาพแสดงผล)",
+        "diyImagesEmpty": "ยังไม่มีรูปภาพ DIY ที่เพิ่มไว้ คลิกเพิ่มรูปภาพด้านบนเพื่ออัปโหลด",
+        "diyImagesMain": "รูปภาพแสดงผล",
+        "diyImagesGallery": "รูปภาพในคลัง",
+        "diyImagesGalleryPlaceholder": "เพิ่มรูปภาพในคลัง (รูปภาพแรกเป็นรูปภาพแสดงผล)",
+        "diyImagesGalleryEmpty": "ยังไม่มีรูปภาพในคลัง คลิกเพิ่มรูปภาพด้านบนเพื่ออัปโหลด"
     },
     "featuredCategories": {
         "title": "ประเภทสินค้าแนะนำ",
@@ -462,6 +487,7 @@
         "placedOn": "สั่งซื้อเมื่อ",
         "status": "สถานะ",
         "qty": "จำนวน",
-        "goCheckout": "ไปที่หน้าชำระเงิน"
+        "goCheckout": "ไปที่หน้าชำระเงิน",
+        "standard": "มาตรฐาน"
     }
 }

@@ -3,14 +3,13 @@ import { ref, onMounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import VideoCard from '../components/video-card.vue';
 import InstagramSection from '../components/InstagramSection.vue';
-// import RecommendedItemSlider from '../components/recommended-item-slider.vue';
-// import CalenderSection from '../components/calender-section.vue';
 import AboutKitcharoen from '../components/AboutKitcharoen.vue';
 import AutoScrollBanner from '../components/auto-scroll-banner.vue';
 import FeaturedCategories from '../components/featured-categories.vue';
 import customerReview from '../components/customer-review.vue';
 import { api, getUtilsUrl } from '../services/api';
 import { codeToPath, defaultLang } from '../utils/localeRoutes';
+import ProductStock from '../components/products-stock.vue';
 
 const products = ref([]);
 const route = useRoute();
@@ -102,6 +101,9 @@ onMounted(async () => {
 
     <!-- Customer Review -->
     <customerReview />
+
+    <!-- Product Stock -->
+    <ProductStock />
 
     <!-- Promotional Banner -->
     <section class="promo-section">

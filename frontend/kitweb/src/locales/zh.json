@@ -136,7 +136,9 @@
         "completionTime": "完成时间",
         "difficulty": "难度",
         "whatsIncluded": "包含内容：",
-        "addToCart": "加入购物车"
+        "addToCart": "加入购物车",
+        "images": "图片",
+        "videos": "视频"
     },
     "common": {
         "address": "曼谷三攀他旺区 乍甲拉瓦 瓦尼奇1路 376号"
@@ -428,6 +430,7 @@
         "placedOn": "下单时间",
         "status": "状态",
         "qty": "数量",
-        "goCheckout": "前往结账"
+        "goCheckout": "前往结账",
+        "standard": "标准"
     }
 }

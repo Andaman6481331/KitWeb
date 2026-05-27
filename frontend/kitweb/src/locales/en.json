@@ -150,7 +150,9 @@
     "addToCart": "Add to Cart",
     "contactUs": "Contact Us",
     "thankyou": "Thank you for your interest! We will get back to you within 24 hours.",
-    "requiredFields": "Please fill in all required fields."
+    "requiredFields": "Please fill in all required fields.",
+    "images": "Images",
+    "videos": "Videos"
   },
   "catalog": {
     "since": "SINCE 1984",
@@ -305,7 +307,30 @@
     "placeholderUseFor": "e.g. Clothing, Home decor",
     "placeholderVarieties": "e.g. Cotton, Silk, Wool",
     "placeholderSizes": "e.g. 50g, 100m, Small",
-    "placeholderColors": "e.g. Red, Sky Blue, Green"
+    "placeholderColors": "e.g. Red, Sky Blue, Green",
+    "pricingStockConfig": "Pricing & Stock Configuration",
+    "matrixInfoText": "Configure wholesale pricing and stock. Colors will automatically inherit these price levels.",
+    "matrixInfoTextColors": "Colors will automatically inherit these price levels.",
+    "variantName": "Variant Name",
+    "level1": "Level 1",
+    "level2": "Level 2",
+    "level3": "Level 3",
+    "level4": "Level 4",
+    "level5": "Level 5",
+    "stock": "Stock",
+    "baseProduct": "Base Product",
+    "galleryOnly": "Gallery Only",
+    "colorLink": "Color Link",
+    "sizeLink": "Size Link",
+    "addDiyProduct": "Add DIY Product",
+    "updateDiyProduct": "Update DIY Product",
+    "diyImages": "DIY Images",
+    "diyImagesPlaceholder": "Add DIY images (first image is main display)",
+    "diyImagesEmpty": "No DIY images added yet. Click Add Images above to upload.",
+    "diyImagesMain": "Main Image",
+    "diyImagesGallery": "Gallery Image",
+    "diyImagesGalleryPlaceholder": "Add gallery images (first image is main display)",
+    "diyImagesGalleryEmpty": "No gallery images added yet. Click Add Images above to upload."
   },
   "featuredCategories": {
     "title": "Artisan Collections",
@@ -463,6 +488,7 @@
     "placedOn": "Placed on",
     "status": "Status",
     "qty": "Qty",
-    "goCheckout": "Go to Checkout"
+    "goCheckout": "Go to Checkout",
+    "standard": "Standard"
   }
 }

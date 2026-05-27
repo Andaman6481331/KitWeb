@@ -1,6 +1,8 @@
 <script setup>
+import { ref } from 'vue';
 import { getUtilsUrl } from '@/services/api';
 
+const isPaused = ref(false);
 </script>
 <template>
     <div class="banner-section">

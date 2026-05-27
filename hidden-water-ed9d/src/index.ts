@@ -71,6 +71,59 @@ function parseRange(encoded: string | null, size: number) {
 	};
 }
 
+function r2KeysForImageKey(imageKey: string): string[] {
+	if (!imageKey || imageKey.startsWith("http")) return [];
+
+	if (imageKey.includes(".")) {
+		const base = imageKey.replace(/\.[^.]+$/, "");
+		return [imageKey, `${base}.webp`, `${base}.avif`];
+	}
+
+	return [`${imageKey}-large.webp`, `${imageKey}-thumb.webp`];
+}
+
+async function deleteR2Images(bucket: R2Bucket, imageKeys: Iterable<string>) {
+	const objectKeys = new Set<string>();
+	for (const key of imageKeys) {
+		for (const r2Key of r2KeysForImageKey(key)) {
+			objectKeys.add(r2Key);
+		}
+	}
+	await Promise.all([...objectKeys].map((key) => bucket.delete(key)));
+}
+
+async function collectProductImageKeys(env: Env, productId: string): Promise<Set<string>> {
+	const keys = new Set<string>();
+
+	const product = await env.DB.prepare("SELECT image_key FROM products WHERE id = ?").bind(productId).first() as any;
+	if (product?.image_key) keys.add(product.image_key);
+
+	const { results: galleryImages } = await env.DB.prepare(
+		"SELECT image_key FROM product_images WHERE product_id = ?"
+	).bind(productId).all();
+	for (const img of galleryImages) {
+		if (img.image_key) keys.add(img.image_key as string);
+	}
+
+	const { results: variants } = await env.DB.prepare(
+		"SELECT image_key FROM product_variants WHERE product_id = ?"
+	).bind(productId).all();
+	for (const variant of variants) {
+		if (variant.image_key) keys.add(variant.image_key as string);
+	}
+
+	const { results: colors } = await env.DB.prepare(
+		`SELECT vc.image_key FROM variant_colors vc
+		 JOIN product_variants pv ON vc.variant_id = pv.id
+		 WHERE pv.product_id = ?`
+	).bind(productId).all();
+	for (const color of colors) {
+		if (color.image_key) keys.add(color.image_key as string);
+	}
+
+	return keys;
+}
+
 async function handleR2Request(
 	bucket: R2Bucket, 
 	key: string, 
@@ -691,10 +744,13 @@ export default {
 			if (request.method === "DELETE") {
 				if (url.pathname.startsWith("/products/")) {
 					const id = url.pathname.split("/products/")[1];
+					const imageKeys = await collectProductImageKeys(env, id);
+					await deleteR2Images(env.IMAGES, imageKeys);
 					// Set referencing order_items product_id to NULL to preserve order history without violating FK constraints
 					await env.DB.prepare("UPDATE order_items SET product_id = NULL WHERE product_id = ?").bind(id).run();
 					// Explicitly clean up related images and stock history
 					await env.DB.prepare("DELETE FROM product_images WHERE product_id = ?").bind(id).run();
+					await env.DB.prepare("DELETE FROM product_variants WHERE product_id = ?").bind(id).run();
 					await env.DB.prepare("DELETE FROM stock_history WHERE product_id = ?").bind(id).run();
 					// Delete standard product
 					await env.DB.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
@@ -703,6 +759,19 @@ export default {
 				if (url.pathname.startsWith("/diy/products/")) {
 					const id = url.pathname.split("/diy/products/")[1];
 					const diyProductId = `diy-${id}`;
+					const diyProduct = await env.DB.prepare("SELECT images FROM diy_products WHERE id = ?").bind(id).first() as any;
+					const diyImageKeys = new Set<string>();
+					if (diyProduct?.images) {
+						const images = typeof diyProduct.images === "string" ? JSON.parse(diyProduct.images) : diyProduct.images;
+						if (Array.isArray(images)) {
+							for (const img of images) {
+								if (typeof img === "string" && img) {
+									diyImageKeys.add(img);
+								}
+							}
+						}
+					}
+					await deleteR2Images(env.KIT_IMAGE, diyImageKeys);
 					// Set referencing order_items product_id to NULL to preserve order history without violating FK constraints
 					await env.DB.prepare("UPDATE order_items SET product_id = NULL WHERE product_id = ?").bind(diyProductId).run();
 					// Delete DIY product

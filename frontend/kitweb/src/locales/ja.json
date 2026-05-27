@@ -135,7 +135,9 @@
         "completionTime": "完成時間",
         "difficulty": "難易度",
         "whatsIncluded": "含まれるもの：",
-        "addToCart": "カートに追加"
+        "addToCart": "カートに追加",
+        "images": "画像",
+        "videos": "動画"
     },
     "common": {
         "address": "バンコク サンパンタウォン区 チャックラワット ワニット1通り 376番地"
@@ -427,6 +429,7 @@
         "placedOn": "注文日",
         "status": "ステータス",
         "qty": "数量",
-        "goCheckout": "チェックアウトへ進む"
+        "goCheckout": "チェックアウトへ進む",
+        "standard": "標準"
     }
 }

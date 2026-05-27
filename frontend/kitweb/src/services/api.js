@@ -3,6 +3,12 @@
 export const API_URL = 'https://hidden-water-ed9d.shop-backend-kitweb.workers.dev';
 export const getImageUrl = (filename) => `${API_URL}/images/${filename}`;
 export const getUtilsUrl = (filename) => `${API_URL}/utils/${filename}`;
+
+export const getCategoryImageUrl = (category) => {
+  if (!category) return '';
+  const slug = category.toLowerCase().trim().replace(/\s+/g, '');
+  return getUtilsUrl(`cat-${slug}-large.png`);
+};
 export const getDiyImageUrl = (filename, variant = 'thumb') => {
   if (!filename) return 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg';
   const keyStr = String(filename);

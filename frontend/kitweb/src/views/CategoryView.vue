@@ -1,8 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onServerPrefetch, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { api, API_URL } from '../services/api';
-import { categoryHeroImages } from '../services/categoryImages';
+import { api, API_URL, getCategoryImageUrl } from '../services/api';
 import { useI18n } from 'vue-i18n';
 import { useHead } from '@unhead/vue';
 import translationStore from '../stores/translationStore';
@@ -126,12 +125,11 @@ const notificationMessage = ref('');
 const currentCategory = computed(() => route.params.category);
 
 const heroImage = computed(() => {
-    const catKey = currentCategory.value?.toLowerCase();
-    if (catKey && categoryHeroImages[catKey]) {
-        return categoryHeroImages[catKey];
+    if (currentCategory.value) {
+        return getCategoryImageUrl(currentCategory.value);
     }
 
-    // Fallback to first product image if no manual mapping found
+    // Fallback to first product image if no category is set
     if (products.value.length > 0 && products.value[0].image_key) {
         return getImageUrl(products.value[0].image_key);
     }
@@ -339,7 +337,7 @@ const getImageUrl = (key, variant = 'large') => {
 
 const backToCatalog = () => {
     router.push(
-        localizedRoute(route, 'catalog', { category: currentCategory.value })
+        localizedRoute(route, 'catalog')
     );
 };
 
@@ -723,16 +721,13 @@ const sortedProducts = computed(() => {
 /* PRODUCT GRID */
 .product-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 30px;
-    max-width: 1300px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     margin: 0 auto;
-    padding: 0 5%;
+    padding: 0 1rem;
 }
 
 .product-card {
     background: #fdfcfb;
-    border-radius: 16px;
     overflow: hidden;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
     border: 1px solid #f1f2f6;
@@ -802,23 +797,24 @@ const sortedProducts = computed(() => {
 }
 
 .card-title {
-    font-size: 20px;
+    font-size: 16px;
     color: #2d3436;
-    margin: 0 0 10px 0;
+    margin: 0;
     font-weight: 600;
 }
 
 .card-desc {
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 3 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
     font-size: 14px;
     color: #636e72;
-    line-height: 1.6;
+    line-height: 1.4;
     margin-bottom: 20px;
     flex: 1;
+    text-align: justify;
 }
 
 .card-footer {
@@ -1033,6 +1029,7 @@ const sortedProducts = computed(() => {
     color: #666;
     line-height: 1.6;
     margin-bottom: 30px;
+    text-align: justify;
 }
 
 .detail-section {

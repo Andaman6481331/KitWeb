@@ -1,8 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onServerPrefetch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { api, API_URL } from '../services/api';
-import { categoryHeroImages } from '../services/categoryImages';
+import { api, API_URL, getCategoryImageUrl } from '../services/api';
 import { useI18n } from 'vue-i18n';
 import { codeToPath, defaultLang, localizedRoute } from '@/utils/localeRoutes';
 
@@ -105,14 +104,10 @@ const categories = computed(() => {
         if (categoryMap.has(p.category)) {
             categoryMap.get(p.category).count++;
         } else {
-            const catKey = p.category.toLowerCase();
-            const mappedImage = categoryHeroImages[catKey];
-
             categoryMap.set(p.category, {
                 name: p.category,
                 count: 1,
-                image: mappedImage || (p.image_key ? (p.image_key.includes('.') ? `${API_URL}/images/${p.image_key}` : `${API_URL}/images/${p.image_key}-thumb.webp`) : 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg'),
-                description: t(`catalog.categoryDescriptions.${p.category}`, t('catalog.categoryDescriptions.Default'))
+                image: getCategoryImageUrl(p.category) || (p.image_key ? (p.image_key.includes('.') ? `${API_URL}/images/${p.image_key}` : `${API_URL}/images/${p.image_key}-thumb.webp`) : 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg'),
             });
         }
     });
@@ -161,19 +156,18 @@ const selectCategory = (categoryName) => {
 }
 
 .category-grid-container {
-    max-width: 1200px;
     margin: 0 auto;
 }
 
 .category-list {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    padding: 0 1rem;
     gap: 1rem;
 }
 
 .category-card {
     background: #FFFAF6;
-    border-radius: 20px;
     overflow: hidden;
     cursor: pointer;
     transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), box-shadow 0.4s ease;
@@ -181,11 +175,12 @@ const selectCategory = (categoryName) => {
     display: flex;
     flex-direction: column;
     padding: 0;
+    box-shadow: 0 20px 40px rgba(53, 35, 29, 0.08);
 }
 
 .category-card:hover {
     transform: translateY(-8px);
-    box-shadow: 0 20px 40px rgba(53, 35, 29, 0.08);
+    box-shadow: 0 20px 40px rgba(53, 35, 29, 0.379);
 }
 
 .category-image-wrapper {
@@ -199,7 +194,6 @@ const selectCategory = (categoryName) => {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    border-radius: 20px 20px 0 0;
     transition: transform 0.6s ease;
 }
 

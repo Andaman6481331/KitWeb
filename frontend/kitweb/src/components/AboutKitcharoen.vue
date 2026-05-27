@@ -175,7 +175,6 @@ const aboutInfo = computed(() => ({
     max-width: 600px;
     height: 600px;
     overflow: hidden;
-    border-radius: 40px;
     position: relative;
     box-shadow: 0 20px 40px rgba(74, 63, 53, 0.15);
 }
@@ -187,9 +186,6 @@ const aboutInfo = computed(() => ({
     transition: transform 0.6s ease;
 }
 
-.image-content:hover img {
-    transform: scale(1.05);
-}
 
 /* Buttons */
 .cta-buttons {

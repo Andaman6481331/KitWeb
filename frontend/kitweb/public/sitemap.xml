@@ -88,7 +88,7 @@
   <!-- EVENT PAGES -->
   <url>
     <loc>https://kitcharoensampeng.com/th/event</loc>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/catalog" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/event" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/event" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/event" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/event" />
