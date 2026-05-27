@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onServerPrefetch, computed } from 'vue';
 import { api, getDiyImageUrl } from '../services/api';
 import { cartStore } from '../stores/cartStore';
 import { useI18n } from 'vue-i18n';
@@ -14,6 +14,7 @@ const currentLang = computed(() => route.params.lang || defaultLang);
 
 const diyProducts = ref([]);
 const isLoading = ref(true);
+const hasLoaded = ref(false);
 
 const selectedProduct = ref(null);
 const showDetailsPopup = ref(false);
@@ -34,6 +35,7 @@ const loadDiyProducts = async () => {
     try {
         isLoading.value = true;
         diyProducts.value = await api.getDiyProducts();
+        hasLoaded.value = true;
     } catch (error) {
         console.error('Failed to load DIY products:', error);
     } finally {
@@ -41,8 +43,12 @@ const loadDiyProducts = async () => {
     }
 };
 
+onServerPrefetch(loadDiyProducts);
+
 onMounted(() => {
-    loadDiyProducts();
+    if (!hasLoaded.value && diyProducts.value.length === 0) {
+        loadDiyProducts();
+    }
 });
 
 const tProduct = (item, field) => {

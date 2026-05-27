@@ -25,6 +25,21 @@
 
     <!-- Instagram Embed -->
     <script async src="//www.instagram.com/embed.js"></script>
+    <script>
+      (function() {
+        if (typeof window !== 'undefined') {
+          var s1 = document.createElement('script');
+          s1.type = 'module';
+          s1.src = 'https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js';
+          document.head.appendChild(s1);
+          
+          var s2 = document.createElement('script');
+          s2.noModule = true;
+          s2.src = 'https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js';
+          document.head.appendChild(s2);
+        }
+      })();
+    </script>
 
   </head>
   <body>

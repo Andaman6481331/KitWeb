@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { api, API_URL, getDiyImageUrl } from '../services/api';
 import { processProductImage } from '../services/image-processor';
 import { useI18n } from 'vue-i18n';
@@ -53,6 +53,103 @@ const imagePreview = ref(null);
 const uploading = ref(false);
 const stockAdjustment = ref(0);
 
+const galleryImages = ref([]); // Array of { key, file, preview, attribute_type, attribute_value, is_new: boolean }
+const galleryFileInput = ref(null);
+
+// Variant states derived from gallery image link roles
+const sizeVariants = ref([]); // list of { name, price_1, price_2, price_3, price_4, price_5, stock, image_key }
+const initialVariantNames = ref([]); // track loaded variants
+
+const detectedSizes = computed(() => {
+  const sizes = new Set();
+  galleryImages.value.forEach(img => {
+    if (img.attribute_type === 'size' && img.attribute_value) {
+      sizes.add(img.attribute_value.trim());
+    }
+  });
+  return Array.from(sizes);
+});
+
+const detectedColors = computed(() => {
+  const colors = new Set();
+  galleryImages.value.forEach(img => {
+    if (img.attribute_type === 'color' && img.attribute_value) {
+      colors.add(img.attribute_value.trim());
+    }
+  });
+  return Array.from(colors);
+});
+
+watch(
+  [
+    () => galleryImages.value.map(img => `${img.attribute_type}:${img.attribute_value}`),
+    () => [...initialVariantNames.value]
+  ],
+  () => {
+    const detected = new Set();
+    galleryImages.value.forEach(img => {
+      if (img.attribute_type === 'size' && img.attribute_value) {
+        const trimmed = img.attribute_value.trim();
+        if (trimmed) {
+          detected.add(trimmed);
+        }
+      }
+    });
+
+    const allSizeNames = Array.from(new Set([...initialVariantNames.value, ...detected]));
+
+    const updated = allSizeNames.map(size => {
+      const existing = sizeVariants.value.find(sv => sv.name === size);
+      if (existing) return existing;
+      
+      // Check if the loaded product had this variant (for edit mode)
+      if (isEditing.value && newProduct.value.variants) {
+        const match = newProduct.value.variants.find(v => v.variant_name === size);
+        if (match) {
+          return {
+            name: size,
+            price_1: match.price_1 || 0,
+            price_2: match.price_2 || 0,
+            price_3: match.price_3 || 0,
+            price_4: match.price_4 || 0,
+            price_5: match.price_5 || 0,
+            stock: match.stock || 0,
+            image_key: match.image_key || ''
+          };
+        }
+      }
+
+      return {
+        name: size,
+        price_1: newProduct.value.price_1 || 0,
+        price_2: newProduct.value.price_2 || 0,
+        price_3: newProduct.value.price_3 || 0,
+        price_4: newProduct.value.price_4 || 0,
+        price_5: newProduct.value.price_5 || 0,
+        stock: 0,
+        image_key: ''
+      };
+    });
+    sizeVariants.value = updated;
+  },
+  { deep: true, immediate: true }
+);
+
+const removeSizeVariant = (sizeName) => {
+  initialVariantNames.value = initialVariantNames.value.filter(n => n !== sizeName);
+
+  // Untag any gallery images that have this size name
+  galleryImages.value.forEach(img => {
+    if (img.attribute_type === 'size' && img.attribute_value?.trim() === sizeName) {
+      img.attribute_type = 'gallery';
+      img.attribute_value = '';
+    }
+  });
+
+  // Filter it from sizeVariants
+  sizeVariants.value = sizeVariants.value.filter(sv => sv.name !== sizeName);
+};
+
 const updateStockAdjustment = (amount) => {
   stockAdjustment.value += amount;
   validateStockAdjustment();
@@ -64,9 +161,6 @@ const validateStockAdjustment = () => {
     stockAdjustment.value = -currentStock;
   }
 };
-
-const galleryImages = ref([]); // Array of { key, file, preview, attribute_type, attribute_value, is_new: boolean }
-const galleryFileInput = ref(null);
 
 const showFormulaPopup = ref(false);
 const formulaInput = ref("200, 180, 160, 130");
@@ -158,6 +252,8 @@ const resetForm = () => {
   selectedFile.value = null;
   imagePreview.value = null;
   galleryImages.value = [];
+  sizeVariants.value = [];
+  initialVariantNames.value = [];
   isEditing.value = false;
   editingId.value = null;
   stockAdjustment.value = 0;
@@ -178,6 +274,26 @@ const editProduct = (product) => {
     }));
   } else {
     galleryImages.value = [];
+  }
+
+  // Load variants directly to sizeVariants and initialVariantNames
+  if (product.variants && product.variants.length > 0) {
+    initialVariantNames.value = product.variants
+      .map(v => v.variant_name)
+      .filter(name => name !== 'Default');
+    sizeVariants.value = product.variants.map(v => ({
+      name: v.variant_name,
+      price_1: v.price_1 || 0,
+      price_2: v.price_2 || 0,
+      price_3: v.price_3 || 0,
+      price_4: v.price_4 || 0,
+      price_5: v.price_5 || 0,
+      stock: v.stock || 0,
+      image_key: v.image_key || ''
+    })).filter(v => v.name !== 'Default');
+  } else {
+    initialVariantNames.value = [];
+    sizeVariants.value = [];
   }
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -221,8 +337,15 @@ const handleSubmit = async () => {
   try {
     uploading.value = true;
 
-    const prepareAndUpload = async (file) => {
-      const baseName = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    let sku = newProduct.value.sku;
+    if (!sku) {
+      const skuRes = await api.getNextSku(newProduct.value.category);
+      sku = skuRes.sku;
+      newProduct.value.sku = sku;
+    }
+
+    const prepareAndUpload = async (file, suffix = '') => {
+      const baseName = `${sku}${suffix}-${Date.now()}`;
       const processedFiles = await processProductImage(file, baseName);
       await api.uploadImage(processedFiles);
       return baseName;
@@ -234,11 +357,14 @@ const handleSubmit = async () => {
       newProduct.value.image_key = baseKey;
     }
 
-    // 2. Upload Gallery Images if new
+    // 2. Upload Gallery Images if new, saving keys directly to the gallery array
     const finalImages = [];
+    let galleryIndex = 1;
     for (const img of galleryImages.value) {
       if (img.is_new) {
-        const baseKey = await prepareAndUpload(img.file);
+        const baseKey = await prepareAndUpload(img.file, `-g${galleryIndex++}`);
+        img.image_key = baseKey; // save back to helper ref
+        img.is_new = false;
         finalImages.push({
           image_key: baseKey,
           attribute_type: img.attribute_type,
@@ -257,6 +383,71 @@ const handleSubmit = async () => {
 
     // Add images to payload
     newProduct.value.images = finalImages;
+
+    // 3. Build variants payload
+    const variantsPayload = [];
+    const colorsList = detectedColors.value;
+
+    if (sizeVariants.value.length > 0) {
+      for (const sv of sizeVariants.value) {
+        // Find size variant image key
+        const sizeImageObj = galleryImages.value.find(img => img.attribute_type === 'size' && img.attribute_value?.trim() === sv.name);
+        const sizeImageKey = sizeImageObj ? sizeImageObj.image_key : null;
+
+        // Generate variant specific SKU slug
+        const sizeSlug = sv.name.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().substring(0, 5);
+        const variantSku = `${sku}-${sizeSlug}`;
+
+        const variantColors = colorsList.map(colorName => {
+          const colorImageObj = galleryImages.value.find(img => img.attribute_type === 'color' && img.attribute_value?.trim() === colorName);
+          const colorImageKey = colorImageObj ? colorImageObj.image_key : null;
+          return {
+            color_name: colorName,
+            image_key: colorImageKey,
+            stock: sv.stock || 0
+          };
+        });
+
+        variantsPayload.push({
+          variant_name: sv.name,
+          sku: variantSku,
+          price_1: parseFloat(sv.price_1) || 0,
+          price_2: parseFloat(sv.price_2) || 0,
+          price_3: parseFloat(sv.price_3) || 0,
+          price_4: parseFloat(sv.price_4) || 0,
+          price_5: parseFloat(sv.price_5) || 0,
+          stock: parseInt(sv.stock) || 0,
+          image_key: sizeImageKey,
+          colors: variantColors
+        });
+      }
+    } else if (colorsList.length > 0) {
+      // Colors only, no sizes -> create a single default variant
+      const variantColors = colorsList.map(colorName => {
+        const colorImageObj = galleryImages.value.find(img => img.attribute_type === 'color' && img.attribute_value?.trim() === colorName);
+        const colorImageKey = colorImageObj ? colorImageObj.image_key : null;
+        return {
+          color_name: colorName,
+          image_key: colorImageKey,
+          stock: parseInt(newProduct.value.stock) || 0
+        };
+      });
+
+      variantsPayload.push({
+        variant_name: 'Default',
+        sku: `${sku}-DFT`,
+        price_1: parseFloat(newProduct.value.price_1) || 0,
+        price_2: parseFloat(newProduct.value.price_2) || 0,
+        price_3: parseFloat(newProduct.value.price_3) || 0,
+        price_4: parseFloat(newProduct.value.price_4) || 0,
+        price_5: parseFloat(newProduct.value.price_5) || 0,
+        stock: parseInt(newProduct.value.stock) || 0,
+        image_key: null,
+        colors: variantColors
+      });
+    }
+
+    newProduct.value.variants = variantsPayload;
 
     if (isEditing.value) {
       newProduct.value.stock = Math.max(0, (newProduct.value.stock || 0) + stockAdjustment.value);
@@ -296,22 +487,39 @@ const getImageUrl = (key, variant = 'thumb') => {
 };
 
 const applyPriceFormula = () => {
-  const p5 = parseFloat(newProduct.value.price_5);
-  if (isNaN(p5) || p5 <= 0) {
-    alert("Please set a valid Level 5 price first.");
-    return;
-  }
-
   const percentages = formulaInput.value.split(',').map(s => parseFloat(s.trim()));
   if (percentages.length < 4 || percentages.some(isNaN)) {
     alert("Please enter 4 valid percentages separated by commas (e.g. 200, 180, 160, 130)");
     return;
   }
 
-  newProduct.value.price_1 = Number((p5 * percentages[0] / 100).toFixed(2));
-  newProduct.value.price_2 = Number((p5 * percentages[1] / 100).toFixed(2));
-  newProduct.value.price_3 = Number((p5 * percentages[2] / 100).toFixed(2));
-  newProduct.value.price_4 = Number((p5 * percentages[3] / 100).toFixed(2));
+  if (sizeVariants.value.length > 0) {
+    let appliedCount = 0;
+    sizeVariants.value.forEach(sv => {
+      const p5 = parseFloat(sv.price_5);
+      if (!isNaN(p5) && p5 > 0) {
+        sv.price_1 = Number((p5 * percentages[0] / 100).toFixed(2));
+        sv.price_2 = Number((p5 * percentages[1] / 100).toFixed(2));
+        sv.price_3 = Number((p5 * percentages[2] / 100).toFixed(2));
+        sv.price_4 = Number((p5 * percentages[3] / 100).toFixed(2));
+        appliedCount++;
+      }
+    });
+    if (appliedCount === 0) {
+      alert("Please set a valid Level 5 price on at least one variant first.");
+      return;
+    }
+  } else {
+    const p5 = parseFloat(newProduct.value.price_5);
+    if (isNaN(p5) || p5 <= 0) {
+      alert("Please set a valid Level 5 price first.");
+      return;
+    }
+    newProduct.value.price_1 = Number((p5 * percentages[0] / 100).toFixed(2));
+    newProduct.value.price_2 = Number((p5 * percentages[1] / 100).toFixed(2));
+    newProduct.value.price_3 = Number((p5 * percentages[2] / 100).toFixed(2));
+    newProduct.value.price_4 = Number((p5 * percentages[3] / 100).toFixed(2));
+  }
 
   showFormulaPopup.value = false;
 };
@@ -356,7 +564,8 @@ const newDiyProduct = ref({
   price_1: 0,
   price_2: 0,
   price_3: 0,
-  stock: 0
+  stock: 0,
+  sku: ''
 });
 
 const loadDiyProducts = async () => {
@@ -385,7 +594,7 @@ const removeDiyImage = (index) => {
 };
 
 const resetDiyForm = () => {
-  newDiyProduct.value = { name: '', name_th: '', description: '', price_1: 0, price_2: 0, price_3: 0, stock: 0 };
+  newDiyProduct.value = { name: '', name_th: '', description: '', price_1: 0, price_2: 0, price_3: 0, stock: 0, sku: '' };
   diyImages.value = [];
   isDiyEditing.value = false;
   diyEditingId.value = null;
@@ -395,17 +604,25 @@ const handleDiySubmit = async () => {
   try {
     uploading.value = true;
 
-    const prepareAndUploadDiy = async (file) => {
-      const baseName = `diy-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    let sku = newDiyProduct.value.sku;
+    if (!sku) {
+      const skuRes = await api.getNextDiySku();
+      sku = skuRes.sku;
+      newDiyProduct.value.sku = sku;
+    }
+
+    const prepareAndUploadDiy = async (file, suffix = '') => {
+      const baseName = `${sku}${suffix}-${Date.now()}`;
       const processedFiles = await processProductImage(file, baseName);
       await api.uploadDiyImage(processedFiles);
       return baseName;
     };
 
     const finalImages = [];
+    let galleryIndex = 1;
     for (const img of diyImages.value) {
       if (img.is_new) {
-        const baseKey = await prepareAndUploadDiy(img.file);
+        const baseKey = await prepareAndUploadDiy(img.file, `-g${galleryIndex++}`);
         finalImages.push(baseKey);
       } else {
         finalImages.push(img.key);
@@ -444,7 +661,8 @@ const editDiyProduct = (prod) => {
     price_1: prod.price_1,
     price_2: prod.price_2,
     price_3: prod.price_3,
-    stock: prod.stock
+    stock: prod.stock,
+    sku: prod.sku || ''
   };
   if (prod.images) {
     diyImages.value = prod.images.map(imgKey => ({
@@ -547,7 +765,7 @@ const deleteDiyProduct = async (id) => {
               </button>
             </div>
 
-            <form @submit.prevent="handleSubmit">
+            <form id="product-form" @submit.prevent="handleSubmit">
             <div class="product-main-row">
               <div class="form-group name-field">
                 <label>{{ $t('admin.productNameEn') }}</label>
@@ -559,26 +777,12 @@ const deleteDiyProduct = async (id) => {
               </div>
             </div>
 
-            <div class="price-levels">
-              <div class="price-header-row">
-                <label>{{ $t('admin.pricesHeader') }}</label>
-                <button type="button" class="config-btn" @click="showFormulaPopup = true">
-                  <ion-icon name="settings-outline"></ion-icon> {{ $t('admin.config') }}
-                </button>
-              </div>
-              <div class="price-grid">
-                <div v-for="i in 5" :key="i" :class="['price-input-box', i === 1 ? 'active' : '']">
-                  <span class="label">{{ $t('admin.level') }}{{ i }}</span>
-                  <input v-model="newProduct['price_' + i]" type="number" step="0.01" placeholder="0.00" required />
-                </div>
-              </div>
-            </div>
 
             <div class="form-row">
               <div>
                 <div class="product-image-uploader" @click="triggerFileUpload" :title="$t('admin.clickToUpload')">
                   <img v-if="newProduct.image_key || imagePreview"
-                    :src="imagePreview || getImageUrl(newProduct.image_key)" alt="preview" />
+                    :src="imagePreview || getImageUrl(newProduct.image_key, 'large')" alt="preview" />
                   <div v-else class="upload-placeholder">
                     <ion-icon name="camera-outline"></ion-icon>
                     <span>{{ $t('admin.addImage') }}</span>
@@ -617,82 +821,8 @@ const deleteDiyProduct = async (id) => {
               </div>
             </div>
 
-            <div class="form-group">
-              <label>{{ $t('admin.varieties') }}</label>
-              <input v-model="newProduct.varieties" type="text" :placeholder="$t('admin.placeholderVarieties')"
-                class="form-input" />
-            </div>
 
-            <div class="form-row">
-              <div class="form-group">
-                <label>{{ $t('admin.sizes') }}</label>
-                <input v-model="newProduct.sizes" :placeholder="$t('admin.placeholderSizes')" />
-              </div>
-              <div class="form-group">
-                <label>{{ $t('admin.colors') }}</label>
-                <input v-model="newProduct.colors" :placeholder="$t('admin.placeholderColors')" />
-              </div>
-              <div class="form-group" v-if="!isEditing">
-                <label>{{ $t('admin.initialStock') }}</label>
-                <input v-model.number="newProduct.stock" type="number" min="0" placeholder="0" />
-              </div>
-              <div class="form-group stock-form-group" v-else>
-                <label>{{ $t('admin.updateStock', { stock: newProduct.stock || 0 }) }}</label>
-                <div class="stock-control edit-stock-control">
-                  <button type="button" @click="updateStockAdjustment(-2)" class="stock-btn minus">-2</button>
-                  <button type="button" @click="updateStockAdjustment(-1)" class="stock-btn minus">-1</button>
 
-                  <input type="number" v-model.number="stockAdjustment" @input="validateStockAdjustment"
-                    class="stock-adjust-input" />
-
-                  <button type="button" @click="updateStockAdjustment(1)" class="stock-btn plus">+1</button>
-                  <button type="button" @click="updateStockAdjustment(2)" class="stock-btn plus">+2</button>
-                </div>
-                <div class="stock-preview" :class="{ 
-                  'low': (Math.max(0, (newProduct.stock || 0) + stockAdjustment)) === 0,
-                  'warning': (Math.max(0, (newProduct.stock || 0) + stockAdjustment)) > 0 && (Math.max(0, (newProduct.stock || 0) + stockAdjustment)) <= 5
-                }">
-                  {{ $t('admin.resultingStock') }}: <strong>{{ Math.max(0, (newProduct.stock || 0) + stockAdjustment)
-                    }}</strong>
-                </div>
-              </div>
-            </div>
-
-            <!-- Gallery Section -->
-            <div class="gallery-section">
-              <div class="gallery-header">
-                <label>{{ $t('admin.galleryTitle') }}</label>
-                <button type="button" class="add-gallery-btn" @click="triggerGalleryUpload">
-                  <ion-icon name="add-circle-outline"></ion-icon> {{ $t('admin.addImages') }}
-                </button>
-                <input type="file" ref="galleryFileInput" class="hidden-input" @change="handleGalleryUpload"
-                  accept="image/*" multiple />
-              </div>
-
-              <div class="gallery-grid" v-if="galleryImages.length > 0">
-                <div v-for="(img, index) in galleryImages" :key="index" class="gallery-item">
-                  <div class="gallery-thumb">
-                    <img :src="img.preview" />
-                    <button type="button" class="remove-thumb" @click="removeGalleryImage(index)">&times;</button>
-                  </div>
-                  <div class="gallery-meta">
-                    <select v-model="img.attribute_type">
-                      <option value="gallery">{{ $t('admin.galleryOption') }}</option>
-                      <option value="color">{{ $t('admin.colorOption') }}</option>
-                      <option value="size">{{ $t('admin.sizeOption') }}</option>
-                      <option value="variety">{{ $t('admin.varietyOption') }}</option>
-                    </select>
-                    <input v-if="img.attribute_type !== 'gallery'" v-model="img.attribute_value"
-                      :placeholder="$t('admin.enterAttribute', { type: $t('admin.' + img.attribute_type + 'Option').toLowerCase() })" />
-                  </div>
-                </div>
-              </div>
-              <p v-else class="gallery-empty">{{ $t('admin.galleryEmpty') }}</p>
-            </div>
-
-            <button type="submit" :disabled="uploading" :class="['submit-btn', isEditing ? 'update' : '']">
-              {{ uploading ? $t('admin.processing') : (isEditing ? $t('admin.submitUpdate') : $t('admin.submitAdd')) }}
-            </button>
           </form>
           </template>
 
@@ -789,7 +919,8 @@ const deleteDiyProduct = async (id) => {
                 <div class="modal-body">
                   <p>{{ $t('admin.formulaDesc') }}</p>
                   <div class="formula-info">
-                    <span class="info-tag">{{ $t('admin.currentL5', { price: newProduct.price_5 || '0.00' }) }}</span>
+                    <span class="info-tag" v-if="sizeVariants.length === 0">{{ $t('admin.currentL5', { price: newProduct.price_5 || '0.00' }) }}</span>
+                    <span class="info-tag" v-else>Applying to all variants with a set Level 5 price</span>
                   </div>
                   <div class="input-group">
                     <label>{{ $t('admin.percentages') }}</label>
@@ -829,7 +960,7 @@ const deleteDiyProduct = async (id) => {
                 </div>
                 <div class="item-info">
                   <strong>{{ product.name_th ? `${product.name} (${product.name_th})` : product.name }}</strong>
-                  <span class="p-meta">{{ product.category }} | ${{ product.price_1 || product.price }}</span>
+                  <span class="p-meta">SKU: {{ product.sku }} | {{ product.category }} | ${{ product.price_1 || product.price }}</span>
                   <div class="stock-control">
                     <span :class="['stock-count', 
                       product.stock === 0 ? 'low' : (product.stock > 0 && product.stock <= 5 ? 'warning' : '')
@@ -880,6 +1011,121 @@ const deleteDiyProduct = async (id) => {
           </template>
         </section>
       </div>
+
+      <!-- Gallery & Variant Manager (Full Width at Bottom for Standard section) -->
+      <transition name="slide-fade">
+        <section class="gallery-variant-manager" v-if="activeAdminSection === 'standard'">
+          <div class="workspace-header">
+            <h2><ion-icon name="images-outline"></ion-icon> Gallery & Variant Manager</h2>
+            <button type="button" class="add-gallery-btn" @click="triggerGalleryUpload">
+              <ion-icon name="cloud-upload-outline"></ion-icon> Add Images
+            </button>
+            <input type="file" ref="galleryFileInput" class="hidden-input" @change="handleGalleryUpload" accept="image/*" multiple />
+          </div>
+
+          <!-- Gallery Grid Workspace -->
+          <div class="gallery-workspace-grid" v-if="galleryImages.length > 0">
+            <div v-for="(img, index) in galleryImages" :key="index" class="gallery-card">
+              <div class="card-thumb">
+                <img :src="img.preview" />
+                <button type="button" class="remove-card-btn" @click="removeGalleryImage(index)">&times;</button>
+              </div>
+              <div class="card-controls">
+                <label>Link Role</label>
+                <select v-model="img.attribute_type">
+                  <option value="gallery">Gallery Only</option>
+                  <option value="color">Color Link</option>
+                  <option value="size">Size Link</option>
+                </select>
+                <input v-if="img.attribute_type !== 'gallery'" v-model="img.attribute_value" 
+                  :placeholder="img.attribute_type === 'color' ? 'e.g. Red' : 'e.g. 4 inches'" class="card-input" />
+              </div>
+            </div>
+          </div>
+          <!-- Pricing & Stock Matrix -->
+          <div class="pricing-matrix-workspace">
+            <div class="matrix-header-row">
+              <h3>Pricing & Stock Configuration</h3>
+              <button type="button" class="config-btn" @click="showFormulaPopup = true">
+                <ion-icon name="settings-outline"></ion-icon> {{ $t('admin.config') }}
+              </button>
+            </div>
+            <p class="matrix-info-text">
+              Configure wholesale pricing and stock. 
+              <span v-if="sizeVariants.length > 0">Colors will automatically inherit these price levels.</span>
+            </p>
+            <div class="matrix-scrollable">
+              <table class="matrix-table">
+                <thead>
+                  <tr>
+                    <th>Variant Name</th>
+                    <th>Level 1</th>
+                    <th>Level 2</th>
+                    <th>Level 3</th>
+                    <th>Level 4</th>
+                    <th>Level 5</th>
+                    <th>Stock</th>
+                    <th style="width: 50px;"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Case 1: Has Size Variants -->
+                  <template v-if="sizeVariants.length > 0">
+                    <tr v-for="(sv, idx) in sizeVariants" :key="idx">
+                      <td class="variant-name-cell">
+                        <strong>{{ sv.name }}</strong>
+                      </td>
+                      <td><input type="number" step="0.01" v-model="sv.price_1" class="matrix-input" /></td>
+                      <td><input type="number" step="0.01" v-model="sv.price_2" class="matrix-input" /></td>
+                      <td><input type="number" step="0.01" v-model="sv.price_3" class="matrix-input" /></td>
+                      <td><input type="number" step="0.01" v-model="sv.price_4" class="matrix-input" /></td>
+                      <td><input type="number" step="0.01" v-model="sv.price_5" class="matrix-input" /></td>
+                      <td><input type="number" v-model.number="sv.stock" class="matrix-input stock-input" /></td>
+                      <td style="text-align: center;">
+                        <button type="button" class="action-btn del" @click="removeSizeVariant(sv.name)" title="Remove Variant">
+                          <ion-icon name="trash-outline"></ion-icon>
+                        </button>
+                      </td>
+                    </tr>
+                  </template>
+                  <!-- Case 2: No Size Variants (Base Product) -->
+                  <template v-else>
+                    <tr>
+                      <td class="variant-name-cell">
+                        <strong>Base Product</strong>
+                      </td>
+                      <td><input type="number" step="0.01" v-model="newProduct.price_1" class="matrix-input" /></td>
+                      <td><input type="number" step="0.01" v-model="newProduct.price_2" class="matrix-input" /></td>
+                      <td><input type="number" step="0.01" v-model="newProduct.price_3" class="matrix-input" /></td>
+                      <td><input type="number" step="0.01" v-model="newProduct.price_4" class="matrix-input" /></td>
+                      <td><input type="number" step="0.01" v-model="newProduct.price_5" class="matrix-input" /></td>
+                      <td>
+                        <div v-if="!isEditing">
+                          <input type="number" v-model.number="newProduct.stock" class="matrix-input stock-input" min="0" />
+                        </div>
+                        <div v-else style="display: flex; align-items: center; gap: 6px;">
+                          <input type="number" readonly :value="Math.max(0, (newProduct.stock || 0) + stockAdjustment)" class="matrix-input stock-input" style="background:#f1f2f6; width: 60px;" />
+                          <div class="stock-control edit-stock-control" style="margin: 0; gap: 3px;">
+                            <button type="button" @click="updateStockAdjustment(-1)" class="stock-btn minus" style="width:16px; height:16px; font-size:9px;">-1</button>
+                            <input type="number" v-model.number="stockAdjustment" @input="validateStockAdjustment" class="stock-adjust-input" style="width:36px; padding:0; font-size:11px;" />
+                            <button type="button" @click="updateStockAdjustment(1)" class="stock-btn plus" style="width:16px; height:16px; font-size:9px;">+1</button>
+                          </div>
+                        </div>
+                      </td>
+                      <td></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Submit Button at the bottom of the page -->
+          <button type="submit" form="product-form" :disabled="uploading" :class="['submit-btn', isEditing ? 'update' : '']" style="margin-top: 30px; font-size: 16px;">
+            {{ uploading ? $t('admin.processing') : (isEditing ? $t('admin.submitUpdate') : $t('admin.submitAdd')) }}
+          </button>
+        </section>
+      </transition>
     </div>
   </div>
 </template>
@@ -1782,5 +2028,216 @@ select {
 .admin-sub-tabs button:hover:not(.active) {
   background: #f1f2f6;
   color: #2d3436;
+}
+
+/* Gallery & Variant Manager Styling */
+.gallery-variant-manager {
+  background: white;
+  padding: 30px;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  margin-top: 30px;
+  width: 100%;
+}
+
+.workspace-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  border-bottom: 2px solid #f1f2f6;
+  padding-bottom: 15px;
+}
+
+.workspace-header h2 {
+  font-size: 1.4rem;
+  color: #2d3436;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.add-gallery-btn {
+  background: #8b6f47;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.add-gallery-btn:hover {
+  background: #735c3a;
+  transform: translateY(-2px);
+}
+
+.gallery-workspace-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.gallery-card {
+  background: #fafafa;
+  border: 1px solid #f1f2f6;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+}
+
+.card-thumb {
+  position: relative;
+  width: 100%;
+  padding-top: 100%; /* Square */
+  background: #eee;
+}
+
+.card-thumb img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remove-card-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(214, 48, 49, 0.9);
+  color: white;
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.card-controls {
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card-controls label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #8b6f47;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.card-controls select,
+.card-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #e1e8ed;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #2d3436;
+  background: white;
+}
+
+.card-input::placeholder {
+  color: #b2bec3;
+}
+
+.gallery-workspace-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #b2bec3;
+  font-style: italic;
+}
+
+/* Pricing Matrix Workspace Styling */
+.pricing-matrix-workspace {
+  margin-top: 30px;
+  border-top: 2px solid #f1f2f6;
+  padding-top: 25px;
+}
+
+.matrix-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.pricing-matrix-workspace h3 {
+  font-size: 1.2rem;
+  color: #2d3436;
+  margin: 0;
+}
+
+.matrix-info-text {
+  font-size: 13px;
+  color: #636e72;
+  margin: 0 0 20px 0;
+}
+
+.matrix-scrollable {
+  overflow-x: auto;
+  border: 1px solid #f1f2f6;
+  border-radius: 12px;
+}
+
+.matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+
+.matrix-table th,
+.matrix-table td {
+  padding: 15px;
+  border-bottom: 1px solid #f1f2f6;
+}
+
+.matrix-table th {
+  background: #fafafa;
+  font-weight: 700;
+  color: #2d3436;
+}
+
+.variant-name-cell {
+  color: #8b6f47;
+  font-size: 15px;
+}
+
+.matrix-input {
+  width: 90px;
+  padding: 8px 12px;
+  border: 1px solid #e1e8ed;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #2d3436;
+  transition: all 0.2s ease;
+}
+
+.matrix-input:focus {
+  border-color: #8b6f47;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(139, 111, 71, 0.1);
+}
+
+.matrix-input.stock-input {
+  width: 80px;
 }
 </style>

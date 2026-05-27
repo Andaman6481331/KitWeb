@@ -1,9 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
-
+    <url>
+    <loc>https://kitcharoensampeng.com/</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/" />
+    <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/" />
+    <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/" />
+    <xhtml:link rel="alternate" hreflang="ja" href="https://kitcharoensampeng.com/ja/" />
+    <priority>1.0</priority>
+  </url>
   <!-- HOME PAGES -->
   <url>
     <loc>https://kitcharoensampeng.com/th/</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/" />
@@ -12,6 +21,7 @@
   </url>
   <url>
     <loc>https://kitcharoensampeng.com/en/</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/" />
@@ -20,6 +30,7 @@
   </url>
   <url>
     <loc>https://kitcharoensampeng.com/zh/</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/" />
@@ -28,6 +39,7 @@
   </url>
   <url>
     <loc>https://kitcharoensampeng.com/ja/</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/" />
@@ -38,6 +50,7 @@
   <!-- CATALOG PAGES -->
   <url>
     <loc>https://kitcharoensampeng.com/th/catalog</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/catalog" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/catalog" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/catalog" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/catalog" />
@@ -46,6 +59,7 @@
   </url>
   <url>
     <loc>https://kitcharoensampeng.com/en/catalog</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/catalog" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/catalog" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/catalog" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/catalog" />
@@ -54,6 +68,7 @@
   </url>
   <url>
     <loc>https://kitcharoensampeng.com/zh/catalog</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/catalog" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/catalog" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/catalog" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/catalog" />
@@ -62,6 +77,7 @@
   </url>
   <url>
     <loc>https://kitcharoensampeng.com/ja/catalog</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/catalog" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/catalog" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/catalog" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/catalog" />
@@ -72,6 +88,7 @@
   <!-- EVENT PAGES -->
   <url>
     <loc>https://kitcharoensampeng.com/th/event</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/catalog" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/event" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/event" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/event" />
@@ -80,6 +97,7 @@
   </url>
   <url>
     <loc>https://kitcharoensampeng.com/en/event</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/event" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/event" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/event" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/event" />
@@ -88,6 +106,7 @@
   </url>
   <url>
     <loc>https://kitcharoensampeng.com/zh/event</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/event" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/event" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/event" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/event" />
@@ -96,6 +115,7 @@
   </url>
   <url>
     <loc>https://kitcharoensampeng.com/ja/event</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/event" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/event" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/event" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/event" />
@@ -106,6 +126,7 @@
   <!-- PARTNERS PAGES -->
   <url>
     <loc>https://kitcharoensampeng.com/th/partners</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/partners" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/partners" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/partners" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/partners" />
@@ -114,6 +135,7 @@
   </url>
   <url>
     <loc>https://kitcharoensampeng.com/en/partners</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/partners" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/partners" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/partners" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/partners" />
@@ -122,6 +144,7 @@
   </url>
   <url>
     <loc>https://kitcharoensampeng.com/zh/partners</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/partners" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/partners" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/partners" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/partners" />
@@ -130,6 +153,7 @@
   </url>
   <url>
     <loc>https://kitcharoensampeng.com/ja/partners</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/partners" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/partners" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/partners" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/partners" />
@@ -140,6 +164,7 @@
   <!-- CONTACT US PAGES -->
   <url>
     <loc>https://kitcharoensampeng.com/th/contactus</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/contactus" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/contactus" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/contactus" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/contactus" />
@@ -148,6 +173,7 @@
   </url>
   <url>
     <loc>https://kitcharoensampeng.com/en/contactus</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/contactus" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/contactus" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/contactus" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/contactus" />
@@ -156,6 +182,7 @@
   </url>
   <url>
     <loc>https://kitcharoensampeng.com/zh/contactus</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/contactus" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/contactus" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/contactus" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/contactus" />
@@ -164,6 +191,7 @@
   </url>
   <url>
     <loc>https://kitcharoensampeng.com/ja/contactus</loc>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kitcharoensampeng.com/contactus" />
     <xhtml:link rel="alternate" hreflang="th" href="https://kitcharoensampeng.com/th/contactus" />
     <xhtml:link rel="alternate" hreflang="en" href="https://kitcharoensampeng.com/en/contactus" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://kitcharoensampeng.com/zh/contactus" />

@@ -6,8 +6,23 @@ import VueVirtualScroller from 'vue-virtual-scroller'
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
 
 const supportedLocales = ['en', 'th', 'zh', 'ja']
+const API_URL = 'https://hidden-water-ed9d.shop-backend-kitweb.workers.dev'
 
-export function includedRoutes(paths = []) {
+async function fetchCategorySlugs() {
+  try {
+    const response = await fetch(`${API_URL}/products`)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch products: ${response.status}`)
+    }
+    const products = await response.json()
+    return [...new Set(products.map((p) => p.category).filter(Boolean))]
+  } catch (error) {
+    console.warn('[vite-ssg] Could not fetch categories for prerender routes:', error)
+    return []
+  }
+}
+
+export async function includedRoutes(paths = []) {
   const expanded = []
 
   for (const path of paths) {
@@ -27,6 +42,14 @@ export function includedRoutes(paths = []) {
     }
 
     expanded.push(path)
+  }
+
+  const categories = await fetchCategorySlugs()
+  for (const category of categories) {
+    const categorySegment = encodeURIComponent(category)
+    supportedLocales.forEach((lang) => {
+      expanded.push(`/${lang}/catalog/${categorySegment}`)
+    })
   }
 
   return Array.from(new Set(expanded))
@@ -62,9 +85,3 @@ export const createApp = ViteSSG(
     });
   }
 )
-
-
-
-
-
-

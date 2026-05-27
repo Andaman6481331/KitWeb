@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@emailjs/browser": "^4.4.1",
     "@unhead/vue": "^2.1.15",
     "browser-image-compression": "^2.0.2",
     "ionicons": "^8.0.13",

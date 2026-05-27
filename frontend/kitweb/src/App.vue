@@ -114,6 +114,7 @@ const pageTitleKey = computed(() => pageTitleMap[routeName.value] || 'home.heroT
 const pageDescriptionKey = computed(() => pageDescriptionMap[routeName.value] || 'home.heroSubtitle')
 
 useHead(() => {
+  const isCategoryProductsRoute = routeName.value === 'category-products'
   const title = pageSeoTitle.value || `${t(pageTitleKey.value) || t('home.heroTitle')} | ${siteTitle.value}`
   const description = t(pageDescriptionKey.value) || t('home.heroSubtitle')
 
@@ -127,13 +128,13 @@ useHead(() => {
   ] : []
 
   return {
-    title,
+    ...(isCategoryProductsRoute ? {} : { title }),
     htmlAttrs: {
       lang: routeLang.value || 'en'
     },
-    meta: [
-      { name: 'description', content: description }
-    ],
+    meta: isCategoryProductsRoute
+      ? []
+      : [{ name: 'description', content: description, key: 'description' }],
     link: links
   }
 })

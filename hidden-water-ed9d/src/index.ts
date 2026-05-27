@@ -223,6 +223,26 @@ export default {
 					SELECT 
 						p.*,
 						(SELECT json_group_array(json_object(
+							'id', v.id,
+							'variant_name', v.variant_name,
+							'sku', v.sku,
+							'price_1', v.price_1,
+							'price_2', v.price_2,
+							'price_3', v.price_3,
+							'price_4', v.price_4,
+							'price_5', v.price_5,
+							'stock', v.stock,
+							'image_key', v.image_key,
+							'colors', (
+								SELECT json_group_array(json_object(
+									'id', c.id,
+									'color_name', c.color_name,
+									'image_key', c.image_key,
+									'stock', c.stock
+								)) FROM variant_colors c WHERE c.variant_id = v.id
+							)
+						)) FROM product_variants v WHERE v.product_id = p.id) as variants,
+						(SELECT json_group_array(json_object(
 							'id', i.id,
 							'image_key', i.image_key,
 							'attribute_type', i.attribute_type,
@@ -241,10 +261,25 @@ export default {
 				const { results: products } = await env.DB.prepare(query).bind(...params).all();
 
 				// Map and parse nested JSON
-				const parsedProducts = products.map((p: any) => ({
-					...p,
-					images: typeof p.images === 'string' ? JSON.parse(p.images) : (p.images || [])
-				}));
+				const parsedProducts = products.map((p: any) => {
+					let parsedVariants = [];
+					if (typeof p.variants === 'string') {
+						try {
+							parsedVariants = JSON.parse(p.variants);
+							parsedVariants = parsedVariants.map((v: any) => ({
+								...v,
+								colors: typeof v.colors === 'string' ? JSON.parse(v.colors) : (v.colors || [])
+							}));
+						} catch (err) {
+							console.error("Failed to parse variants JSON:", err);
+						}
+					}
+					return {
+						...p,
+						images: typeof p.images === 'string' ? JSON.parse(p.images) : (p.images || []),
+						variants: parsedVariants
+					};
+				});
 
 				return corsResponse(parsedProducts);
 			}
@@ -472,15 +507,33 @@ export default {
 				return corsResponse("Unauthorized", { status: 401 });
 			}
 
+			if (url.pathname === "/products/next-sku" && request.method === "GET") {
+				const category = url.searchParams.get("category");
+				if (!category) return corsResponse({ error: "Category is required" }, { status: 400 });
+				const { count } = await env.DB.prepare("SELECT COUNT(*) as count FROM products WHERE category = ?").bind(category).first() as any;
+				const sku = generateSKU(category, count || 0);
+				return corsResponse({ sku });
+			}
+
+			if (url.pathname === "/diy/products/next-sku" && request.method === "GET") {
+				let seqVal = 0;
+				const seqResult = await env.DB.prepare("SELECT seq FROM sqlite_sequence WHERE name = 'diy_products'").first() as any;
+				if (seqResult && seqResult.seq !== undefined && seqResult.seq !== null) {
+					seqVal = seqResult.seq;
+				}
+				const sku = generateDiySKU(seqVal);
+				return corsResponse({ sku });
+			}
+
 			if (url.pathname === "/products" && request.method === "POST") {
 				const body = await request.json() as any;
-				const { name, name_th, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, images, stock } = body;
+				const { name, name_th, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, images, stock, variants } = body;
 				const activePrice = price || price_3 || 0;
 				const initialStock = stock || 0;
 
 				// Generate SKU
 				const { count } = await env.DB.prepare("SELECT COUNT(*) as count FROM products WHERE category = ?").bind(category).first() as any;
-				const sku = generateSKU(category, count || 0);
+				const sku = body.sku || generateSKU(category, count || 0);
 
 				const { meta } = await env.DB.prepare(
 					"INSERT INTO products (name, name_th, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, stock, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -496,13 +549,32 @@ export default {
 					}
 				}
 
+				// Save new structured variants & variant colors
+				if (variants && Array.isArray(variants) && productId) {
+					for (const v of variants) {
+						const vResult = await env.DB.prepare(
+							"INSERT INTO product_variants (product_id, variant_name, sku, price_1, price_2, price_3, price_4, price_5, stock, image_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+						).bind(productId, v.variant_name, v.sku, v.price_1 || 0, v.price_2 || 0, v.price_3 || 0, v.price_4 || 0, v.price_5 || 0, v.stock || 0, v.image_key || null).run();
+
+						const variantId = vResult.meta.last_row_id;
+
+						if (v.colors && Array.isArray(v.colors) && variantId) {
+							for (const c of v.colors) {
+								await env.DB.prepare(
+									"INSERT INTO variant_colors (variant_id, color_name, image_key, stock) VALUES (?, ?, ?, ?)"
+								).bind(variantId, c.color_name, c.image_key || null, c.stock || 0).run();
+							}
+						}
+					}
+				}
+
 				return corsResponse({ success: true, id: productId });
 			}
 
 			if (url.pathname.startsWith("/products/") && request.method === "PUT") {
 				const id = url.pathname.split("/products/")[1];
 				const body = await request.json() as any;
-				const { name, name_th, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, images, stock } = body;
+				const { name, name_th, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, images, stock, variants } = body;
 				const activePrice = price_3 || price || 0;
 
 				const currentProduct = await env.DB.prepare("SELECT stock FROM products WHERE id = ?").bind(id).first() as any;
@@ -525,6 +597,28 @@ export default {
 						await env.DB.prepare(
 							"INSERT INTO product_images (product_id, image_key, attribute_type, attribute_value, is_main) VALUES (?, ?, ?, ?, ?)"
 						).bind(id, img.image_key, img.attribute_type, img.attribute_value, img.is_main ? 1 : 0).run();
+					}
+				}
+
+				// Update variants & variant colors: delete and re-insert
+				if (variants && Array.isArray(variants)) {
+					// Delete existing variants (will cascade delete variant_colors)
+					await env.DB.prepare("DELETE FROM product_variants WHERE product_id = ?").bind(id).run();
+
+					for (const v of variants) {
+						const vResult = await env.DB.prepare(
+							"INSERT INTO product_variants (product_id, variant_name, sku, price_1, price_2, price_3, price_4, price_5, stock, image_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+						).bind(id, v.variant_name, v.sku, v.price_1 || 0, v.price_2 || 0, v.price_3 || 0, v.price_4 || 0, v.price_5 || 0, v.stock || 0, v.image_key || null).run();
+
+						const variantId = vResult.meta.last_row_id;
+
+						if (v.colors && Array.isArray(v.colors) && variantId) {
+							for (const c of v.colors) {
+								await env.DB.prepare(
+									"INSERT INTO variant_colors (variant_id, color_name, image_key, stock) VALUES (?, ?, ?, ?)"
+								).bind(variantId, c.color_name, c.image_key || null, c.stock || 0).run();
+							}
+						}
 					}
 				}
 
@@ -569,7 +663,7 @@ export default {
 				if (seqResult && seqResult.seq !== undefined && seqResult.seq !== null) {
 					seqVal = seqResult.seq;
 				}
-				const sku = generateDiySKU(seqVal);
+				const sku = body.sku || generateDiySKU(seqVal);
 
 				const serializedImages = JSON.stringify(images || []);
 
@@ -597,11 +691,21 @@ export default {
 			if (request.method === "DELETE") {
 				if (url.pathname.startsWith("/products/")) {
 					const id = url.pathname.split("/products/")[1];
+					// Set referencing order_items product_id to NULL to preserve order history without violating FK constraints
+					await env.DB.prepare("UPDATE order_items SET product_id = NULL WHERE product_id = ?").bind(id).run();
+					// Explicitly clean up related images and stock history
+					await env.DB.prepare("DELETE FROM product_images WHERE product_id = ?").bind(id).run();
+					await env.DB.prepare("DELETE FROM stock_history WHERE product_id = ?").bind(id).run();
+					// Delete standard product
 					await env.DB.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
 					return corsResponse({ success: true });
 				}
 				if (url.pathname.startsWith("/diy/products/")) {
 					const id = url.pathname.split("/diy/products/")[1];
+					const diyProductId = `diy-${id}`;
+					// Set referencing order_items product_id to NULL to preserve order history without violating FK constraints
+					await env.DB.prepare("UPDATE order_items SET product_id = NULL WHERE product_id = ?").bind(diyProductId).run();
+					// Delete DIY product
 					await env.DB.prepare("DELETE FROM diy_products WHERE id = ?").bind(id).run();
 					return corsResponse({ success: true });
 				}

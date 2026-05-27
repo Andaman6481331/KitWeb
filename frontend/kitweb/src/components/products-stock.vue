@@ -1,10 +1,10 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onServerPrefetch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, API_URL } from '../services/api';
 import { categoryHeroImages } from '../services/categoryImages';
 import { useI18n } from 'vue-i18n';
-import { codeToPath, defaultLang } from '@/utils/localeRoutes';
+import { codeToPath, defaultLang, localizedRoute } from '@/utils/localeRoutes';
 
 const { t } = useI18n();
 const router = useRouter();
@@ -75,19 +75,27 @@ const tCategoryDesc = (catName) => {
 
 const products = ref([]);
 const loading = ref(true);
-
-onMounted(loadData);
+const hasLoaded = ref(false);
 
 async function loadData() {
     loading.value = true;
     try {
         products.value = await api.getProducts();
+        hasLoaded.value = true;
     } catch (error) {
         console.error('Error loading data:', error);
     } finally {
         loading.value = false;
     }
 }
+
+onServerPrefetch(loadData);
+
+onMounted(() => {
+    if (!hasLoaded.value && products.value.length === 0) {
+        loadData();
+    }
+});
 
 
 const categories = computed(() => {
@@ -114,7 +122,9 @@ const categories = computed(() => {
 });
 
 const selectCategory = (categoryName) => {
-    router.push({ name: 'category-products', params: { lang: currentLang, category: categoryName } });
+  router.push(
+    localizedRoute(route, 'category-products', { category: categoryName })
+  );
 };
 
 </script>
@@ -153,7 +163,6 @@ const selectCategory = (categoryName) => {
 .category-grid-container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 0 5%;
 }
 
 .category-list {

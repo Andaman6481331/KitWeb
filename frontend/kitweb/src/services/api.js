@@ -254,5 +254,21 @@ export const api = {
     });
     if (!response.ok) throw new Error(`DIY Upload failed: ${response.status}`);
     return await response.json();
+  },
+
+  async getNextSku(category) {
+    const response = await fetch(`${API_URL}/products/next-sku?category=${encodeURIComponent(category)}`, {
+      headers: { 'Authorization': this.getToken() }
+    });
+    if (!response.ok) throw new Error('Failed to fetch next SKU');
+    return await response.json();
+  },
+
+  async getNextDiySku() {
+    const response = await fetch(`${API_URL}/diy/products/next-sku`, {
+      headers: { 'Authorization': this.getToken() }
+    });
+    if (!response.ok) throw new Error('Failed to fetch next DIY SKU');
+    return await response.json();
   }
 };

@@ -29,7 +29,7 @@ export const routes = [
         children: [
             { path: '', name: 'home', component: Home },
             { path: 'catalog', name: 'catalog', component: Catalog },
-            { path: 'catalog/:category', name: 'category-products', component: CategoryView },
+            { path: 'catalog/:category/:productSlug?', name: 'category-products', component: CategoryView },
             { path: 'orderpage', name: 'orderpage', component: OrderPage, meta: { requiresAuth: true } },
             { path: 'contactus', name: 'contactus', component: ContactUsPage },
             { path: 'login', name: 'login', component: Login },
@@ -100,6 +100,11 @@ router.beforeEach((to, from, next) => {
 // 🌟 ADD THIS ROUTER GUARD FOR THE TITLES 🌟
 router.afterEach((to) => {
     if (typeof document === 'undefined') {
+        return;
+    }
+
+    // Let CategoryView handle dynamic meta tags
+    if (to.name === 'category-products') {
         return;
     }
 

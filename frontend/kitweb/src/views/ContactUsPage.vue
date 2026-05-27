@@ -464,7 +464,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
     padding: 0 40px;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    gap: 40px;
     align-items: start;
     position: relative;
     z-index: 1;
@@ -521,10 +521,10 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 }
 
 .description p {
-    font-size: 1.1rem;
+    font-size: 1rem;
     color: #555;
     line-height: 1.8;
-    margin-bottom: 16px;
+    margin-bottom: 8px;
 }
 
 .features-grid {

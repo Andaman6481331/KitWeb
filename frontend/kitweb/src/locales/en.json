@@ -147,7 +147,10 @@
     "completionTime": "Completion Time",
     "difficulty": "Difficulty",
     "whatsIncluded": "What's Included:",
-    "addToCart": "Add to Cart"
+    "addToCart": "Add to Cart",
+    "contactUs": "Contact Us",
+    "thankyou": "Thank you for your interest! We will get back to you within 24 hours.",
+    "requiredFields": "Please fill in all required fields."
   },
   "catalog": {
     "since": "SINCE 1984",

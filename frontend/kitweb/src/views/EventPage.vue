@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import AutoScrollEvent from '../components/auto-scroll-event.vue';
 import { getUtilsUrl } from '@/services/api';
 import comingSoonImg from '../assets/card-img05.webp';
+import emailjs from '@emailjs/browser';
 
 const contactFormLoc = ref(null); // Create the template ref
 
@@ -98,6 +99,59 @@ const handleContactSubmit = () => {
         preferredDate: ''
     };
 };
+const errorMessage = ref(false);
+const formSubmitted = ref(false);
+const submitForm = async () => {
+    // 1. Run your validation block
+    if (
+        !contactForm.value.preferredDate || 
+        contactForm.value.groupSize === '' || 
+        contactForm.value.groupSize < 0 || 
+        !contactForm.value.name.trim() || 
+        !contactForm.value.email.trim() || 
+        !contactForm.value.phone.trim() || 
+        !contactForm.value.eventType.trim() || 
+        !/^\S+@\S+\.\S+$/.test(contactForm.value.email)
+    ) {
+        errorMessage.value = true;
+        setTimeout(() => { errorMessage.value = false; }, 2000);
+        return; 
+    }
+
+    // 2. Send the data if validation passes
+    try {
+        // Replace these string placeholders with your actual keys from EmailJS dashboard
+        await emailjs.send(
+            'service_gnqb7po', 
+            'template_om8vuv9', 
+            {
+                name: contactForm.value.name,
+                email: contactForm.value.email,
+                phone: contactForm.value.phone,
+                eventType: contactForm.value.eventType,
+                groupSize: contactForm.value.groupSize,
+                preferredDate: contactForm.value.preferredDate,
+            },
+            'WtvQxxvgU57WMDs6K'
+        );
+
+        // Success state
+        formSubmitted.value = true;
+        
+        // Reset form fields after successful sending
+        contactForm.value = {
+            name: '', email: '', phone: '', eventType: 'workshop',
+            groupSize: '', message: '', preferredDate: ''
+        };
+
+        setTimeout(() => { formSubmitted.value = false; }, 3000);
+
+    } catch (error) {
+        console.error('Email failed to send:', error);
+        alert('Something went wrong. Please try again.');
+    }
+};
+
 </script>
 
 <template>
@@ -296,13 +350,13 @@ const handleContactSubmit = () => {
                                 <div class="form-group">
                                     <label>{{ $t('events.groupSize') }}</label>
                                     <input type="number" v-model="contactForm.groupSize"
-                                        :placeholder="$t('events.howManyPeople')" />
+                                        :placeholder="$t('events.howManyPeople')" required/>
                                 </div>
                             </div>
 
                             <div class="form-group">
                                 <label>{{ $t('events.preferredDate') }}</label>
-                                <input type="date" v-model="contactForm.preferredDate" />
+                                <input type="date" v-model="contactForm.preferredDate" required/>
                             </div>
 
                             <div class="form-group">
@@ -310,8 +364,13 @@ const handleContactSubmit = () => {
                                 <textarea v-model="contactForm.message" rows="4"
                                     :placeholder="$t('events.messagePlaceholder')"></textarea>
                             </div>
-
-                            <button type="submit" class="submit-btn">{{ $t('events.sendRequest') }}</button>
+                            <button type="submit" class="submit-btn" @click="submitForm()">{{ $t('events.sendRequest') }}</button>
+                            <div v-if="formSubmitted" class="form-note">
+                                <span>* {{ $t('events.thankyou') }}</span>
+                            </div>
+                            <div v-if="errorMessage" class="error-alert">
+                                {{ $t('events.requiredFields') }}
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -852,6 +911,17 @@ const handleContactSubmit = () => {
 .submit-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+.form-note {
+    color: #38a169;
+    font-weight: 600;
+    text-align: center;
+}
+.error-alert{
+    color: #ff6b6b;
+    font-weight: 600;
+    text-align: center;
 }
 
 /* Modal */

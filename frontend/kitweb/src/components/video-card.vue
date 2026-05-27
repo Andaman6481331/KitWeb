@@ -10,11 +10,11 @@ const { t } = useI18n()
 const videos = computed(() => [
   {
     id: 1,
-    src: getUtilsUrl('shop-clip01.mp4'),
-    poster: getUtilsUrl('video-clip01-tn-large.webp'),
+    src: getUtilsUrl('shop-clip00.mp4'),
+    poster: getUtilsUrl('shop-clip00-tn-large.webp'),
     title: t('videoSection.videos.clip1.title'),
     description: t('videoSection.videos.clip1.description'),
-    duration: '2:30'
+    duration: '1:03'
   },
   {
     id: 2,

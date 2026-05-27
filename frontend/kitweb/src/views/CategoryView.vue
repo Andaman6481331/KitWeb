@@ -1,12 +1,22 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onServerPrefetch, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, API_URL } from '../services/api';
 import { categoryHeroImages } from '../services/categoryImages';
 import { useI18n } from 'vue-i18n';
+import { useHead } from '@unhead/vue';
 import translationStore from '../stores/translationStore';
 import { cartStore } from '../stores/cartStore';
-import { codeToPath, defaultLang } from '@/utils/localeRoutes';
+import { codeToPath, defaultLang, localizedRoute } from '@/utils/localeRoutes';
+
+const generateSlug = (name, id) => {
+    if (!name) return String(id);
+    const slugified = name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+    return `${slugified}-${id}`;
+};
 
 const { t, locale } = useI18n();
 const route = useRoute();
@@ -102,6 +112,7 @@ const tCategoryDesc = (catName) => {
 
 const products = ref([]);
 const loading = ref(true);
+const hasLoaded = ref(false);
 const showPopup = ref(false);
 const selectedProduct = ref(null);
 const sortBy = ref('popular');
@@ -127,14 +138,16 @@ const heroImage = computed(() => {
     return '';
 });
 
-onMounted(loadData);
-watch(() => route.params.category, loadData);
-
 async function loadData() {
     loading.value = true;
     try {
         if (currentCategory.value) {
-            products.value = await api.getProducts(currentCategory.value);
+            const data = await api.getProducts(currentCategory.value);
+            products.value = data.map(p => ({
+                ...p,
+                slug: p.slug || generateSlug(p.name, p.id)
+            }));
+            hasLoaded.value = true;
         }
     } catch (error) {
         console.error('Error loading data:', error);
@@ -143,19 +156,119 @@ async function loadData() {
     }
 }
 
+onServerPrefetch(loadData);
+
+onMounted(() => {
+    if (!hasLoaded.value && products.value.length === 0) {
+        loadData();
+    }
+});
+
+watch(() => route.params.category, () => {
+    hasLoaded.value = false;
+    loadData();
+});
+
 const currentImageKey = ref(null);
 
 const handleQuickView = (item) => {
-    selectedProduct.value = item;
-    currentImageKey.value = item.image_key; // default to main
-    showPopup.value = true;
+    router.push({
+        name: 'category-products',
+        params: {
+            lang: currentLang.value,
+            category: currentCategory.value,
+            productSlug: item.slug
+        }
+    });
 };
 
-const closePopup = () => {
+const closePopupState = () => {
     showPopup.value = false;
     selectedProduct.value = null;
     currentImageKey.value = null;
 };
+
+const closePopup = () => {
+    router.push({
+        name: 'category-products',
+        params: {
+            lang: currentLang.value,
+            category: currentCategory.value
+        }
+    });
+};
+
+// Watch for product slug in route parameters to trigger popup
+watch(
+    [() => route.params.productSlug, products],
+    ([newSlug, currentProducts]) => {
+        if (newSlug) {
+            if (currentProducts && currentProducts.length > 0) {
+                const product = currentProducts.find(p => p.slug === newSlug);
+                if (product) {
+                    selectedProduct.value = product;
+                    currentImageKey.value = product.image_key;
+                    showPopup.value = true;
+                } else {
+                    closePopupState();
+                }
+            }
+        } else {
+            closePopupState();
+        }
+    },
+    { immediate: true }
+);
+
+const truncateMetaDescription = (text, maxLength = 160) => {
+    if (!text) return '';
+    const cleaned = text.replace(/\s+/g, ' ').trim();
+    if (cleaned.length <= maxLength) return cleaned;
+    return `${cleaned.slice(0, maxLength - 1).trim()}…`;
+};
+
+const productSeoFallback = (product) => {
+    const prodName = tProduct(product, 'name');
+    if (currentLang.value === 'th') {
+        return `ซื้อ ${prodName} ออนไลน์ อุปกรณ์เย็บปักถักร้อยและวัสดุงานฝีมือคุณภาพสูงจากตลาดสำเพ็ง ราคาเป็นกันเอง`;
+    }
+    return `Buy ${prodName} online. High-quality sewing, tailoring, and craft supplies from Bangkok's Sampeng Market.`;
+};
+
+// Dynamic SEO tags using useHead
+const seoTitle = computed(() => {
+    if (selectedProduct.value) {
+        const isThai = currentLang.value === 'th';
+        const storeName = isThai ? 'กิจเจริญ สำเพ็ง' : 'Kitcharoen Sampeng Market';
+        const prodName = tProduct(selectedProduct.value, 'name');
+        return `${prodName} | ${storeName}`;
+    }
+    const isThai = currentLang.value === 'th';
+    const storeName = isThai ? 'กิจเจริญ สำเพ็ง' : 'Kitcharoen Sampeng Market';
+    const catName = tCategory(currentCategory.value);
+    return `${catName} - ${storeName}`;
+});
+
+const seoDescription = computed(() => {
+    // Re-run when async product translations finish loading
+    translationStore.translations;
+
+    if (selectedProduct.value) {
+        const productDescription = tProduct(selectedProduct.value, 'description');
+        if (productDescription) {
+            return truncateMetaDescription(productDescription);
+        }
+        return productSeoFallback(selectedProduct.value);
+    }
+    return tCategoryDesc(currentCategory.value);
+});
+
+useHead(() => ({
+    title: seoTitle.value,
+    meta: [
+        { name: 'description', content: seoDescription.value, key: 'description' }
+    ]
+}));
 
 const setMainImage = (key) => {
     currentImageKey.value = key;
@@ -225,7 +338,9 @@ const getImageUrl = (key, variant = 'large') => {
 };
 
 const backToCatalog = () => {
-    router.push({ name: 'catalog', params: { lang: currentLang } });
+    router.push(
+        localizedRoute(route, 'catalog', { category: currentCategory.value })
+    );
 };
 
 const sortedProducts = computed(() => {
@@ -284,7 +399,12 @@ const sortedProducts = computed(() => {
 
         <!-- Product Grid -->
         <div class="product-grid">
-            <div v-for="item in sortedProducts" :key="item.id" class="product-card" @click="handleQuickView(item)">
+            <router-link 
+                v-for="item in sortedProducts" 
+                :key="item.id" 
+                :to="{ name: 'category-products', params: { lang: currentLang, category: currentCategory, productSlug: item.slug } }"
+                class="product-card"
+            >
                 <div class="card-image">
                     <div class="badge" v-if="item.price_1">{{ $t('catalog.artisanChoice') }}</div>
                     <img :src="getImageUrl(item.image_key)" :alt="tProduct(item, 'name')">
@@ -294,12 +414,12 @@ const sortedProducts = computed(() => {
                     <p class="card-desc">{{ tProduct(item, 'description') || $t('catalog.categoryDescriptions.Default')
                         }}</p>
                     <div class="card-footer">
-                        <button class="add-btn" @click.stop="handleAddToCartClick(item)">
+                        <button class="add-btn" @click.prevent.stop="handleAddToCartClick(item)">
                             <ion-icon name="cart"></ion-icon> {{ $t('catalog.addToOrder') }}
                         </button>
                     </div>
                 </div>
-            </div>
+            </router-link>
         </div>
 
         <!-- Product Details Popup -->
@@ -620,6 +740,8 @@ const sortedProducts = computed(() => {
     cursor: pointer;
     display: flex;
     flex-direction: column;
+    text-decoration: none;
+    color: inherit;
 }
 
 .product-card:hover {
