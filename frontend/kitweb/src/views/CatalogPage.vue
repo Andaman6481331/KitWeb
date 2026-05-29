@@ -1,11 +1,29 @@
 <script setup>
 import ProductStock from '../components/products-stock.vue';
 import DiyProductKit from '../components/diy-product-kit.vue';
+import CategoryView from '../views/CategoryView.vue';
 import { getUtilsUrl } from '@/services/api';
+import { useRoute, useRouter } from 'vue-router';
+import { computed } from 'vue';
+import { codeToPath, defaultLang } from '@/utils/localeRoutes';
 
-const toggleCart = () => {
+const route = useRoute();
+const router = useRouter();
 
-}
+const currentLang = computed(() => route.params.lang || defaultLang);
+const currentCategory = computed(() => route.params.category || "needles");
+
+const categories = [
+  'yarn', 'needles', 'threads', 'tools',
+  'beads', 'ribbons', 'buttons', 'accessories', 'artificialflowers'
+];
+
+const selectCategory = (cat) => {
+  router.push({
+    name: 'catalog',
+    params: { lang: currentLang.value, category: cat }
+  });
+};
 
 </script>
 <template>
@@ -22,19 +40,28 @@ const toggleCart = () => {
             </p>
         </div>
     </div>
-
-
-    <div class="section-header" v-reveal style="padding-top: 2rem;">
-        <span class="section-tag">{{ $t('productstocks.tag') }}</span>
-        <h2 class="section-title">{{ $t('productstocks.title') }}</h2>
-        <p class="section-description">
-            {{ $t('productstocks.description') }}
-        </p>
+    <div class="category-navbar-container">
+        <nav class="category-navbar">
+            <button
+            v-for="cat in categories"
+            :key="cat"
+            class="cat-nav-btn"
+            :class="{ active: currentCategory === cat }"
+            @click="selectCategory(cat)"
+            >
+            {{ $t(`categories.${cat}`) }}   <!-- reuse your existing i18n keys -->
+            </button>
+        </nav>
     </div>
 
     <!-- Main Stock -->
-    <ProductStock />
-
+    <!-- <ProductStock /> -->
+    <CategoryView 
+    v-if="currentCategory"
+    :category="currentCategory"
+    />
+    
+    <!-- DIY Kit -->
     <div class="section-header" v-reveal>
         <span class="section-tag">{{ $t('diyKits.tag') }}</span>
         <h2 class="section-title">{{ $t('diyKits.title') }}</h2>
@@ -44,29 +71,32 @@ const toggleCart = () => {
     </div>
 
     <!--DIY Kit -->
-    <DiyProductKit />
+    <DiyProductKit /> 
 
 </template>
 <style scoped>
 /* Catalog Header */
 .catalog-header {
     padding: 120px 5% 100px 5%;
-    /* background-image: url('../assets/shop06.png'); */
     background-size: cover;
     background-position: center;
     text-align: center;
     position: relative;
-    color: white;
     overflow: hidden;
 }
 
 .overlay {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    inset: 0;
+
+    background:
+        radial-gradient(
+            circle at center,
+            rgba(250, 244, 236, 0.838) 0%,
+            rgba(80, 60, 45, 0.18) 60%,
+            rgba(40, 28, 20, 0.337) 100%
+        );
+
     z-index: 1;
 }
 
@@ -82,7 +112,7 @@ const toggleCart = () => {
     font-family: 'Work Sans', sans-serif;
     font-size: 14px;
     font-weight: 700;
-    color: #e8dcc8;
+    color: #604539e0;
     letter-spacing: 4px;
     margin-bottom: 15px;
     text-transform: uppercase;
@@ -90,20 +120,63 @@ const toggleCart = () => {
 
 .catalog-title {
     font-family: 'ZCOOL XiaoWei', serif;
-    font-size: 4.5rem;
-    color: white;
+    font-size: 4rem;
+    color: #604539;
     margin: 0 auto 25px;
     line-height: 1.1;
-    font-weight: 500;
+    font-weight: 400;
 }
 
 .catalog-subtitle {
     font-family: 'Work Sans', sans-serif;
     font-size: 1.35rem;
-    color: rgba(255, 255, 255, 0.9);
+    color: #604539e0;
     max-width: 800px;
     margin: 0 auto;
     line-height: 1.6;
+}
+
+.category-navbar-container {
+  overflow-x: hidden;
+}
+
+.category-navbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 18px;
+  background-color: #FDF3E6;
+  border-radius: 0 16px 0 16px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  justify-content: center;
+}
+
+.category-navbar button {
+  background: transparent;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: 1rem;
+  background-color: white;
+  color: #5d4037;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.category-navbar button.active {
+  background: #DD876E;
+  color: white;
+  box-shadow: 0 4px 10px rgba(139, 111, 71, 0.2);
+}
+
+.category-navbar button:hover:not(.active) {
+  background: #8b6f4746;
+  color: #2d3436;
 }
 
 .desktop-only {
@@ -143,6 +216,11 @@ const toggleCart = () => {
 }
 
 @media (max-width: 768px) {
+    .catalog-header {
+        height: 40vh;
+        padding: 50px 5% 50px 5%;
+    }
+
     .catalog-title {
         font-size: 2.5rem;
     }
@@ -158,5 +236,17 @@ const toggleCart = () => {
     .section-title {
         font-size: 36px;
     }
+
+    .category-navbar button {
+    padding: 8px 14px;
+    font-size: 0.875rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .category-navbar button {
+    padding: 7px 12px;
+    font-size: 0.8rem;
+  }
 }
 </style>

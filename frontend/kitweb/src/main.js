@@ -15,7 +15,9 @@ async function fetchCategorySlugs() {
       throw new Error(`Failed to fetch products: ${response.status}`)
     }
     const products = await response.json()
-    return [...new Set(products.map((p) => p.category).filter(Boolean))]
+    return [...new Set(products.flatMap((p) =>
+      p.categories?.length ? p.categories : (p.category ? [p.category] : [])
+    ).filter(Boolean))]
   } catch (error) {
     console.warn('[vite-ssg] Could not fetch categories for prerender routes:', error)
     return []

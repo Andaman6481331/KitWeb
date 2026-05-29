@@ -19,6 +19,19 @@ export const getDiyImageUrl = (filename, variant = 'thumb') => {
 
 const isBrowser = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
+const parseApiError = async (response, fallback) => {
+  const text = await response.text();
+  if (!text) return fallback;
+  try {
+    const err = JSON.parse(text);
+    if (typeof err === 'string') return err;
+    if (err?.error) return err.error;
+  } catch {
+    return text;
+  }
+  return fallback;
+};
+
 export const api = {
   getToken() {
     if (!isBrowser) return null;
@@ -77,7 +90,9 @@ export const api = {
       },
       body: JSON.stringify(productData)
     });
-    if (!response.ok) throw new Error(`Add product failed: ${response.status} ${response.statusText}`);
+    if (!response.ok) {
+      throw new Error(await parseApiError(response, `Add product failed: ${response.status} ${response.statusText}`));
+    }
     return await response.json();
   },
 
@@ -90,7 +105,9 @@ export const api = {
       },
       body: JSON.stringify(productData)
     });
-    if (!response.ok) throw new Error(`Update product failed: ${response.status} ${response.statusText}`);
+    if (!response.ok) {
+      throw new Error(await parseApiError(response, `Update product failed: ${response.status} ${response.statusText}`));
+    }
     return await response.json();
   },
 

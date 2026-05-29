@@ -124,6 +124,46 @@ async function collectProductImageKeys(env: Env, productId: string): Promise<Set
 	return keys;
 }
 
+function parseProductCategories(raw: unknown, fallbackCategory: string | null): string[] {
+	if (typeof raw === "string") {
+		try {
+			const parsed = JSON.parse(raw).filter((c: unknown) => typeof c === "string" && c);
+			if (parsed.length > 0) return parsed;
+		} catch {
+			// ignore malformed JSON
+		}
+	} else if (Array.isArray(raw)) {
+		const paths = raw.filter((c): c is string => typeof c === "string" && !!c);
+		if (paths.length > 0) return paths;
+	}
+	return fallbackCategory ? [fallbackCategory] : [];
+}
+
+function normalizeCategoryList(categories: unknown, primaryCategory: string | null): string[] {
+	if (Array.isArray(categories)) {
+		const paths = categories.filter((c): c is string => typeof c === "string" && !!c.trim());
+		if (paths.length > 0) return paths;
+	}
+	return primaryCategory ? [primaryCategory] : [];
+}
+
+function dbValue(value: unknown) {
+	return value === undefined ? null : value;
+}
+
+function isValidImageKey(value: unknown): value is string {
+	return typeof value === "string" && value.trim().length > 0;
+}
+
+async function saveProductCategories(env: Env, productId: number, categories: string[]) {
+	await env.DB.prepare("DELETE FROM product_categories WHERE product_id = ?").bind(productId).run();
+	for (const path of categories) {
+		await env.DB.prepare(
+			"INSERT OR IGNORE INTO product_categories (product_id, category_path) VALUES (?, ?)"
+		).bind(productId, path).run();
+	}
+}
+
 async function handleR2Request(
 	bucket: R2Bucket, 
 	key: string, 
@@ -275,6 +315,7 @@ export default {
 				let query = `
 					SELECT 
 						p.*,
+						(SELECT json_group_array(pc.category_path) FROM product_categories pc WHERE pc.product_id = p.id) as categories,
 						(SELECT json_group_array(json_object(
 							'id', v.id,
 							'variant_name', v.variant_name,
@@ -306,8 +347,14 @@ export default {
 				`;
 				let params: any[] = [];
 				if (category) {
-					query += " WHERE p.category = ? ORDER BY p.created_at DESC";
-					params.push(category);
+					query += ` WHERE (
+						p.category = ?
+						OR EXISTS (
+							SELECT 1 FROM product_categories pc
+							WHERE pc.product_id = p.id AND pc.category_path = ?
+						)
+					) ORDER BY p.created_at DESC`;
+					params.push(category, category);
 				} else {
 					query += " ORDER BY p.created_at DESC";
 				}
@@ -329,6 +376,7 @@ export default {
 					}
 					return {
 						...p,
+						categories: parseProductCategories(p.categories, p.category),
 						images: typeof p.images === 'string' ? JSON.parse(p.images) : (p.images || []),
 						variants: parsedVariants
 					};
@@ -580,61 +628,103 @@ export default {
 
 			if (url.pathname === "/products" && request.method === "POST") {
 				const body = await request.json() as any;
-				const { name, name_th, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, images, stock, variants } = body;
+				const { name, name_th, description, price, category, categories, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, images, stock, variants } = body;
+				const categoryList = normalizeCategoryList(categories, category);
+				const primaryCategory = categoryList[0] || category || null;
 				const activePrice = price || price_3 || 0;
 				const initialStock = stock || 0;
+				let productId: number | null = null;
 
-				// Generate SKU
-				const { count } = await env.DB.prepare("SELECT COUNT(*) as count FROM products WHERE category = ?").bind(category).first() as any;
-				const sku = body.sku || generateSKU(category, count || 0);
-
-				const { meta } = await env.DB.prepare(
-					"INSERT INTO products (name, name_th, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, stock, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-				).bind(name, name_th, description, activePrice, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, initialStock, sku).run();
-
-				const productId = meta.last_row_id;
-
-				if (images && Array.isArray(images) && productId) {
-					for (const img of images) {
-						await env.DB.prepare(
-							"INSERT INTO product_images (product_id, image_key, attribute_type, attribute_value, is_main) VALUES (?, ?, ?, ?, ?)"
-						).bind(productId, img.image_key, img.attribute_type, img.attribute_value, img.is_main ? 1 : 0).run();
-					}
+				if (!primaryCategory) {
+					return corsResponse({ error: "At least one category is required" }, { status: 400 });
 				}
 
-				// Save new structured variants & variant colors
-				if (variants && Array.isArray(variants) && productId) {
-					for (const v of variants) {
-						const vResult = await env.DB.prepare(
-							"INSERT INTO product_variants (product_id, variant_name, sku, price_1, price_2, price_3, price_4, price_5, stock, image_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-						).bind(productId, v.variant_name, v.sku, v.price_1 || 0, v.price_2 || 0, v.price_3 || 0, v.price_4 || 0, v.price_5 || 0, v.stock || 0, v.image_key || null).run();
+				try {
+					// Generate SKU
+					const { count } = await env.DB.prepare("SELECT COUNT(*) as count FROM products WHERE category = ?").bind(primaryCategory).first() as any;
+					let sku = body.sku || generateSKU(primaryCategory, count || 0);
 
-						const variantId = vResult.meta.last_row_id;
+					// Avoid duplicate SKU if a previous attempt partially succeeded
+					const existingSku = await env.DB.prepare("SELECT id FROM products WHERE sku = ?").bind(sku).first();
+					if (existingSku) {
+						sku = generateSKU(primaryCategory, (count || 0) + 1);
+					}
 
-						if (v.colors && Array.isArray(v.colors) && variantId) {
-							for (const c of v.colors) {
-								await env.DB.prepare(
-									"INSERT INTO variant_colors (variant_id, color_name, image_key, stock) VALUES (?, ?, ?, ?)"
-								).bind(variantId, c.color_name, c.image_key || null, c.stock || 0).run();
+					const { meta } = await env.DB.prepare(
+						"INSERT INTO products (name, name_th, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, stock, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+					).bind(
+						dbValue(name), dbValue(name_th), dbValue(description), activePrice, primaryCategory,
+						dbValue(image_key), dbValue(usage), dbValue(use_for), dbValue(varieties), dbValue(sizes), dbValue(colors),
+						price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, initialStock, sku
+					).run();
+
+					productId = meta.last_row_id;
+
+					if (productId) {
+						await saveProductCategories(env, productId, categoryList);
+					}
+
+					if (images && Array.isArray(images) && productId) {
+						for (const img of images) {
+							if (!isValidImageKey(img?.image_key)) continue;
+							await env.DB.prepare(
+								"INSERT INTO product_images (product_id, image_key, attribute_type, attribute_value, is_main) VALUES (?, ?, ?, ?, ?)"
+							).bind(productId, img.image_key, dbValue(img.attribute_type), dbValue(img.attribute_value), img.is_main ? 1 : 0).run();
+						}
+					}
+
+					if (variants && Array.isArray(variants) && productId) {
+						for (const v of variants) {
+							if (!v?.variant_name || !v?.sku) continue;
+							const vResult = await env.DB.prepare(
+								"INSERT INTO product_variants (product_id, variant_name, sku, price_1, price_2, price_3, price_4, price_5, stock, image_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+							).bind(productId, v.variant_name, v.sku, v.price_1 || 0, v.price_2 || 0, v.price_3 || 0, v.price_4 || 0, v.price_5 || 0, v.stock || 0, v.image_key || null).run();
+
+							const variantId = vResult.meta.last_row_id;
+
+							if (v.colors && Array.isArray(v.colors) && variantId) {
+								for (const c of v.colors) {
+									if (!c?.color_name) continue;
+									await env.DB.prepare(
+										"INSERT INTO variant_colors (variant_id, color_name, image_key, stock) VALUES (?, ?, ?, ?)"
+									).bind(variantId, c.color_name, c.image_key || null, c.stock || 0).run();
+								}
 							}
 						}
 					}
-				}
 
-				return corsResponse({ success: true, id: productId });
+					return corsResponse({ success: true, id: productId, sku });
+				} catch (insertError: any) {
+					if (productId) {
+						await env.DB.prepare("DELETE FROM products WHERE id = ?").bind(productId).run();
+					}
+					throw insertError;
+				}
 			}
 
 			if (url.pathname.startsWith("/products/") && request.method === "PUT") {
 				const id = url.pathname.split("/products/")[1];
 				const body = await request.json() as any;
-				const { name, name_th, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, images, stock, variants } = body;
+				const { name, name_th, description, price, category, categories, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, images, stock, variants } = body;
+				const categoryList = normalizeCategoryList(categories, category);
+				const primaryCategory = categoryList[0] || category || null;
 				const activePrice = price_3 || price || 0;
+
+				if (!primaryCategory) {
+					return corsResponse({ error: "At least one category is required" }, { status: 400 });
+				}
 
 				const currentProduct = await env.DB.prepare("SELECT stock FROM products WHERE id = ?").bind(id).first() as any;
 
 				await env.DB.prepare(
 					"UPDATE products SET name=?, name_th=?, description=?, price=?, category=?, image_key=?, usage=?, use_for=?, varieties=?, sizes=?, colors=?, price_1=?, price_2=?, price_3=?, price_4=?, price_5=?, stock=? WHERE id=?"
-				).bind(name, name_th, description, activePrice, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, stock, id).run();
+				).bind(
+					dbValue(name), dbValue(name_th), dbValue(description), activePrice, primaryCategory,
+					dbValue(image_key), dbValue(usage), dbValue(use_for), dbValue(varieties), dbValue(sizes), dbValue(colors),
+					price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, stock ?? 0, id
+				).run();
+
+				await saveProductCategories(env, Number(id), categoryList);
 
 				if (currentProduct && stock !== undefined && currentProduct.stock !== stock) {
 					const change = stock - currentProduct.stock;
@@ -647,9 +737,10 @@ export default {
 				if (images && Array.isArray(images)) {
 					await env.DB.prepare("DELETE FROM product_images WHERE product_id = ?").bind(id).run();
 					for (const img of images) {
+						if (!isValidImageKey(img?.image_key)) continue;
 						await env.DB.prepare(
 							"INSERT INTO product_images (product_id, image_key, attribute_type, attribute_value, is_main) VALUES (?, ?, ?, ?, ?)"
-						).bind(id, img.image_key, img.attribute_type, img.attribute_value, img.is_main ? 1 : 0).run();
+						).bind(id, img.image_key, dbValue(img.attribute_type), dbValue(img.attribute_value), img.is_main ? 1 : 0).run();
 					}
 				}
 
@@ -659,6 +750,7 @@ export default {
 					await env.DB.prepare("DELETE FROM product_variants WHERE product_id = ?").bind(id).run();
 
 					for (const v of variants) {
+						if (!v?.variant_name || !v?.sku) continue;
 						const vResult = await env.DB.prepare(
 							"INSERT INTO product_variants (product_id, variant_name, sku, price_1, price_2, price_3, price_4, price_5, stock, image_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 						).bind(id, v.variant_name, v.sku, v.price_1 || 0, v.price_2 || 0, v.price_3 || 0, v.price_4 || 0, v.price_5 || 0, v.stock || 0, v.image_key || null).run();
@@ -667,6 +759,7 @@ export default {
 
 						if (v.colors && Array.isArray(v.colors) && variantId) {
 							for (const c of v.colors) {
+								if (!c?.color_name) continue;
 								await env.DB.prepare(
 									"INSERT INTO variant_colors (variant_id, color_name, image_key, stock) VALUES (?, ?, ?, ?)"
 								).bind(variantId, c.color_name, c.image_key || null, c.stock || 0).run();
@@ -679,8 +772,10 @@ export default {
 			}
 
 			if (url.pathname === "/categories" && request.method === "POST") {
-				const { name, path, default_usage, default_use_for } = await request.json() as any;
-				await env.DB.prepare("INSERT INTO categories (name, path, default_usage, default_use_for) VALUES (?, ?, ?, ?)").bind(name, path, default_usage, default_use_for).run();
+				const { name, name_th, path, default_usage, default_use_for } = await request.json() as any;
+				await env.DB.prepare(
+					"INSERT INTO categories (name, name_th, path, default_usage, default_use_for) VALUES (?, ?, ?, ?, ?)"
+				).bind(name, name_th || null, path, default_usage, default_use_for).run();
 				return corsResponse({ success: true });
 			}
 
@@ -827,7 +922,13 @@ export default {
 
 			return corsResponse("Not Found", { status: 404 });
 		} catch (e: any) {
-			return corsResponse({ error: e.message }, { status: 500 });
+			const message = e?.message || "Internal server error";
+			const friendly = message.includes("UNIQUE constraint failed: products.sku")
+				? "This SKU already exists. Please try again."
+				: message.includes("NOT NULL constraint failed: product_images.image_key")
+					? "Gallery image is missing its uploaded file. Remove empty gallery slots or re-upload."
+					: message;
+			return corsResponse({ error: friendly }, { status: 500 });
 		}
 	},
 } satisfies ExportedHandler<Env>;

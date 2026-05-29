@@ -480,12 +480,11 @@ const submitForm = async () => {
 
 /* Hero Section */
 .hero {
-    height: 70vh;
-    /* background: url("../assets/shop05.png") center/cover; */
+    height: 65vh;
     background-size: cover;
     background-position: center;
     justify-content: center;
-    color: white;
+    color: #604539;
     text-align: center;
     position: relative;
 }
@@ -497,7 +496,17 @@ const submitForm = async () => {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4));
+    inset: 0;
+
+    background:
+        radial-gradient(
+            circle at center,
+            rgba(250, 244, 236, 0.838) 0%,
+            rgba(80, 60, 45, 0.18) 60%,
+            rgba(40, 28, 20, 0.337) 100%
+        );
+
+    z-index: 1;
 }
 
 .hero-content {
@@ -517,16 +526,6 @@ const submitForm = async () => {
     gap: 16px;
 }
 
-.logo-icon {
-    font-size: 3.5rem;
-    background: white;
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
 
 .logo h1 {
     font-size: 4rem;
@@ -544,6 +543,8 @@ const submitForm = async () => {
     font-size: 1.3rem;
     margin-bottom: 32px;
     opacity: 0.9;
+    
+    color: #604539e0;
 }
 
 .cta-btn {

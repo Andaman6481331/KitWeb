@@ -107,13 +107,13 @@ const aboutInfo = computed(() => ({
     content: '';
     width: 40px;
     height: 2px;
-    background: #8b6f47;
+    background: #E7C9A2;
 }
 
 .title {
     font-size: 3rem;
     font-weight: 700;
-    color: #2d2d2d;
+    color: #604539;
     margin: 16px 0 8px;
     line-height: 1.2;
 }

@@ -8,6 +8,13 @@ import translationStore from '../stores/translationStore';
 import { cartStore } from '../stores/cartStore';
 import { codeToPath, defaultLang, localizedRoute } from '@/utils/localeRoutes';
 
+const props = defineProps({
+  category: {
+    type: String,
+    default: null
+  }
+});
+
 const generateSlug = (name, id) => {
     if (!name) return String(id);
     const slugified = name
@@ -50,25 +57,15 @@ const tProduct = (item, field) => {
 const tCategory = (catName) => {
     if (!catName) return '';
     const mapping = {
-        'yarn': 'Yarn',
-        'yarns': 'Yarn',
-        'needles': 'Needles',
-        'needle': 'Needles',
-        'threads': 'Threads',
-        'thread': 'Threads',
-        'tools': 'Tools',
-        'tool': 'Tools',
-        'beads': 'Beads',
-        'bead': 'Beads',
-        'ribbons': 'Ribbons',
-        'ribbon': 'Ribbons',
-        'buttons': 'Buttons',
-        'button': 'Buttons',
-        'accessories': 'Accessories',
-        'accessory': 'Accessories',
-        'artificialflowers': 'ArtificialFlowers',
-        'artificialflower': 'ArtificialFlowers',
-        'artificial flowers': 'ArtificialFlowers'
+        'yarn': 'yarn',
+        'needles': 'needles',
+        'threads': 'threads',
+        'tools': 'tools',
+        'beads': 'beads',
+        'ribbons': 'ribbons',
+        'buttons': 'buttons',
+        'accessories': 'accessories',
+        'artificialflowers': 'artificialflowers',
     };
     const lower = catName.toLowerCase().trim();
     const key = mapping[lower];
@@ -81,25 +78,16 @@ const tCategory = (catName) => {
 const tCategoryDesc = (catName) => {
     if (!catName) return '';
     const mapping = {
-        'yarn': 'YarnDesc',
-        'yarns': 'YarnDesc',
-        'needles': 'NeedlesDesc',
-        'needle': 'NeedlesDesc',
-        'threads': 'ThreadsDesc',
-        'thread': 'ThreadsDesc',
-        'tools': 'ToolsDesc',
-        'tool': 'ToolsDesc',
-        'beads': 'BeadsDesc',
-        'bead': 'BeadsDesc',
-        'ribbons': 'RibbonsDesc',
-        'ribbon': 'RibbonsDesc',
-        'buttons': 'ButtonsDesc',
-        'button': 'ButtonsDesc',
-        'accessories': 'AccessoriesDesc',
-        'accessory': 'AccessoriesDesc',
-        'artificialflowers': 'ArtificialFlowersDesc',
-        'artificialflower': 'ArtificialFlowersDesc',
-        'artificial flowers': 'ArtificialFlowersDesc'
+        'yarn': 'yarnDesc',
+        'yarns': 'yarnDesc',
+        'needles': 'needlesDesc',
+        'threads': 'threadsDesc',
+        'tools': 'toolsDesc',
+        'beads': 'beadsDesc',
+        'ribbons': 'ribbonsDesc',
+        'buttons': 'buttonsDesc',
+        'accessories': 'accessoriesDesc',
+        'artificialflowers': 'artificialflowersDesc',
     };
     const lower = catName.toLowerCase().trim();
     const key = mapping[lower];
@@ -122,7 +110,7 @@ const selectedProductForCart = ref(null);
 const showNotification = ref(false);
 const notificationMessage = ref('');
 
-const currentCategory = computed(() => route.params.category);
+const currentCategory = computed(() => props.category || route.params.category);
 
 const heroImage = computed(() => {
     if (currentCategory.value) {
@@ -162,7 +150,7 @@ onMounted(() => {
     }
 });
 
-watch(() => route.params.category, () => {
+watch(() => props.category, () => {
     hasLoaded.value = false;
     loadData();
 });
@@ -171,13 +159,9 @@ const currentImageKey = ref(null);
 
 const handleQuickView = (item) => {
     router.push({
-        name: 'category-products',
-        params: {
-            lang: currentLang.value,
-            category: currentCategory.value,
-            productSlug: item.slug
-        }
-    });
+        name: 'catalog',
+        params: { lang: currentLang.value, category: currentCategory.value, productSlug: item.slug }
+        });
 };
 
 const closePopupState = () => {
@@ -188,12 +172,9 @@ const closePopupState = () => {
 
 const closePopup = () => {
     router.push({
-        name: 'category-products',
-        params: {
-            lang: currentLang.value,
-            category: currentCategory.value
-        }
-    });
+  name: 'catalog',
+  params: { lang: currentLang.value, category: currentCategory.value }
+});
 };
 
 // Watch for product slug in route parameters to trigger popup
@@ -335,11 +316,6 @@ const getImageUrl = (key, variant = 'large') => {
     return `${API_URL}/images/${keyStr}-${variant}.webp`;
 };
 
-const backToCatalog = () => {
-    router.push(
-        localizedRoute(route, 'catalog')
-    );
-};
 
 const sortedProducts = computed(() => {
     let sorted = [...products.value];
@@ -357,13 +333,6 @@ const sortedProducts = computed(() => {
 <template>
     <div class="category-page">
         <div style="background-color: #E5E2DD;">
-            <!-- Back Navigation -->
-            <div class="nav-container">
-                <button class="back-link" @click="backToCatalog">
-                    <ion-icon name="arrow-back-outline"></ion-icon> {{ $t('catalog.backToCatalog') }}
-                </button>
-            </div>
-
             <!-- Hero Section -->
             <div class="hero-section">
                 <div class="hero-text">
@@ -400,7 +369,7 @@ const sortedProducts = computed(() => {
             <router-link 
                 v-for="item in sortedProducts" 
                 :key="item.id" 
-                :to="{ name: 'category-products', params: { lang: currentLang, category: currentCategory, productSlug: item.slug } }"
+                :to="{ name: 'catalog', params: { lang: currentLang, category: currentCategory, productSlug: item.slug } }"
                 class="product-card"
             >
                 <div class="card-image">
@@ -568,46 +537,19 @@ const sortedProducts = computed(() => {
 
 <style scoped>
 .category-page {
-    background: #fafafa;
+    background: #FBF7F2;
     min-height: 100vh;
     padding-bottom: 60px;
-}
-
-.nav-container {
-    max-width: 1300px;
-    margin: 0 auto;
-    padding: 20px 5%;
-}
-
-.back-link {
-    background: none;
-    border: none;
-    color: #8b6f47;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.2s;
-}
-
-.back-link:hover {
-    color: #5d4037;
-    transform: translateX(-4px);
 }
 
 /* HERO SECTION */
 .hero-section {
     max-width: 1300px;
     margin: 0 auto;
-    padding: 0 5% 50px 5%;
+    padding: 50px 5%;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 30px;
     align-items: center;
-    margin-bottom: 50px;
-    background-color: #E5E2DD;
 }
 
 
@@ -678,7 +620,6 @@ const sortedProducts = computed(() => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 30px;
     border-bottom: 1px solid #eee;
     padding-bottom: 20px;
 }
@@ -1225,16 +1166,19 @@ const sortedProducts = computed(() => {
     transform: translate(-50%, 100%);
     opacity: 0;
 }
-
+/* RESPONSIVE */
 @media (max-width: 900px) {
-
-    .product-grid {
-        grid-template-columns: repeat(2, 1fr);
+    .hero-section {
+        grid-template-columns: 1fr;
+        text-align: center;
     }
 
-    .hero-section {
-        flex-direction: column;
-        text-align: center;
+    .hero-title {
+        font-size: 2.5rem;
+    }
+
+    .hero-desc {
+        font-size: 1rem;
     }
 
     .since-badge {
@@ -1255,15 +1199,45 @@ const sortedProducts = computed(() => {
     }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 900px) {
     .product-grid {
         grid-template-columns: 1fr;
     }
 
+    .product-card {
+        flex-direction: row;
+        max-height: 140px;
+    }
+
+    .card-image {
+        width: 140px;
+        min-width: 140px;
+        height: 140px;
+        flex-shrink: 0;
+        border-radius: 0;
+    }
+
+    .card-content {
+        padding: 14px 16px;
+        justify-content: center;
+    }
+
+    .card-title {
+        font-size: 15px;
+        margin-bottom: 4px;
+    }
+
+    .card-desc {
+        -webkit-line-clamp: 2 !important;
+        font-size: 13px;
+        margin-bottom: 10px;
+    }
+}
+
+@media (max-width: 600px) {
     .controls-section {
         flex-direction: column;
         align-items: flex-start;
         gap: 15px;
     }
-}
-</style>
+}</style>

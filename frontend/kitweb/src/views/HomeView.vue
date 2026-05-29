@@ -30,8 +30,7 @@ onMounted(async () => {
   <div class="content">
 
     <!-- Hero Section -->
-    <img :src="getUtilsUrl('shop02-large.webp')" fetchpriority="high" aria-hidden="true" style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">
-    <section class="hero-section" :style="{ backgroundImage: `url(${getUtilsUrl('shop02-large.webp')})` }">
+     <section class="hero-section" :style="{ backgroundImage: `url(${getUtilsUrl('home-banner.png')})`}" fetchpriority="high">
       <div class="hero-content">
         <div class="hero-text">
           <div class="hero-eyebrow">{{ $t('home.eyebrow') }}</div>
@@ -47,7 +46,7 @@ onMounted(async () => {
             </router-link>
           </div>
         </div>
-        <div class="hero-decoration">
+        <!-- <div class="hero-decoration">
           <div class="floating-card-container container-group-1">
             <div class="floating-card card-1">
               <img :src="getUtilsUrl('card-img09-thumb.webp')" alt="">
@@ -78,9 +77,103 @@ onMounted(async () => {
               <img :src="getUtilsUrl('card-img09-thumb.webp')" alt="">
             </div>
           </div>
-        </div>
+        </div> -->
       </div>
     </section>
+      <div class="feature-bar">
+    <div class="feature-item">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path
+            d="M3 10.5L12 3l9 7.5"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M5.5 9.5V20h13V9.5"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </div>
+      <div class="feature-text">
+        <h4>{{$t('home.feature1Title')}}</h4>
+        <p>{{$t('home.feature1Desc')}}</p>
+      </div>
+    </div>
+
+    <div class="feature-item">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <circle cx="12" cy="12" r="8.5" stroke-width="1.8" />
+          <path
+            d="M9.5 12l1.7 1.7L15 10"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </div>
+      <div class="feature-text">
+        <h4>{{$t('home.feature2Title')}}</h4>
+        <p>{{$t('home.feature2Desc')}}</p>
+      </div>
+    </div>
+
+    <div class="feature-item">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+    <!-- truck body -->
+    <path
+      d="M2.5 7.5h11v8h-11z"
+      stroke-width="1.8"
+      stroke-linejoin="round"
+    />
+
+    <!-- front cabin -->
+    <path
+      d="M13.5 10h4l3 3v2.5h-7z"
+      stroke-width="1.8"
+      stroke-linejoin="round"
+    />
+
+    <!-- wheels -->
+    <circle cx="7" cy="18" r="1.8" fill="currentColor" />
+    <circle cx="18" cy="18" r="1.8" fill="currentColor" />
+
+    <!-- bottom line -->
+    <path
+      d="M2.5 18h2.7M8.8 18h7.4M19.8 18H21"
+      stroke-width="1.8"
+      stroke-linecap="round"
+    />
+  </svg>
+      </div>
+      <div class="feature-text">
+        <h4>{{$t('home.feature3Title')}}</h4>
+        <p>{{$t('home.feature3Desc')}}</p>
+      </div>
+    </div>
+
+    <div class="feature-item">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path
+            d="M12 20s-6.5-4.3-8.5-8C1.7 8.8 3.5 5 7.5 5c2 0 3.2 1 4.5 2.5C13.3 6 14.5 5 16.5 5c4 0 5.8 3.8 4 7-2 3.7-8.5 8-8.5 8z"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </div>
+      <div class="feature-text">
+        <h4>{{$t('home.feature4Title')}}</h4>
+        <p>{{$t('home.feature4Desc')}}</p>
+      </div>
+    </div>
+  </div>
 
     <!-- About us / History / Location -->
     <AboutKitcharoen />
@@ -133,10 +226,9 @@ onMounted(async () => {
 
 /* ===== HERO SECTION ===== */
 .hero-section {
-    /* background: url('../assets/shop02.jpg'); */
     background-size: cover;
     background-repeat: no-repeat;
-    background-position: center center;
+    background-position: center top;
     min-height: 600px;
     height: auto;
     padding: 60px 0;
@@ -152,14 +244,13 @@ onMounted(async () => {
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(to right, rgba(53, 35, 29, 0.85) 0%, rgba(53, 35, 29, 0.5) 35%, transparent 100%);
-  z-index: 1;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to right, #f3e7d793 0%, transparent 100%);
 }
 
 .hero-content {
-  max-width: 1180px;
+  max-width: 1200px;
   width: 100%;
   display: grid;
   grid-template-columns: 4fr 1fr;
@@ -172,13 +263,12 @@ onMounted(async () => {
 .hero-text {
   flex: 1;
   min-width: 280px;
-  color: #ffffff;
   margin-top: 4rem;
 }
 .hero-eyebrow {
-  color: #ffffff;
+  color: #604539e0;
   font-weight: 600;
-  font-size: clamp(1rem, 2.2vw, 1.35rem);
+  font-size: clamp(0.9rem, 1.5vw, 1.2rem);
   letter-spacing: 2px;
   text-transform: uppercase;
   margin-bottom: 8px;
@@ -187,13 +277,20 @@ onMounted(async () => {
   gap: 8px;
 }
 
+.hero-eyebrow::before {
+  content: '';
+  width: 40px;
+  height: 2px;
+  background: #E7C9A2;
+}
+
 .hero-title {
   font-family: 'Crimson Pro', serif;
   font-size: clamp(2.2rem, 6vw, 3.6rem);
-  font-weight: 600;
+  color: #604539;
+  font-weight: 500;
   line-height: 1.1;
   margin: 0 0 20px 0;
-  text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
   animation: fadeInUp 0.8s ease;
   max-width: 720px;
 }
@@ -201,6 +298,7 @@ onMounted(async () => {
 .hero-subtitle {
   font-family: 'Work Sans', sans-serif;
   font-size: clamp(0.9rem, 2.0vw, 1.2rem);
+  color: #604539e0;
   font-weight: 400;
   line-height: 1.6;
   margin: 0 0 32px 0;
@@ -228,8 +326,8 @@ onMounted(async () => {
 }
 
 .cta-primary {
-  background: white;
-  color: #8b6f47;
+  background: linear-gradient(135deg, #DD876E, #e6957c);
+  color: white;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
@@ -240,8 +338,9 @@ onMounted(async () => {
 
 .cta-secondary {
   background: rgba(255, 255, 255, 0.2);
-  color: white;
+  color: #E7C9A2;
   backdrop-filter: blur(10px);
+  border: 1px solid #d9b585;
 }
 
 .cta-secondary:hover {
@@ -426,6 +525,53 @@ onMounted(async () => {
   }
 }
 
+.feature-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 40px;
+  padding: 42px 60px;
+  background: #f3e7d7;
+  border-bottom: 1px solid #e7d9cb;
+  
+}
+
+.feature-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 18px;
+}
+
+.icon-wrap {
+  width: 2rem;
+  height: 2rem;
+  min-width: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a6b56;
+}
+
+.icon-wrap svg {
+  width: 26px;
+  height: 26px;
+}
+
+.feature-text h4 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #5f493b;
+  line-height: 1.3;
+}
+
+.feature-text p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #8f7a6b;
+}
+
 /* ===== SECTION HEADERS ===== */
 .section-header {
   text-align: center;
@@ -505,11 +651,19 @@ onMounted(async () => {
 
   .hero-content {
     align-items: flex-start;
+    grid-template-columns: 1fr;
   }
 
   .hero-decoration {
     transform: scale(0.75);
     flex: 0.85;
+  }
+  .hero-eyebrow {
+    font-size: clamp(0.8rem, 1.5vw, 1rem);
+  }
+
+  .feature-bar {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -552,6 +706,15 @@ onMounted(async () => {
   .cta-secondary {
     padding: 12px 28px;
     font-size: 15px;
+  }
+
+  .feature-bar {
+    grid-template-columns: 1fr;
+    padding: 30px 24px;
+  }
+
+  .feature-item {
+    align-items: center;
   }
 }
 

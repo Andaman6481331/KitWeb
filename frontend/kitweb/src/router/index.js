@@ -28,8 +28,8 @@ export const routes = [
         component: RouterView,
         children: [
             { path: '', name: 'home', component: Home },
-            { path: 'catalog', name: 'catalog', component: Catalog },
-            { path: 'catalog/:category/:productSlug?', name: 'category-products', component: CategoryView },
+            // { path: 'catalog', name: 'catalog', component: Catalog },
+            { path: 'catalog/:category?/:productSlug?', name: 'catalog', component: Catalog },
             { path: 'orderpage', name: 'orderpage', component: OrderPage, meta: { requiresAuth: true } },
             { path: 'contactus', name: 'contactus', component: ContactUsPage },
             { path: 'login', name: 'login', component: Login },

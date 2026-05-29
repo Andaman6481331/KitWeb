@@ -100,19 +100,20 @@ onMounted(() => {
 const categories = computed(() => {
     const categoryMap = new Map();
     products.value.forEach(p => {
-        if (!p.category) return;
-        if (categoryMap.has(p.category)) {
-            categoryMap.get(p.category).count++;
-        } else {
-            categoryMap.set(p.category, {
-                name: p.category,
-                count: 1,
-                image: getCategoryImageUrl(p.category) || (p.image_key ? (p.image_key.includes('.') ? `${API_URL}/images/${p.image_key}` : `${API_URL}/images/${p.image_key}-thumb.webp`) : 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg'),
-            });
-        }
+        const paths = p.categories?.length ? p.categories : (p.category ? [p.category] : []);
+        paths.forEach(catPath => {
+            if (!catPath) return;
+            if (categoryMap.has(catPath)) {
+                categoryMap.get(catPath).count++;
+            } else {
+                categoryMap.set(catPath, {
+                    name: catPath,
+                    count: 1,
+                    image: getCategoryImageUrl(catPath) || (p.image_key ? (p.image_key.includes('.') ? `${API_URL}/images/${p.image_key}` : `${API_URL}/images/${p.image_key}-thumb.webp`) : 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg'),
+                });
+            }
+        });
     });
-    // Ensure we show at least the categories in the reference if possible
-    // (This part might be tricky if data is dynamic, but we can stick to what we have)
     return Array.from(categoryMap.values());
 });
 

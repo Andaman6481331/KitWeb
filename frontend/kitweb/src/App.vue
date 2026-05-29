@@ -7,6 +7,9 @@ import { setLocale } from './i18n'
 import { authStore } from './stores/authStore'
 import { api, getUtilsUrl } from './services/api';
 import { localizedRoute, codeToPath, pathToCode } from './utils/localeRoutes'
+import { absoluteUrl } from './utils/siteUrl'
+
+const SEO_LOCALES = ['en', 'th', 'zh', 'ja']
 
 const isDev = import.meta.env.DEV
 
@@ -58,8 +61,12 @@ const pathWithoutLang = computed(() => {
   const cleaned = full.replace(/^\/(en|th|zh|ja)/, '')
   return cleaned || '/'
 })
-const origin = typeof window !== 'undefined' ? window.location.origin : ''
 const siteTitle = computed(() => routeLang.value === 'th' ? 'กิจเจริญ' : 'Kitcharoen')
+
+function localizedAbsoluteUrl(lang) {
+  const suffix = pathWithoutLang.value === '/' ? '' : pathWithoutLang.value
+  return absoluteUrl(`/${lang}${suffix}`)
+}
 
 const pageSeoTitle = computed(() => {
   const lang = routeLang.value
@@ -118,14 +125,26 @@ useHead(() => {
   const title = pageSeoTitle.value || `${t(pageTitleKey.value) || t('home.heroTitle')} | ${siteTitle.value}`
   const description = t(pageDescriptionKey.value) || t('home.heroSubtitle')
 
-  const links = origin ? [
-    { rel: 'alternate', hreflang: 'en', href: `${origin}/en${pathWithoutLang.value}` },
-    { rel: 'alternate', hreflang: 'th', href: `${origin}/th${pathWithoutLang.value}` },
-    { rel: 'alternate', hreflang: 'zh', href: `${origin}/zh${pathWithoutLang.value}` },
-    { rel: 'alternate', hreflang: 'ja', href: `${origin}/ja${pathWithoutLang.value}` },
-    { rel: 'alternate', hreflang: 'x-default', href: `${origin}/en${pathWithoutLang.value}` },
-    { rel: 'canonical', href: `${origin}${router.currentRoute.value.fullPath || '/'}` }
-  ] : []
+  const canonicalHref = absoluteUrl(router.currentRoute.value.fullPath || '/')
+  const links = [
+    ...SEO_LOCALES.map((lang) => ({
+      rel: 'alternate',
+      hreflang: lang,
+      href: localizedAbsoluteUrl(lang),
+      key: `hreflang-${lang}`
+    })),
+    {
+      rel: 'alternate',
+      hreflang: 'x-default',
+      href: localizedAbsoluteUrl('en'),
+      key: 'hreflang-x-default'
+    },
+    {
+      rel: 'canonical',
+      href: canonicalHref,
+      key: 'canonical'
+    }
+  ]
 
   return {
     ...(isCategoryProductsRoute ? {} : { title }),
@@ -240,7 +259,7 @@ const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
       <div class="nav-center" style="justify-content: center; align-items: center; text-align: center;">
         <router-link :to="{ name: 'home', params: { lang: currentLang } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.home') }}</router-link>
         <template v-if="isDev">
-          <router-link :to="{ name: 'catalog', params: { lang: currentLang } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.products') }}</router-link>
+          <router-link :to="{ name: 'catalog', params: { lang: currentLang, category: 'needles' } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.products') }}</router-link>
         </template>
         <router-link :to="{ name: 'event', params: { lang: currentLang } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.events') }}</router-link>
         <router-link :to="{ name: 'partners', params: { lang: currentLang } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.partners') }}</router-link>
@@ -447,7 +466,7 @@ body {
   top: 0;
   left: 0;
   height: 80px;
-  background-color: #F3F0EB;
+  background-color: #f3e7d7;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -486,7 +505,7 @@ body {
 }
 
 .nav-link:hover {
-  color: #008080;
+  color: #DD876E;
   /* Teal */
 }
 
@@ -497,7 +516,7 @@ body {
   left: 0;
   width: 100%;
   height: 2px;
-  background-color: #008080;
+  background-color: #DD876E;
   /* Teal underline */
 }
 
@@ -509,7 +528,7 @@ body {
 }
 
 .search-capsule {
-  background-color: #E5E2DD;
+  background-color: white;
   /* Soft beige background */
   padding: 10px 20px;
   border-radius: 30px;
@@ -609,28 +628,28 @@ body {
 }
 
 .login-capsule {
-  background-color: #006666;
-  /* Deep teal from image */
+  background: linear-gradient(135deg, #DD876E, #e6957c);
   color: white;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   text-decoration: none;
   padding: 10px 28px;
   border-radius: 30px;
   font-weight: 700;
   font-size: 15px;
   transition: transform 0.2s, background 0.3s;
-  border: 2px solid #006666;
 }
 
 .order-capsule {
   background-color: white;
-  color: #006666;
+  color: #DD876E;
   text-decoration: none;
-  padding: 10px 28px;
-  border-radius: 30px;
+  padding: 10px 16px;
+  border-radius: 1rem;
   font-weight: 700;
   font-size: 15px;
   transition: transform 0.2s, background 0.3s;
-  border: 2px solid #006666;
+  border: 2px solid #DD876E;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
 .login-capsule:hover,
@@ -640,7 +659,7 @@ body {
 }
 
 .login-capsule:hover {
-  background-color: #004d4d;
+  background-color: #DD876E;
 }
 
 .order-capsule:hover {

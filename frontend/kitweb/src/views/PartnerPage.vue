@@ -270,17 +270,20 @@ const handleLearnMoreClick = () => {
     align-items: center;
     text-align: center;
     position: relative;
-    color: white;
 }
 
 .hero::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(to right, rgba(53, 35, 29, 0.703) 0%, rgba(53, 35, 29, 0.632) 10%, transparent 100%);
+    inset: 0;
+    background:
+        radial-gradient(
+            circle at center,
+            rgba(250, 244, 236, 0.838) 0%,
+            rgba(80, 60, 45, 0.18) 50%,
+            rgba(40, 28, 20, 0.337) 100%
+        );
+
     z-index: 1;
 }
 
@@ -296,11 +299,12 @@ const handleLearnMoreClick = () => {
 
 h1 {
     font-family: 'Crimson Pro', serif;
-    font-size: 3.2rem;
-    font-weight: 600;
+    font-size: 2.5rem;
+    font-weight: 400;
     margin-bottom: 1.5rem;
     line-height: 1.2;
     letter-spacing: -0.02em;
+    color: #604539;
 }
 
 .subtitle {
@@ -309,6 +313,7 @@ h1 {
     opacity: 0.95;
     max-width: 700px;
     margin: 0 auto;
+    color: #604539e0;
 }
 
 .container {

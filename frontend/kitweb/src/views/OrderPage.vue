@@ -176,10 +176,15 @@ const productSelections = ref({})
 // Selections are initialized in fetchProducts
 
 // Categories
+const getProductCategoryPaths = (product) => {
+    if (product.categories?.length) return product.categories;
+    return product.category ? [product.category] : [];
+};
+
 const categories = computed(() => {
-    const cats = ['All', ...new Set(products.value.map(p => p.category))]
-    return cats
-})
+    const paths = products.value.flatMap(getProductCategoryPaths);
+    return ['All', ...new Set(paths.filter(Boolean))];
+});
 
 const tCategory = (cat) => {
     if (!cat) return '';
@@ -224,7 +229,7 @@ const filteredProducts = computed(() => {
 
     // Filter by category
     if (selectedCategory.value !== 'All') {
-        filtered = filtered.filter(p => p.category === selectedCategory.value)
+        filtered = filtered.filter(p => getProductCategoryPaths(p).includes(selectedCategory.value))
     }
 
     // Filter by search
@@ -232,7 +237,7 @@ const filteredProducts = computed(() => {
         filtered = filtered.filter(p =>
             p.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
             p.description.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-            p.category.toLowerCase().includes(searchQuery.value.toLowerCase())
+            getProductCategoryPaths(p).some(cat => cat.toLowerCase().includes(searchQuery.value.toLowerCase()))
         )
     }
 

@@ -16,7 +16,7 @@ const editingId = ref(null);
 const showCategoryManager = ref(false);
 
 // New Category form
-const newCat = ref({ name: '', path: '', default_usage: '', default_use_for: '' });
+const newCat = ref({ name: '', name_th: '', path: '', default_usage: '', default_use_for: '' });
 
 // Filtering
 const activeFilter = ref('all');
@@ -29,6 +29,7 @@ const newProduct = ref({
   description_th: '',
   price: 0,
   category: '',
+  categories: [],
   image_key: '',
   usage: '',
   usage_th: '',
@@ -196,9 +197,26 @@ const loadCategories = async () => {
   }
 };
 
+const formatProductCategories = (product) => {
+  const paths = product.categories?.length
+    ? product.categories
+    : (product.category ? [product.category] : []);
+  return paths.map((path) => {
+    const cat = categories.value.find((c) => c.path === path);
+    if (!cat) return path;
+    return cat.name_th ? `${cat.name} (${cat.name_th})` : cat.name;
+  }).join(', ');
+};
+
 const filteredProducts = computed(() => {
   if (activeFilter.value === 'all') return products.value;
-  return products.value.filter(p => p.category === activeFilter.value);
+  return products.value.filter(p => {
+    // Support both legacy single category and new multi-category
+    if (p.categories && p.categories.length > 0) {
+      return p.categories.includes(activeFilter.value);
+    }
+    return p.category === activeFilter.value;
+  });
 });
 
 const handleLogin = async () => {
@@ -245,7 +263,7 @@ const triggerGalleryUpload = () => {
 
 const resetForm = () => {
   newProduct.value = {
-    name: '', name_th: '', description: '', description_th: '', price: 0, category: '', image_key: '',
+    name: '', name_th: '', description: '', description_th: '', price: 0, category: '', categories: [], image_key: '',
     usage: '', usage_th: '', use_for: '', use_for_th: '', varieties: '', varieties_th: '', sizes: '', sizes_th: '', colors: '', colors_th: '',
     price_1: 0, price_2: 0, price_3: 0, price_4: 0, price_5: 0, stock: 0
   };
@@ -265,6 +283,17 @@ const editProduct = (product) => {
   newProduct.value = { ...product };
   imagePreview.value = null; // Clear local preview to show saved image
 
+  if (!newProduct.value.categories || newProduct.value.categories.length === 0) {
+    newProduct.value.categories = newProduct.value.category
+      ? [newProduct.value.category]
+      : [];
+  } else if (typeof newProduct.value.categories === 'string') {
+    try {
+      newProduct.value.categories = JSON.parse(newProduct.value.categories);
+    } catch {
+      newProduct.value.categories = newProduct.value.category ? [newProduct.value.category] : [];
+    }
+  }
   // Load gallery images
   if (product.images) {
     galleryImages.value = product.images.map(img => ({
@@ -315,7 +344,7 @@ const handleAddCategory = async () => {
   if (!newCat.value.name || !newCat.value.path) return;
   try {
     await api.addCategory(newCat.value);
-    newCat.value = { name: '', path: '', default_usage: '', default_use_for: '' };
+    newCat.value = { name: '', name_th: '', path: '', default_usage: '', default_use_for: '' };
     loadCategories();
   } catch (error) {
     alert(t('admin.errorDeleteCategory'));
@@ -337,9 +366,16 @@ const handleSubmit = async () => {
   try {
     uploading.value = true;
 
+    if (!newProduct.value.categories || newProduct.value.categories.length === 0) {
+      alert(t('admin.selectAtLeastOneCategory'));
+      return;
+    }
+
+    newProduct.value.category = newProduct.value.categories[0];
+
     let sku = newProduct.value.sku;
     if (!sku) {
-      const skuRes = await api.getNextSku(newProduct.value.category);
+      const skuRes = await api.getNextSku(newProduct.value.categories[0]);
       sku = skuRes.sku;
       newProduct.value.sku = sku;
     }
@@ -382,7 +418,7 @@ const handleSubmit = async () => {
     }
 
     // Add images to payload
-    newProduct.value.images = finalImages;
+    newProduct.value.images = finalImages.filter(img => img.image_key);
 
     // 3. Build variants payload
     const variantsPayload = [];
@@ -449,18 +485,45 @@ const handleSubmit = async () => {
 
     newProduct.value.variants = variantsPayload;
 
+    const productPayload = {
+      name: newProduct.value.name,
+      name_th: newProduct.value.name_th || null,
+      description: newProduct.value.description,
+      price: newProduct.value.price_3 || newProduct.value.price || 0,
+      category: newProduct.value.category,
+      categories: newProduct.value.categories,
+      image_key: newProduct.value.image_key || null,
+      usage: newProduct.value.usage || null,
+      use_for: newProduct.value.use_for || null,
+      varieties: newProduct.value.varieties || null,
+      sizes: newProduct.value.sizes || null,
+      colors: newProduct.value.colors || null,
+      price_1: newProduct.value.price_1,
+      price_2: newProduct.value.price_2,
+      price_3: newProduct.value.price_3,
+      price_4: newProduct.value.price_4,
+      price_5: newProduct.value.price_5,
+      stock: newProduct.value.stock,
+      sku: newProduct.value.sku || undefined,
+      images: finalImages.filter(img => img.image_key),
+      variants: variantsPayload
+    };
+
     if (isEditing.value) {
-      newProduct.value.stock = Math.max(0, (newProduct.value.stock || 0) + stockAdjustment.value);
-      await api.updateProduct(editingId.value, newProduct.value);
+      productPayload.stock = Math.max(0, (newProduct.value.stock || 0) + stockAdjustment.value);
+      await api.updateProduct(editingId.value, productPayload);
       alert(t('admin.alertUpdated'));
     } else {
-      await api.addProduct(newProduct.value);
+      await api.addProduct(productPayload);
       alert(t('admin.alertAdded'));
     }
     resetForm();
     loadProducts();
   } catch (error) {
     console.error('Submit error:', error);
+    if (!isEditing.value) {
+      newProduct.value.sku = '';
+    }
     alert('Error: ' + error.message);
   } finally {
     uploading.value = false;
@@ -524,10 +587,17 @@ const applyPriceFormula = () => {
   showFormulaPopup.value = false;
 };
 
-const onCategoryChange = () => {
-  if (isEditing.value) return; // Don't overwrite existing product data when editing
+const onCategoriesChange = () => {
+  if (isEditing.value) return;
 
-  const selectedCat = categories.value.find(c => c.path === newProduct.value.category);
+  const firstPath = newProduct.value.categories[0];
+  if (!firstPath) {
+    newProduct.value.category = '';
+    return;
+  }
+
+  newProduct.value.category = firstPath;
+  const selectedCat = categories.value.find(c => c.path === firstPath);
   if (selectedCat) {
     if (selectedCat.default_usage) {
       newProduct.value.usage = selectedCat.default_usage;
@@ -730,6 +800,7 @@ const deleteDiyProduct = async (id) => {
             <h3>{{ $t('admin.manageCategories') }}</h3>
             <div class="cat-add-row">
               <input v-model="newCat.name" :placeholder="$t('admin.categoryName')" />
+              <input v-model="newCat.name_th" :placeholder="$t('admin.categoryNameTh')" />
               <input v-model="newCat.path" :placeholder="$t('admin.path')" />
             </div>
             <div class="cat-add-row">
@@ -740,7 +811,9 @@ const deleteDiyProduct = async (id) => {
             <div class="cat-list">
               <div v-for="cat in categories" :key="cat.id" class="cat-tag">
                 <div class="cat-tag-info">
-                  <strong>{{ cat.name }}</strong> ({{ cat.path }})
+                  <strong>{{ cat.name }}</strong>
+                  <span v-if="cat.name_th"> ({{ cat.name_th }})</span>
+                  <span class="cat-path">({{ cat.path }})</span>
                   <div class="cat-defaults" v-if="cat.default_usage || cat.default_use_for">
                     <span v-if="cat.default_usage">U: {{ cat.default_usage }}</span>
                     <span v-if="cat.default_use_for">F: {{ cat.default_use_for }}</span>
@@ -792,13 +865,22 @@ const deleteDiyProduct = async (id) => {
               </div>
               <div>
                 <div class="form-group">
-                  <label>{{ $t('admin.category') }}</label>
-                  <select v-model="newProduct.category" required @change="onCategoryChange">
-                    <option value="" disabled>{{ $t('admin.selectCategory') }}</option>
-                    <option v-for="cat in categories" :key="cat.id" :value="cat.path">
-                      {{ cat.name }}
-                    </option>
-                  </select>
+                  <label>{{ $t('admin.categoriesLabel') }}</label>
+                  <div class="category-checkboxes">
+                    <label v-for="cat in categories" :key="cat.id" class="category-checkbox">
+                      <input
+                        type="checkbox"
+                        :value="cat.path"
+                        v-model="newProduct.categories"
+                        @change="onCategoriesChange"
+                      />
+                      <span>
+                        {{ cat.name }}
+                        <span v-if="cat.name_th" class="cat-th-label">({{ cat.name_th }})</span>
+                      </span>
+                    </label>
+                  </div>
+                  <small class="auto-hint">{{ $t('admin.categoriesHint') }}</small>
                 </div>
                 <div class="form-group">
                   <label>{{ $t('admin.description') }}</label>
@@ -948,7 +1030,7 @@ const deleteDiyProduct = async (id) => {
                   }}</button>
                 <button v-for="cat in categories" :key="cat.id" :class="{ active: activeFilter === cat.path }"
                   @click="activeFilter = cat.path">
-                  {{ cat.name }}
+                  {{ cat.name_th ? `${cat.name} (${cat.name_th})` : cat.name }}
                 </button>
               </div>
             </div>
@@ -960,7 +1042,7 @@ const deleteDiyProduct = async (id) => {
                 </div>
                 <div class="item-info">
                   <strong>{{ product.name_th ? `${product.name} (${product.name_th})` : product.name }}</strong>
-                  <span class="p-meta">SKU: {{ product.sku }} | {{ product.category }} | ${{ product.price_1 || product.price }}</span>
+                  <span class="p-meta">SKU: {{ product.sku }} | {{ formatProductCategories(product) }} | ${{ product.price_1 || product.price }}</span>
                   <div class="stock-control">
                     <span :class="['stock-count', 
                       product.stock === 0 ? 'low' : (product.stock > 0 && product.stock <= 5 ? 'warning' : '')
@@ -1036,6 +1118,7 @@ const deleteDiyProduct = async (id) => {
                   <option value="gallery">{{$t('admin.galleryOnly')}}</option>
                   <option value="color">{{$t('admin.colorLink')}}</option>
                   <option value="size">{{$t('admin.sizeLink')}}</option>
+                  <option value="variant">{{$t('admin.variantLink')}}</option>
                 </select>
                 <input v-if="img.attribute_type !== 'gallery'" v-model="img.attribute_value" 
                   :placeholder="img.attribute_type === 'color' ? 'e.g. Red' : 'e.g. 4 inches'" class="card-input" />
@@ -1312,6 +1395,44 @@ header {
   color: #ff7675;
   cursor: pointer;
   font-size: 18px;
+}
+
+.cat-path {
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
+.category-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.category-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #dfe6e9;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  background: #fafafa;
+}
+
+.category-checkbox:has(input:checked) {
+  border-color: #0984e3;
+  background: #eef7ff;
+}
+
+.category-checkbox input {
+  accent-color: #0984e3;
+}
+
+.cat-th-label {
+  color: #636e72;
+  font-size: 13px;
 }
 
 .dashboard-grid {

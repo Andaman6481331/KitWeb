@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite-ssg build && node scripts/append-sitemap.js",
+    "build": "vite-ssg build && node scripts/fix-root-canonical.js && node scripts/append-sitemap.js && node scripts/verify-canonicals.js",
     "preview": "vite preview"
   },
   "dependencies": {

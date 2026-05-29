@@ -365,17 +365,21 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
     align-items: center;
     text-align: center;
     position: relative;
-    color: white;
 }
 
 .catalog-header::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4));
+    inset: 0;
+    background:
+        radial-gradient(
+            circle at center,
+            rgba(250, 244, 236, 0.838) 0%,
+            rgba(80, 60, 45, 0.18) 50%,
+            rgba(40, 28, 20, 0.337) 100%
+        );
+
+    z-index: 1;
 }
 
 .catalog-header>* {
@@ -387,23 +391,24 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
     display: block;
     font-size: 14px;
     font-weight: 700;
-    color: #e8dcc8;
+    color: #604539e0;
     letter-spacing: 4px;
     margin-bottom: 15px;
 }
 
 .catalog-title {
     font-family: 'ZCOOL XiaoWei', serif;
-    font-size: 4rem;
-    color: #ffffff;
+    font-size: 3rem;
+    color: #604539;
     margin: 15px auto;
     line-height: 1.1;
     animation: fadeInUp 0.8s ease;
+    font-weight: 400;
 }
 
 .catalog-subtitle {
     font-size: 1.2rem;
-    color: #ffffff;
+    color: #604539e0;
     max-width: 800px;
     margin: 0 auto;
     line-height: 1.6;

@@ -254,7 +254,7 @@ onUnmounted(() => {
   <div style="width: 100%; overflow: hidden; line-height: 0;">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 120" preserveAspectRatio="none"
       style="width: 100%; height: 120px; display: block;">
-      <path fill="#d2b4a0cc"
+      <path fill="#FDF3E6"
         d="M0,64L48,69.3C96,75,192,85,288,80C384,75,480,53,576,48C672,43,768,53,864,58.7C960,64,1056,64,1152,58.7C1248,53,1344,43,1392,37.3L1440,32L1440,120L1392,120C1344,120,1248,120,1152,120C1056,120,960,120,864,120C768,120,672,120,576,120C480,120,384,120,288,120C192,120,96,120,48,120L0,120Z">
       </path>
     </svg>
@@ -407,7 +407,7 @@ onUnmounted(() => {
   <div style="width: 100%; overflow: hidden; line-height: 0;">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 120" preserveAspectRatio="none"
       style="width: 100%; height: 120px; display: block;">
-      <path fill="#d2b4a0cc"
+      <path fill="#FDF3E6"
         d="M0,64L48,69.3C96,75,192,85,288,80C384,75,480,53,576,48C672,43,768,53,864,58.7C960,64,1056,64,1152,58.7C1248,53,1344,43,1392,37.3L1440,32L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z">
       </path>
     </svg>
@@ -427,7 +427,7 @@ onUnmounted(() => {
 }
 
 .video-card-container {
-  background-color: var(--primary-color);
+  background-color: #FDF3E6;
   background-size: cover;
   background-position: center;
   margin: 0 auto;
@@ -441,9 +441,13 @@ onUnmounted(() => {
 .section-header h2 {
   font-size: 42px;
   font-weight: 700;
-  color: var(--text-dark-color);
+  color: #604539;
   margin: 0 0 10px 0;
   letter-spacing: -0.5px;
+}
+
+.section-header p {
+  color: #8b6f47;
 }
 
 .carousel-container {
