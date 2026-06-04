@@ -251,7 +251,7 @@ const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
       <!-- Left: Logo -->
       <div class="nav-left">
         <router-link :to="{ name: 'home', params: { lang: currentLang } }"  @click="scrollToTop">
-          <img :src="getUtilsUrl('kitWeb_logo1-large.webp')" fetchpriority="high" alt="KitWeb Logo" class="main-logo">
+          <img :src="getUtilsUrl('kitWeb_logo1-large.webp')+'?v2'" fetchpriority="high" alt="KitWeb Logo" class="main-logo">
         </router-link>
       </div>
 
@@ -466,7 +466,8 @@ body {
   top: 0;
   left: 0;
   height: 80px;
-  background-color: #f3e7d7;
+  /* background-color: #f3e7d7; */
+  background: linear-gradient(135deg, #f3e7d7, #f1e1cb, #f3e7d7);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -483,7 +484,7 @@ body {
 }
 
 .main-logo {
-  height: 75px;
+  height: 50px;
   cursor: pointer;
 }
 

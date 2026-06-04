@@ -529,7 +529,7 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 40px;
-  padding: 42px 60px;
+  padding: 20px 10%;
   background: #f3e7d7;
   border-bottom: 1px solid #e7d9cb;
   
@@ -539,7 +539,11 @@ onMounted(async () => {
   display: flex;
   align-items: flex-start;
   justify-content: center;
+  align-items: center;
   gap: 18px;
+  background-color: #ffffff5a;
+  border-radius: 12px;
+  padding: 12px;
 }
 
 .icon-wrap {

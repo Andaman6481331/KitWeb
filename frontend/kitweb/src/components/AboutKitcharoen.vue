@@ -145,30 +145,6 @@ const aboutInfo = computed(() => ({
     margin-bottom: 40px;
 }
 
-.feature-item {
-    display: flex;
-    gap: 12px;
-    align-items: flex-start;
-}
-
-.feature-icon {
-    font-size: 2rem;
-    flex-shrink: 0;
-}
-
-.feature-content h4 {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: #2d2d2d;
-    margin-bottom: 4px;
-}
-
-.feature-content p {
-    font-size: 0.9rem;
-    color: #666;
-    line-height: 1.5;
-}
-
 /* Right Side - Image */
 .image-content {
     flex: 1;

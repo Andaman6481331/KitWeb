@@ -82,7 +82,7 @@
     "expertGuidance": "Expert Guidance",
     "expertGuidanceDesc": "Free workshops and tutorials for all skill levels",
     "communityFocus": "Community Focus",
-    "communityFocusDesc": "Supporting local artisans and craft communities",
+    "communityFocusDesc": "Supporting local crafters and craft communities",
     "qualityAssured": "Quality Assured",
     "qualityAssuredDesc": "100% satisfaction guarantee on all products",
     "headerTitle": "Let's Get Crafty Together",
@@ -165,7 +165,7 @@
   "catalog": {
     "since": "SINCE 1984",
     "title": "Browse Our Collection",
-    "subtitle": "Four decades of artisanal quality, curated by category for the modern maker and the traditional tailor.",
+    "subtitle": "Four decades of craftsman quality, curated by category for the modern maker and the traditional tailor.",
     "shopCategory": "Shop Category",
     "backToCatalog": "Back to Categories",
     "collection": "{category} Collection",
@@ -189,7 +189,7 @@
     "categoryDescriptions": {
       "Yarns": "Hand-dyed cotton and northern Thai silk, perfect for weaving stories into every stitch.",
       "Ribbons": "Bespoke satin and velvet trims, gathered from the finest looms across Southeast Asia.",
-      "Threads": "Industrial strength and artisanal color palettes, crafted for longevity and vibrant detail.",
+      "Threads": "Industrial strength and craftsman color palettes, crafted for longevity and vibrant detail.",
       "Needles": "Precision-engineered tools for the traditional tailor and the modern craft enthusiast.",
       "Fabrics": "Premium materials sourced directly from the vibrant heart of Sampeng Market, hand-picked for quality and character.",
       "Buttons": "Hand-carved wood, mother-of-pearl, and signature metal closures for distinct finishes.",
@@ -199,7 +199,7 @@
   },
   "videoSection": {
     "title": "Our Story In Motion",
-    "subtitle": "Witness the artisanal processes behind our materials.",
+    "subtitle": "Witness the craftsman processes behind our materials.",
     "controls": {
       "restart": "Restart",
       "seekBack": "-10s",
@@ -233,13 +233,64 @@
   "diyKits": {
     "tag": "Do it by yourself",
     "title": "DIY set",
-    "description": "Everything you need to begin your next masterpiece, thoughtfully assembled for the modern artisan.",
+    "description": "Everything you need to begin your next masterpiece, thoughtfully assembled for the modern crafters.",
     "essentialItems": "Essential Items",
     "exploreDetails": "Explore Kit Details"
   },
   "partner": {
     "heroTitle": "Trusted Partners Across Thailand & Beyond",
-    "heroSubtitle": "Building reliable retail partnerships from Bangkok to every corner of Thailand and across international borders"
+    "heroSubtitle": "Building reliable retail partnerships from Bangkok to every corner of Thailand and across international borders",
+    "reasonsTitle": "Built for wholesale success",
+    "reasonsEyebrow": "Why Partner With Kitcharoen",
+    "reasonsSubtitle": "Four decades of expertise distilled into a partnership model that prioritizes your growth.",
+    "reasonsTitle1": "Inventory Management Made Simple",
+    "reasonsDescription1": "Reduce tracking friction with our combined Material & Tool Sets. We curate compatible components so you don't have to manage dozens of separate SKUs for a single project line.",
+    "reasonsTitle2": "Low Material Costs, High Margins",
+    "reasonsDescription2": "Leverage our decades-old relationships in Sampeng Market to access bulk pricing. We provide the affordability needed for attractive retail points while maintaining healthy margins.", 
+    "reasonsTitle3": "Turnkey Store Sections",
+    "reasonsDescription3": "Expand your retail footprint effortlessly. We help map and stock dedicated handicraft shelves, providing planograms and curated assortments that have proven sales velocity.",
+    "reasonsTitle4": "Careful Commercial Packing",
+    "reasonsDescription4": "Our warehouse team treats every bulk order with artisanal care. Meticulous, retail-ready packaging ensures that supplies arrive organized and protected for immediate display.",
+    "ctaText": "Whether you're an established retailer or just starting out, we'd love to explore how we can support your business. Our team is here to answer questions, discuss possibilities, and build a partnership that works for you.",
+    "ctaButton1": "Become a Partner",
+    "ctaButton2": "Learn More",
+    "deliveryTitle": "Reliable delivery, worldwide",
+    "deliverySubtitle": "Seamless delivery from the heart of Bangkok to your doorstep, powered by our trusted logistics partners.",
+    "deliveryEyebrow": "Global Logistics Network",
+    "cargo": {
+      "local": {
+        "title": "Domestic Logistics (Within Thailand)",
+        "subtitle": "Bulk Regional Truck Lines",
+        "subtitle2": "Standard Express Delivery",
+        "cargo1": "P.L. EXPRESS TRANSPORT CO., LTD.",
+        "cargo2": "RAPIDUS TRANS CO., LTD.",
+        "cargo3": "SAHA LOMSAK KONSONG CO., LTD.",
+        "cargo4": "NIM SEE SENG TRANSPORT 1988 CO., LTD.",
+        "cargo5": "PORNCHAI PANUS KONSONG CO., LTD.",
+        "express1": "J&T EXPRESS THAILAND CO., LTD.",
+        "express2": "FLASH EXPRESS CO., LTD.",
+        "express3": "THAILAND POST CO., LTD. (EMS)"
+
+      },
+      "international": {
+        "title": "International Export (Worldwide Cargo)",
+        "subtitle": "Air & Sea Freight Forwarders",
+        "subtitle2": "Global Express Carriers",
+        "cargo1": "TRANS AIR CARGO CO., LTD.",
+        "cargo2": "SRB LOGISTICS CO., LTD.",
+        "cargo3": "MAYOCOM EXPRESS CARGO CO., LTD.",
+        "cargo4": "EAGLES AIR & SEA (THAILAND) CO., LTD.",
+        "cargo5": "GOLD COIN INTERNATIONAL CO., LTD.",
+        "cargo6": "TASNIM UNIVERSAL CO., LTD.",
+        "cargo7": "KPN CARGO CO., LTD.",
+        "cargo8": "SWIFT WAY INTERNATIONAL CO., LTD.",
+        "cargo9": "WORLD AIR LOGISTIC CO., LTD.",
+        "express1": "UPS PARCEL DELIVERY SERVICE (THAILAND) CO., LTD.",
+        "express2": "DHL EXPRESS (THAILAND) CO., LTD."
+      }
+    },
+    "protipTitle": "Pro-Tip for Local Partners:",
+    "protipText": "Have a preferred transport company or a specific consolidation hub in Rong Mueang or Phutthamonthon? Let us know during order verification, and we will deliver straight to their terminal."
   },
   "common": {
     "address": "376 Wanich 1 Chakkrawat Samphantawong Bangkok",
@@ -345,7 +396,7 @@
     "diyImagesGalleryEmpty": "No gallery images added yet. Click Add Images above to upload."
   },
   "featuredCategories": {
-    "title": "Artisan Collections",
+    "title": "Kitcharoen Collections",
     "subtitle": "Discover the finest materials for your next masterpiece.",
     "explore": "Explore Collection",
   "items": {
@@ -355,7 +406,7 @@
     },
     "yarn": {
       "name": "Yarn",
-      "description": "Premium organic fibers dyed in a curated palette of artisanal tones for a superior tactile experience."
+      "description": "Premium organic fibers dyed in a curated palette of craftsman tones for a superior tactile experience."
     },
     "tools": {
       "name": "Accessories",
@@ -391,7 +442,7 @@
   "auth": {
     "since": "SINCE 1984",
     "brandName": "Kitcharoen376",
-    "brandDesc": "A legacy of artisanal quality and traditional Thai craftsmanship, preserved for the modern maker. Welcome back to the house of Heritage Craft & Stitch.",
+    "brandDesc": "A legacy of craftsman quality and traditional Thai craftsmanship, preserved for the modern maker. Welcome back to the house of Heritage Craft & Stitch.",
     "signIn": "Sign In",
     "signInSubtitle": "Enter your details to access your account.",
     "emailLabel": "Email Address",
@@ -418,7 +469,7 @@
     "agreeToTerms": "I agree to the",
     "terms": "Terms",
     "createAccount": "Create Account",
-    "footer": "© 1984 Kitcharoen376. Artisanal quality for generations.",
+    "footer": "© 1984 Kitcharoen376. Craftsman quality for generations.",
     "loginFailed": "Login failed. Please check your credentials.",
     "passwordsDoNotMatch": "Passwords do not match!",
     "agreeTermsError": "Please agree to the terms and conditions",

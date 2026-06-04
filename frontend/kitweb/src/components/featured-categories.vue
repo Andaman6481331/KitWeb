@@ -92,22 +92,24 @@ const categories = [
 }
 
 .section-title {
-    font-family: 'ZCOOL XiaoWei', serif;
-    font-size: 3.5rem;
-    color: #5E4535;
+  font-size: 42px;
+  font-weight: 700;
+  color: #604539;
+  letter-spacing: -0.5px;
 }
 
-.section-subtitle {
-    font-size: 1.2rem;
-    color: #8b6f47;
-    font-weight: 500;
+.section-subtitle{
+  /* font-size: 18px; */
+  color: #8b6f47;
+  margin: 0;
+  font-weight: 400;
 }
 
 /* Accordion Layout */
 .categories-accordion {
     display: flex;
     gap: 20px;
-    height: 600px;
+    height: 30rem;
     padding: 0 40px;
 }
 
