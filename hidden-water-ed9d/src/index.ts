@@ -32,17 +32,46 @@ async function hashPassword(password: string): Promise<string> {
 	return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-function generateSKU(category: string, countInCategory: number): string {
+function getSkuPrefix(category: string): string {
 	const parts = (category || "UK").trim().split(/\s+/);
-	let prefix = "";
 	if (parts.length >= 2) {
-		prefix = (parts[0][0] + parts[1][0]).toUpperCase();
-	} else {
-		// Use first two letters, pad with 'X' if too short
-		prefix = (category || "UK").substring(0, 2).toUpperCase().padEnd(2, 'X');
+		return (parts[0][0] + parts[1][0]).toUpperCase();
 	}
-	const suffix = (countInCategory + 1).toString().padStart(3, '0');
-	return `${prefix}${suffix}`;
+	return (category || "UK").substring(0, 2).toUpperCase().padEnd(2, 'X');
+}
+
+function formatProductSku(prefix: string, sequence: number): string {
+	return `${prefix}${sequence.toString().padStart(3, '0')}`;
+}
+
+/** Allocate the next unused base product SKU for a category prefix (e.g. tools -> TO001). */
+async function allocateProductSku(env: Env, category: string, preferredSku?: string | null): Promise<string> {
+	if (preferredSku) {
+		const taken = await env.DB.prepare("SELECT id FROM products WHERE sku = ?").bind(preferredSku).first();
+		if (!taken) return preferredSku;
+	}
+
+	const prefix = getSkuPrefix(category);
+	const { results } = await env.DB.prepare(
+		"SELECT sku FROM products WHERE sku GLOB ?"
+	).bind(`${prefix}[0-9][0-9][0-9]`).all();
+
+	let maxSequence = 0;
+	const pattern = new RegExp(`^${prefix}(\\d{3})$`);
+	for (const row of results) {
+		const match = String(row.sku).match(pattern);
+		if (match) {
+			maxSequence = Math.max(maxSequence, parseInt(match[1], 10));
+		}
+	}
+
+	for (let seq = maxSequence + 1; seq <= maxSequence + 1000; seq++) {
+		const candidate = formatProductSku(prefix, seq);
+		const taken = await env.DB.prepare("SELECT id FROM products WHERE sku = ?").bind(candidate).first();
+		if (!taken) return candidate;
+	}
+
+	throw new Error("Unable to allocate a unique SKU");
 }
 
 function generateDiySKU(count: number): string {
@@ -611,8 +640,7 @@ export default {
 			if (url.pathname === "/products/next-sku" && request.method === "GET") {
 				const category = url.searchParams.get("category");
 				if (!category) return corsResponse({ error: "Category is required" }, { status: 400 });
-				const { count } = await env.DB.prepare("SELECT COUNT(*) as count FROM products WHERE category = ?").bind(category).first() as any;
-				const sku = generateSKU(category, count || 0);
+				const sku = await allocateProductSku(env, category);
 				return corsResponse({ sku });
 			}
 
@@ -640,21 +668,13 @@ export default {
 				}
 
 				try {
-					// Generate SKU
-					const { count } = await env.DB.prepare("SELECT COUNT(*) as count FROM products WHERE category = ?").bind(primaryCategory).first() as any;
-					let sku = body.sku || generateSKU(primaryCategory, count || 0);
-
-					// Avoid duplicate SKU if a previous attempt partially succeeded
-					const existingSku = await env.DB.prepare("SELECT id FROM products WHERE sku = ?").bind(sku).first();
-					if (existingSku) {
-						sku = generateSKU(primaryCategory, (count || 0) + 1);
-					}
+					const sku = await allocateProductSku(env, primaryCategory, body.sku);
 
 					const { meta } = await env.DB.prepare(
-						"INSERT INTO products (name, name_th, description, price, category, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, stock, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+						"INSERT INTO products (name, name_th, description, description_th, price, category, image_key, usage, usage_th, use_for, use_for_th, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, stock, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 					).bind(
-						dbValue(name), dbValue(name_th), dbValue(description), activePrice, primaryCategory,
-						dbValue(image_key), dbValue(usage), dbValue(use_for), dbValue(varieties), dbValue(sizes), dbValue(colors),
+						dbValue(name), dbValue(name_th), dbValue(description), dbValue(body.description_th || null), activePrice, primaryCategory,
+						dbValue(image_key), dbValue(usage), dbValue(body.usage_th || null), dbValue(use_for), dbValue(body.use_for_th || null), dbValue(varieties), dbValue(sizes), dbValue(colors),
 						price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, initialStock, sku
 					).run();
 
@@ -717,10 +737,10 @@ export default {
 				const currentProduct = await env.DB.prepare("SELECT stock FROM products WHERE id = ?").bind(id).first() as any;
 
 				await env.DB.prepare(
-					"UPDATE products SET name=?, name_th=?, description=?, price=?, category=?, image_key=?, usage=?, use_for=?, varieties=?, sizes=?, colors=?, price_1=?, price_2=?, price_3=?, price_4=?, price_5=?, stock=? WHERE id=?"
+					"UPDATE products SET name=?, name_th=?, description=?, description_th=?, price=?, category=?, image_key=?, usage=?, usage_th=?, use_for=?, use_for_th=?, varieties=?, sizes=?, colors=?, price_1=?, price_2=?, price_3=?, price_4=?, price_5=?, stock=? WHERE id=?"
 				).bind(
-					dbValue(name), dbValue(name_th), dbValue(description), activePrice, primaryCategory,
-					dbValue(image_key), dbValue(usage), dbValue(use_for), dbValue(varieties), dbValue(sizes), dbValue(colors),
+					dbValue(name), dbValue(name_th), dbValue(description), dbValue(body.description_th || null), activePrice, primaryCategory,
+					dbValue(image_key), dbValue(usage), dbValue(body.usage_th || null), dbValue(use_for), dbValue(body.use_for_th || null), dbValue(varieties), dbValue(sizes), dbValue(colors),
 					price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, stock ?? 0, id
 				).run();
 

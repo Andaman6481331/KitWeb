@@ -227,7 +227,7 @@ const handleAddToCart = (product) => {
 <style scoped>
 .diy-kits-section {
     padding: 20px 5% 100px 5%;
-    background-color: #FBF7F2;
+    background-color: #FDF3E6;
     position: relative;
     overflow: hidden;
 }

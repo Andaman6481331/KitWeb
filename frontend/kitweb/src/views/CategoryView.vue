@@ -34,21 +34,22 @@ const tProduct = (item, field) => {
     if (!item) return '';
     const lang = locale.value.toLowerCase();
 
-    // 1. Manual Thai Name Priority (as requested: "add only thai product name field in product table")
-    if (field === 'name' && lang === 'th' && item.name_th) {
-        return item.name_th;
+    if (lang === 'th') {
+        if (field === 'name' && item.name_th) return item.name_th;
+        if (field === 'description' && item.description_th) return item.description_th;
+        if (field === 'usage' && item.usage_th) return item.usage_th;
     }
 
     // 2. Auto-translation for metadata fields
-    const autoFields = ['description', 'usage', 'use_for', 'varieties', 'sizes', 'colors'];
-    if (autoFields.includes(field) && lang !== 'en') {
-        const text = item[field];
-        if (text) {
-            translationStore.getTranslation(item.id, field, text, lang);
-            const key = `${item.id}-${field}-${lang}`;
-            return translationStore.translations[key] || text; // Show original while loading
-        }
-    }
+    // const autoFields = ['description', 'usage', 'use_for', 'varieties', 'sizes', 'colors'];
+    // if (autoFields.includes(field) && lang !== 'en') {
+    //     const text = item[field];
+    //     if (text) {
+    //         translationStore.getTranslation(item.id, field, text, lang);
+    //         const key = `${item.id}-${field}-${lang}`;
+    //         return translationStore.translations[key] || text; // Show original while loading
+    //     }
+    // }
 
     // Default fallback
     return item[field] || '';
@@ -63,9 +64,8 @@ const tCategory = (catName) => {
         'tools': 'tools',
         'beads': 'beads',
         'ribbons': 'ribbons',
-        'buttons': 'buttons',
-        'accessories': 'accessories',
-        'artificialflowers': 'artificialflowers',
+        'decorative': 'decorative',
+        'flora': 'flora',
     };
     const lower = catName.toLowerCase().trim();
     const key = mapping[lower];
@@ -79,15 +79,13 @@ const tCategoryDesc = (catName) => {
     if (!catName) return '';
     const mapping = {
         'yarn': 'yarnDesc',
-        'yarns': 'yarnDesc',
         'needles': 'needlesDesc',
-        'threads': 'threadsDesc',
+        'thread': 'threadDesc',
         'tools': 'toolsDesc',
         'beads': 'beadsDesc',
         'ribbons': 'ribbonsDesc',
-        'buttons': 'buttonsDesc',
-        'accessories': 'accessoriesDesc',
-        'artificialflowers': 'artificialflowersDesc',
+        'decorative': 'decorativeDesc',
+        'flora': 'floraDesc',
     };
     const lower = catName.toLowerCase().trim();
     const key = mapping[lower];
@@ -662,9 +660,10 @@ const sortedProducts = computed(() => {
 /* PRODUCT GRID */
 .product-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     margin: 0 auto;
     padding: 0 1rem;
+    gap: 2px;
 }
 
 .product-card {
@@ -731,14 +730,14 @@ const sortedProducts = computed(() => {
 }
 
 .card-content {
-    padding: 24px;
+    padding: 10px;
     flex: 1;
     display: flex;
     flex-direction: column;
 }
 
 .card-title {
-    font-size: 16px;
+    font-size: 0.8rem;
     color: #2d3436;
     margin: 0;
     font-weight: 600;
@@ -746,11 +745,11 @@ const sortedProducts = computed(() => {
 
 .card-desc {
     display: -webkit-box !important;
-    -webkit-line-clamp: 3 !important;
+    -webkit-line-clamp: 2 !important;
     -webkit-box-orient: vertical !important;
     overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    font-size: 14px;
+    /* text-overflow: ellipsis !important; */
+    font-size: 0.7rem;
     color: #636e72;
     line-height: 1.4;
     margin-bottom: 20px;
@@ -760,7 +759,7 @@ const sortedProducts = computed(() => {
 
 .card-footer {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     margin-top: auto;
 }
@@ -775,7 +774,7 @@ const sortedProducts = computed(() => {
     border: none;
     padding: 10px 20px;
     border-radius: 20px;
-    font-size: 13px;
+    font-size: 0.7rem;
     font-weight: 600;
     display: flex;
     align-items: center;
@@ -818,7 +817,7 @@ const sortedProducts = computed(() => {
 .popup-content {
     background: white;
     border-radius: 20px;
-    max-width: 900px;
+    max-width: 950px;
     width: 100%;
     max-height: 90vh;
     overflow-y: auto;
@@ -869,7 +868,7 @@ const sortedProducts = computed(() => {
 
 .popup-body {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 3fr 2fr;
     gap: 0;
 }
 
@@ -899,7 +898,8 @@ const sortedProducts = computed(() => {
 
 .gallery-thumbnails {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(70px, max-content));
+    gap: 8px;
 }
 
 .thumb {
@@ -958,7 +958,7 @@ const sortedProducts = computed(() => {
 }
 
 .popup-title {
-    font-size: 28px;
+    font-size: 1rem;
     font-weight: 700;
     color: #2d2d2d;
     margin: 0 0 16px 0;

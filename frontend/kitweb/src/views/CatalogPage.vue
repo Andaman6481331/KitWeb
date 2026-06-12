@@ -14,8 +14,8 @@ const currentLang = computed(() => route.params.lang || defaultLang);
 const currentCategory = computed(() => route.params.category || "needles");
 
 const categories = [
-  'yarn', 'needles', 'threads', 'tools',
-  'beads', 'ribbons', 'buttons', 'accessories', 'artificialflowers'
+  'yarn', 'needles', 'thread', 'tools',
+  'beads','decorative', 'flora'
 ];
 
 const selectCategory = (cat) => {
@@ -186,7 +186,7 @@ const selectCategory = (cat) => {
 .section-header {
     padding: 0px 0 30px 0;
     text-align: left;
-    background-color: #FBF7F2;
+    background-color: #FDF3E6;
     justify-content: center;
     display: flex;
     flex-direction: column;

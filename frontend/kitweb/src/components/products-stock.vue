@@ -13,25 +13,14 @@ const currentLang = computed(() => route.params.lang || defaultLang);
 const tCategory = (catName) => {
     if (!catName) return '';
     const mapping = {
-        'yarn': 'Yarn',
-        'yarns': 'Yarn',
-        'needles': 'Needles',
-        'needle': 'Needles',
-        'threads': 'Threads',
-        'thread': 'Threads',
-        'tools': 'Tools',
-        'tool': 'Tools',
-        'beads': 'Beads',
-        'bead': 'Beads',
-        'ribbons': 'Ribbons',
-        'ribbon': 'Ribbons',
-        'buttons': 'Buttons',
-        'button': 'Buttons',
-        'accessories': 'Accessories',
-        'accessory': 'Accessories',
-        'artificialflowers': 'ArtificialFlowers',
-        'artificialflower': 'ArtificialFlowers',
-        'artificial flowers': 'ArtificialFlowers'
+        'yarn': 'yarn',
+        'needles': 'needles',
+        'thread': 'thread',
+        'tools': 'tools',
+        'beads': 'beads',
+        'ribbons': 'ribbons',
+        'decorative': 'decorative',
+        'flora': 'flora',
     };
     const lower = catName.toLowerCase().trim();
     const key = mapping[lower];
@@ -44,25 +33,14 @@ const tCategory = (catName) => {
 const tCategoryDesc = (catName) => {
     if (!catName) return '';
     const mapping = {
-        'yarn': 'YarnDesc',
-        'yarns': 'YarnDesc',
-        'needles': 'NeedlesDesc',
-        'needle': 'NeedlesDesc',
-        'threads': 'ThreadsDesc',
-        'thread': 'ThreadsDesc',
-        'tools': 'ToolsDesc',
-        'tool': 'ToolsDesc',
-        'beads': 'BeadsDesc',
-        'bead': 'BeadsDesc',
-        'ribbons': 'RibbonsDesc',
-        'ribbon': 'RibbonsDesc',
-        'buttons': 'ButtonsDesc',
-        'button': 'ButtonsDesc',
-        'accessories': 'AccessoriesDesc',
-        'accessory': 'AccessoriesDesc',
-        'artificialflowers': 'ArtificialFlowersDesc',
-        'artificialflower': 'ArtificialFlowersDesc',
-        'artificial flowers': 'ArtificialFlowersDesc'
+        'yarn': 'yarnDesc',
+        'needles': 'needlesDesc',
+        'thread': 'threadDesc',
+        'tools': 'toolsDesc',
+        'beads': 'beadsDesc',
+        'ribbons': 'ribbonsDesc',
+        'decorative': 'decorativeDesc',
+        'flora': 'floraDesc',
     };
     const lower = catName.toLowerCase().trim();
     const key = mapping[lower];
@@ -123,6 +101,11 @@ const selectCategory = (categoryName) => {
   );
 };
 
+const navigateToCategory = (categoryName) => {
+  router.push(
+    localizedRoute(route, 'category-products', { category: categoryName })
+  );
+};
 </script>
 
 <template>
@@ -138,10 +121,10 @@ const selectCategory = (categoryName) => {
                     <div class="category-info">
                         <h3 class="category-title-text">{{ tCategory(category.name) }}</h3>
                         <p class="category-description-text">{{ tCategoryDesc(category.name) }}</p>
-                        <div class="category-action">
+                        <router-link :to="{ name: 'catalog', params: { lang: currentLang, category: category.name } }" class="category-action">
                             <span class="shop-now-link">{{ $t('catalog.shopCategory') }} <ion-icon
                                     name="arrow-forward-outline"></ion-icon></span>
-                        </div>
+                        </router-link>
                     </div>
                 </div>
             </div>
@@ -161,27 +144,63 @@ const selectCategory = (categoryName) => {
 }
 
 .category-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-    padding: 0 1rem;
-    gap: 1rem;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;           /* Keeps horizontal scroll active */
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    padding: 1.5rem 10% 2.5rem 10%; 
+    gap: 1.5rem;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
 }
 
+/* 2. Style the scrollbar container (The Track) */
+.category-list::-webkit-scrollbar {
+    height: 6px;                /* Make it thin and elegant, never bulky */
+    display: block;             /* Ensure it is visible on desktop */
+}
+
+/* 3. Style the empty runway background of the scrollbar */
+.category-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.03); 
+    border-radius: 10px;
+    margin: 0 10%;              /* Matches your layout padding perfectly */
+}
+
+/* 4. Style the moving handle indicator (The Thumb) */
+.category-list::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15); /* Soft, professional gray marker */
+    border-radius: 10px;
+    transition: background 0.2s ease;
+}
+
+/* Make the handle slightly darker when hovered so the user knows it's interactive */
+.category-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3); 
+    cursor: pointer;
+}
+/* 2. The upgraded card layout rules */
 .category-card {
-    background: #FFFAF6;
+    flex: 0 0 320px;            /* Crucial: Prevents card from shrinking. Each card stays exactly 320px wide */
+    scroll-snap-align: start;   /* Snaps the edge of the card cleanly to the screen scroll container */
+    background: #FFFFFF;        /* Crisp flat white surface offers higher contrast for professional catalogs */
+    border-radius: 8px;         /* Uniform modern structural corners */
     overflow: hidden;
     cursor: pointer;
     transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), box-shadow 0.4s ease;
-    border: 1px solid rgba(139, 111, 71, 0.1);
+    border: 1px solid rgba(0, 0, 0, 0.06); /* Soft modern layout separator */
     display: flex;
     flex-direction: column;
     padding: 0;
-    box-shadow: 0 20px 40px rgba(53, 35, 29, 0.08);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03); /* Subtle, premium professional depth drop */
 }
 
+/* Subtle elegant hover action */
 .category-card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 20px 40px rgba(53, 35, 29, 0.379);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
 }
 
 .category-image-wrapper {
@@ -209,7 +228,7 @@ const selectCategory = (categoryName) => {
 
 .category-title-text {
     font-family: 'ZCOOL XiaoWei', serif !important;
-    font-size: 2rem;
+    font-size: 1rem;
     color: #3d2b1f;
     margin: 0 0 12px 0;
     font-weight: 600;
@@ -217,7 +236,7 @@ const selectCategory = (categoryName) => {
 
 .category-description-text {
     font-family: 'Work Sans', sans-serif !important;
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     color: #6d5838;
     line-height: 1.6;
     margin-bottom: 25px;
@@ -236,7 +255,7 @@ const selectCategory = (categoryName) => {
 
 .shop-now-link {
     font-family: 'Work Sans', sans-serif !important;
-    font-size: 1rem;
+    font-size: 0.7rem;
     font-weight: 700;
     color: #008080;
     display: flex;

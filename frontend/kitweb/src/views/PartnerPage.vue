@@ -502,15 +502,15 @@ h1 {
 
 /* Different heights per row to create Masonry effect */
 .row-1 .wall-item {
-    height: 220px;
-}
-
-.row-2 .wall-item {
     height: 200px;
 }
 
+.row-2 .wall-item {
+    height: 180px;
+}
+
 .row-3 .wall-item {
-    height: 280px;
+    height: 240px;
 }
 
 

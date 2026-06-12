@@ -608,7 +608,6 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 .map-container {
     width: 100%;
     height: 100%;
-    border-radius: 20px;
     overflow: hidden;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
     position: sticky;
@@ -658,7 +657,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 .contact-grid {
     display: grid;
     grid-template-columns: 500px 1fr;
-    gap: 30px;
+    /* gap: 30px; */
     align-items: stretch;
 }
 
@@ -672,7 +671,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 .info-card {
     background: #ffffff;
     padding: 1.5rem;
-    border-radius: 1rem;
+    /* border-radius: 1rem; */
     box-shadow: 0 4px 30px rgba(94, 69, 53, 0.05);
     border: 1px solid rgba(94, 69, 53, 0.1);
 }
@@ -742,7 +741,6 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 .social-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
 }
 
 .social-link,
@@ -750,7 +748,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
     display: block;
     width: 100%;
     padding: 18px 18px;
-    border-radius: 18px;
+    /* border-radius: 18px; */
     background: #faf9f6;
     border: 1px solid #f0f0f0;
     text-decoration: none;
@@ -906,7 +904,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 .inquiry-form-card {
     background: #ffffff;
     padding: 1.5rem;
-    border-radius: 20px;
+    /* border-radius: 20px; */
     box-shadow: 0 4px 30px rgba(94, 69, 53, 0.05);
     border: 1px solid rgba(94, 69, 53, 0.1);
 }

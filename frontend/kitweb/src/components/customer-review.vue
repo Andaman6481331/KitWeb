@@ -191,7 +191,7 @@ const getStars = (rating) => {
 
 /* Review Card */
 .review-card {
-    background: white;
+    background: rgba(255, 255, 255, 0.079);
     overflow: hidden;
     box-shadow: 0 10px 50px rgba(0, 0, 0, 0.1);
     animation: fadeSlideIn 0.5s ease;
@@ -432,7 +432,6 @@ const getStars = (rating) => {
     grid-template-columns: repeat(4, 1fr);
     gap: 32px;
     padding: 40px;
-    background: white;
     border-radius: 20px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }

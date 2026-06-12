@@ -158,9 +158,7 @@ useHead(() => {
   }
 })
 
-// Get saved language from localStorage or default to 'EN'
-const savedLang = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem('locale') || 'EN' : 'EN'
-const currentLanguage = ref(savedLang)
+const currentLanguage = ref(pathToCode[route.params?.lang] || 'EN')
 const currentLang = computed(() => {
   const lang = route.params?.lang
   if (typeof lang === 'string' && lang.length === 2) return lang
@@ -168,11 +166,15 @@ const currentLang = computed(() => {
 })
 const showLanguageMenu = ref(false)
 
-watch(() => route.params.lang, (newLang) => {
-  if (newLang && pathToCode[newLang]) {
-    currentLanguage.value = pathToCode[newLang]
-  }
-})
+watch(
+  () => route.params.lang,
+  (newLang) => {
+    if (newLang && pathToCode[newLang]) {
+      currentLanguage.value = pathToCode[newLang]
+    }
+  },
+  { immediate: true },
+)
 const showLogoutConfirm = ref(false)
 
 const languages = [
@@ -258,20 +260,14 @@ const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
       <!-- Center: Links -->
       <div class="nav-center" style="justify-content: center; align-items: center; text-align: center;">
         <router-link :to="{ name: 'home', params: { lang: currentLang } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.home') }}</router-link>
-        <template v-if="isDev">
-          <router-link :to="{ name: 'catalog', params: { lang: currentLang, category: 'needles' } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.products') }}</router-link>
-        </template>
+        <router-link :to="{ name: 'catalog', params: { lang: currentLang, category: 'needles' } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.products') }}</router-link>
         <router-link :to="{ name: 'event', params: { lang: currentLang } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.events') }}</router-link>
         <router-link :to="{ name: 'partners', params: { lang: currentLang } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.partners') }}</router-link>
         <router-link :to="{ name: 'contactus', params: { lang: currentLang } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.contactUs') }}</router-link>
       </div>
 
-      <!-- Right: Search & Actions -->
+      <!-- Right: Actions -->
       <div class="nav-right" style="justify-content: center; align-items: center; text-align: center;">
-        <div class="search-capsule">
-          <ion-icon name="search-outline"></ion-icon>
-          <input type="text" placeholder="Search materials...">
-        </div>
 
         <div class="action-icons">
           <div class="lang-globe" @click="toggleLanguageMenu">
@@ -461,22 +457,28 @@ body {
   color: inherit;
 }
 
+
 .NavBar {
   position: sticky;
   top: 0;
   left: 0;
   height: 80px;
-  /* background-color: #f3e7d7; */
-  background: linear-gradient(135deg, #f3e7d7, #f1e1cb, #f3e7d7);
+  width: 100%; /* Ensures it stretches edge-to-edge */
+  background: linear-gradient(
+    135deg, 
+    rgba(243, 231, 215, 0.75), 
+    rgba(241, 225, 203, 0.75), 
+    rgba(243, 231, 215, 0.75)
+  );
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px); /* Safari support */
+
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 5%;
   z-index: 1000;
-  border-bottom: 1px solid #f0f0f0;
-  align-self: flex-start;
 }
-
 /* Left: Logo */
 .nav-left {
   display: flex;
@@ -526,30 +528,6 @@ body {
   display: flex;
   align-items: center;
   gap: 25px;
-}
-
-.search-capsule {
-  background-color: white;
-  /* Soft beige background */
-  padding: 10px 20px;
-  border-radius: 30px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 180px;
-}
-
-.search-capsule ion-icon {
-  color: #8b6f47;
-  font-size: 20px;
-}
-
-.search-capsule input {
-  border: none;
-  background: transparent;
-  outline: none;
-  font-size: 14px;
-  width: 100%;
 }
 
 .action-icons {
@@ -818,10 +796,6 @@ body {
   .nav-right {
     gap: 15px;
   }
-
-  .search-capsule {
-    width: 220px;
-  }
 }
 
 @media (max-width: 1100px) {
@@ -831,10 +805,6 @@ body {
 
   .nav-link {
     font-size: 13px;
-  }
-
-  .search-capsule {
-    width: 120px;
   }
 
   .action-icons {
@@ -860,6 +830,10 @@ body {
   .nav-left {
     width: 100%;
     justify-content: center;
+    height: 50px;
+  }
+  .main-logo {
+    height: 40px;
   }
 
   .nav-center {
@@ -873,10 +847,6 @@ body {
     width: 100%;
     justify-content: center;
     order: 2;
-  }
-
-  .search-capsule {
-    width: 300px;
   }
 }
 
@@ -897,11 +867,6 @@ body {
   .order-capsule {
     padding: 8px 16px;
     font-size: 12px;
-  }
-
-  .search-capsule {
-    display: none;
-    /* Hide search on very small screens to save space */
   }
 }
 </style>

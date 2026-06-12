@@ -61,6 +61,38 @@ const galleryFileInput = ref(null);
 const sizeVariants = ref([]); // list of { name, price_1, price_2, price_3, price_4, price_5, stock, image_key }
 const initialVariantNames = ref([]); // track loaded variants
 
+const showDescTh = ref(true);
+const showUseForTh = ref(true);
+const usageOptions = [
+  { en: 'sewing',           th: 'งานเย็บ' },
+  { en: 'crafting',         th: 'งานประดิษฐ์' },
+  { en: 'school activity',  th: 'กิจกรรมโรงเรียน' },
+  { en: 'temple activity',  th: 'กิจกรรมวัด' },
+  { en: 'decorating',       th: 'ตกแต่ง' },
+  { en: 'crocheting',       th: 'งานถักโครเช' },
+  { en: 'beading',          th: 'งานร้อย' },
+  { en: 'origami',          th: 'งานกระดาษพับ' },
+  { en: 'ribbon crafting',  th: 'งานริบบิ้น' },
+  { en: 'ribbon folding',   th: 'งานพับเหรียญ' },
+  { en: 'hand hemming',     th: 'งานสอย' },
+  { en: 'punching',         th: 'งานตอก' }
+];
+
+const selectedUsages = ref([]);
+
+// Sync FROM newProduct.usage -> selectedUsages (e.g. on editProduct load)
+watch(() => newProduct.value.usage, (val) => {
+  selectedUsages.value = val ? val.split(', ').map(s => s.trim()).filter(Boolean) : [];
+}, { immediate: true });
+
+// Sync TO newProduct when checkboxes change
+watch(selectedUsages, (val) => {
+  newProduct.value.usage = val.join(', ');
+  newProduct.value.usage_th = val
+    .map(en => usageOptions.find(u => u.en === en)?.th || en)
+    .join(', ');
+}, { flush: 'sync' });
+
 const detectedSizes = computed(() => {
   const sizes = new Set();
   galleryImages.value.forEach(img => {
@@ -275,12 +307,14 @@ const resetForm = () => {
   isEditing.value = false;
   editingId.value = null;
   stockAdjustment.value = 0;
+  showDescTh.value = false;
 };
 
 const editProduct = (product) => {
   isEditing.value = true;
   editingId.value = product.id;
   newProduct.value = { ...product };
+  showDescTh.value = false;
   imagePreview.value = null; // Clear local preview to show saved image
 
   if (!newProduct.value.categories || newProduct.value.categories.length === 0) {
@@ -489,12 +523,15 @@ const handleSubmit = async () => {
       name: newProduct.value.name,
       name_th: newProduct.value.name_th || null,
       description: newProduct.value.description,
+      description_th: newProduct.value.description_th || null,
       price: newProduct.value.price_3 || newProduct.value.price || 0,
       category: newProduct.value.category,
       categories: newProduct.value.categories,
       image_key: newProduct.value.image_key || null,
       usage: newProduct.value.usage || null,
+      usage_th: newProduct.value.usage_th || null,
       use_for: newProduct.value.use_for || null,
+      use_for_th: newProduct.value.use_for_th || null,
       varieties: newProduct.value.varieties || null,
       sizes: newProduct.value.sizes || null,
       colors: newProduct.value.colors || null,
@@ -597,11 +634,11 @@ const onCategoriesChange = () => {
   }
 
   newProduct.value.category = firstPath;
+  if (!isEditing.value) {
+    newProduct.value.sku = '';
+  }
   const selectedCat = categories.value.find(c => c.path === firstPath);
   if (selectedCat) {
-    if (selectedCat.default_usage) {
-      newProduct.value.usage = selectedCat.default_usage;
-    }
     if (selectedCat.default_use_for) {
       newProduct.value.use_for = selectedCat.default_use_for;
     }
@@ -862,6 +899,17 @@ const deleteDiyProduct = async (id) => {
                   </div>
                   <input type="file" ref="fileInput" class="hidden-input" @change="handleFileUpload" accept="image/*" />
                 </div>
+                <div class="form-group" style="margin-top:10px;">
+                  <label>
+                    {{ $t('admin.useFor') }}
+                    <button type="button" @click="showUseForTh = !showUseForTh"
+                      style="font-size:11px; padding:2px 8px; border-radius:12px; border:1px solid #b2bec3; background: #f1f2f6; cursor:pointer; color:#636e72;">
+                      {{ showUseForTh ? 'TH' : 'EN' }}
+                    </button>
+                  </label>
+                  <input v-if="!showUseForTh" v-model="newProduct.use_for" :placeholder="$t('admin.placeholderUseFor')" />
+                  <input v-if="showUseForTh" v-model="newProduct.use_for_th" :placeholder="`ใช้สำหรับทำอะไรบ้าง...`" />
+                </div>
               </div>
               <div>
                 <div class="form-group">
@@ -883,27 +931,37 @@ const deleteDiyProduct = async (id) => {
                   <small class="auto-hint">{{ $t('admin.categoriesHint') }}</small>
                 </div>
                 <div class="form-group">
-                  <label>{{ $t('admin.description') }}</label>
-                  <textarea required v-model="newProduct.description" rows="8"
-                    :placeholder="$t('admin.descriptionPlaceholder')"></textarea>
+                  <label style="display:flex; align-items:center; gap:8px;">
+                    {{ $t('admin.description') }}
+                    <button type="button" @click="showDescTh = !showDescTh"
+                      style="font-size:11px; padding:2px 8px; border-radius:12px; border:1px solid #b2bec3; background: #f1f2f6; cursor:pointer; color:#636e72;">
+                      {{ showDescTh ? 'TH' : 'EN' }}
+                    </button>
+                  </label>
+                  <textarea v-if="!showDescTh" required v-model="newProduct.description" rows="8"
+                    placeholder="English description..."></textarea>
+                  <textarea v-if="showDescTh" v-model="newProduct.description_th" rows="8"
+                    placeholder="คำอธิบายภาษาไทย..."
+                    ></textarea>
                   <small class="auto-hint">{{ $t('admin.autoTranslateHint') }}</small>
                 </div>
               </div>
             </div>
 
-
-            <div class="form-row">
-              <div class="form-group">
-                <label>{{ $t('admin.usage') }}</label>
-                <input v-model="newProduct.usage" :placeholder="$t('admin.placeholderUsage')" />
+            <div class="form-group">
+              <label>{{ $t('admin.usage') }}</label>
+              <div class="category-checkboxes">
+                <label v-for="u in usageOptions" :key="u.en" class="category-checkbox">
+                  <input
+                    type="checkbox"
+                    :value="u.en"
+                    v-model="selectedUsages"
+                  />
+                  <span>{{ u.en }} <span class="cat-th-label">({{ u.th }})</span></span>
+                </label>
               </div>
-              <div class="form-group">
-                <label>{{ $t('admin.useFor') }}</label>
-                <input v-model="newProduct.use_for" :placeholder="$t('admin.placeholderUseFor')" />
-              </div>
+              <small class="auto-hint" v-if="newProduct.usage">{{ newProduct.usage }}</small>
             </div>
-
-
 
           </form>
           </template>
@@ -937,15 +995,15 @@ const deleteDiyProduct = async (id) => {
                 <div class="price-grid" style="grid-template-columns: repeat(3, 1fr);">
                   <div class="price-input-box active">
                     <span class="label">Level 1 (Retail/Display)</span>
-                    <input v-model="newDiyProduct.price_1" type="number" step="0.01" placeholder="0.00" required />
+                    <input v-model="newDiyProduct.price_1" type="number" step="1" placeholder="0.00" required />
                   </div>
                   <div class="price-input-box">
                     <span class="label">Level 2 (Medium Wholesale)</span>
-                    <input v-model="newDiyProduct.price_2" type="number" step="0.01" placeholder="0.00" required />
+                    <input v-model="newDiyProduct.price_2" type="number" step="1" placeholder="0.00" required />
                   </div>
                   <div class="price-input-box">
                     <span class="label">Level 3 (Bulk Wholesale)</span>
-                    <input v-model="newDiyProduct.price_3" type="number" step="0.01" placeholder="0.00" required />
+                    <input v-model="newDiyProduct.price_3" type="number" step="1" placeholder="0.00" required />
                   </div>
                 </div>
               </div>
@@ -1158,11 +1216,11 @@ const deleteDiyProduct = async (id) => {
                       <td class="variant-name-cell">
                         <strong>{{ sv.name }}</strong>
                       </td>
-                      <td><input type="number" step="0.01" v-model="sv.price_1" class="matrix-input" /></td>
-                      <td><input type="number" step="0.01" v-model="sv.price_2" class="matrix-input" /></td>
-                      <td><input type="number" step="0.01" v-model="sv.price_3" class="matrix-input" /></td>
-                      <td><input type="number" step="0.01" v-model="sv.price_4" class="matrix-input" /></td>
-                      <td><input type="number" step="0.01" v-model="sv.price_5" class="matrix-input" /></td>
+                      <td><input type="number" step="1" v-model="sv.price_1" class="matrix-input" /></td>
+                      <td><input type="number" step="1" v-model="sv.price_2" class="matrix-input" /></td>
+                      <td><input type="number" step="1" v-model="sv.price_3" class="matrix-input" /></td>
+                      <td><input type="number" step="1" v-model="sv.price_4" class="matrix-input" /></td>
+                      <td><input type="number" step="1" v-model="sv.price_5" class="matrix-input" /></td>
                       <td><input type="number" v-model.number="sv.stock" class="matrix-input stock-input" /></td>
                       <td style="text-align: center;">
                         <button type="button" class="action-btn del" @click="removeSizeVariant(sv.name)" title="Remove Variant">
@@ -1177,11 +1235,11 @@ const deleteDiyProduct = async (id) => {
                       <td class="variant-name-cell">
                         <strong>{{$t('admin.baseProduct')}}</strong>
                       </td>
-                      <td><input type="number" step="0.01" v-model="newProduct.price_1" class="matrix-input" /></td>
-                      <td><input type="number" step="0.01" v-model="newProduct.price_2" class="matrix-input" /></td>
-                      <td><input type="number" step="0.01" v-model="newProduct.price_3" class="matrix-input" /></td>
-                      <td><input type="number" step="0.01" v-model="newProduct.price_4" class="matrix-input" /></td>
-                      <td><input type="number" step="0.01" v-model="newProduct.price_5" class="matrix-input" /></td>
+                      <td><input type="number" step="1" v-model="newProduct.price_1" class="matrix-input" /></td>
+                      <td><input type="number" step="1" v-model="newProduct.price_2" class="matrix-input" /></td>
+                      <td><input type="number" step="1" v-model="newProduct.price_3" class="matrix-input" /></td>
+                      <td><input type="number" step="1" v-model="newProduct.price_4" class="matrix-input" /></td>
+                      <td><input type="number" step="1" v-model="newProduct.price_5" class="matrix-input" /></td>
                       <td>
                         <div v-if="!isEditing">
                           <input type="number" v-model.number="newProduct.stock" class="matrix-input stock-input" min="0" />
@@ -1405,31 +1463,58 @@ header {
 .category-checkboxes {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 8px;
+  gap: 0.5rem; /* Standardized modern tight gap spacing */
+  margin-top: 0.5rem;
 }
 
 .category-checkbox {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid #dfe6e9;
-  border-radius: 8px;
+  justify-content: center;
+  padding: 0.2rem 0.5rem;
+  
+  /* Subtle, professional neutral colors */
+  background: #f4f4f5; /* Tailwind zinc-100 */
+  border: 1px solid transparent; /* Smooth transitions without layout snapping */
+  border-radius: 9999px; /* Pill-shaped edges look incredibly sleek */
+  
+  color: #71717a; /* Muted slate text color */
+  font-size: 0.6rem;
+  font-weight: 500;
   cursor: pointer;
-  font-size: 14px;
-  background: #fafafa;
+  user-select: none;
+  transition: all 0.2s cubic-bezier(0.165, 0.84, 0.44, 1);
 }
 
+/* 1. Completely hide the native browser checkbox square */
+.category-checkbox input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+}
+
+/* 2. Hover state for unselected items */
+.category-checkbox:hover {
+  background: #e4e4e7; /* Slight contrast drop */
+  color: #18181b;
+}
+
+/* 3. The Activated Selected State (The Professional Glow) */
 .category-checkbox:has(input:checked) {
-  border-color: #0984e3;
-  background: #eef7ff;
+  background: #18181b; /* Sleek high-contrast dark selection (or use your var(--accent-warm)) */
+  color: #ffffff;
+  border-color: #18181b;
+  box-shadow: 0 4px 12px rgba(24, 24, 27, 0.12); /* Micro-depth */
 }
 
-.category-checkbox input {
-  accent-color: #0984e3;
+/* Secondary language tag logic */
+.cat-th-label {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  margin-left: 0.25rem;
 }
-
 .cat-th-label {
   color: #636e72;
   font-size: 13px;
@@ -1478,7 +1563,7 @@ header {
 
 .product-image-uploader {
   width: 100%;
-  height: 100%;
+  aspect-ratio: 1/1;
   border-radius: 16px;
   overflow: hidden;
   border: 2px dashed #d1d8e0;

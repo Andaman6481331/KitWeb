@@ -192,11 +192,11 @@ onMounted(async () => {
     <!-- Auto Item Scroll Banner -->
     <AutoScrollBanner />
 
+        <!-- Product Stock -->
+    <ProductStock />
+
     <!-- Customer Review -->
     <customerReview />
-
-    <!-- Product Stock -->
-    <ProductStock />
 
     <!-- Promotional Banner -->
     <section class="promo-section">

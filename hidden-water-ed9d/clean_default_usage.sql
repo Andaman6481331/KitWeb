@@ -1,0 +1,1 @@
+UPDATE products SET usage = NULL WHERE usage IS NOT NULL;
