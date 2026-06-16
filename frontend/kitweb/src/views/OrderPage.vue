@@ -12,6 +12,8 @@ const route = useRoute();
 const currentLang = computed(() => route.params.lang || defaultLang);
 const { t, te, locale } = useI18n()
 
+const isMobile = ref(window.innerWidth <= 768)
+
 // Helper to translate product fields
 const tProduct = (item, field) => {
     if (!item) return '';
@@ -534,7 +536,7 @@ const closeOrderDetails = () => {
                                 <p>{{ t('order.loadingProducts') }}</p>
                             </div>
                             <template v-else>
-                                <RecycleScroller class="scroller" :items="filteredProducts" :item-size="160"
+                                <RecycleScroller v-if="!isMobile" class="scroller" :items="filteredProducts" :item-size="isMobile ? 100 : 160"
                                     key-field="id" v-slot="{ item: product }">
                                     <div v-if="product"
                                         class="product-row" :class="{
@@ -599,6 +601,65 @@ const closeOrderDetails = () => {
                                         </div>
                                     </div>
                                 </RecycleScroller>
+                                <div v-else>
+                                    <div v-for="product in filteredProducts" :key="product.id" class="product-row" :class="{'out-of-stock': !product.inStock, 'in-cart': isProductInCart(product.id)}">
+                                        <!-- Image -->
+                                        <div class="td-image">
+                                            <div class="image-wrapper">
+                                                <img :src="product.image" :alt="tProduct(product, 'name')"
+                                                    class="product-thumb" />
+                                                <div v-if="!product.inStock" class="stock-badge">{{
+                                                    t('order.outOfStock') }}</div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Product Info -->
+                                        <div class="td-details">
+                                            <span :class="['product-tag', { 'diy-tag': product.category === 'DIY Kit' }]">{{ product.category }}</span>
+                                            <h3 class="product-name">{{ tProduct(product, 'name') }}</h3>
+                                            <p class="product-desc">{{ tProduct(product, 'description') }}</p>
+                                        </div>
+
+                                        <!-- Variations -->
+                                        <div class="td-variations" v-if="productSelections[product.id]">
+                                            <template v-if="product.category === 'DIY Kit'">
+                                                <span class="standard-spec-badge">{{ t('order.standard') || 'Standard' }}</span>
+                                            </template>
+                                            <template v-else>
+                                                <select v-model="productSelections[product.id].size"
+                                                    @change="updateSize(product.id, $event.target.value)"
+                                                    class="variation-select" :disabled="!product.inStock">
+                                                    <option v-for="(size, idx) in product.sizes" :key="size" :value="size">
+                                                        {{ tArray(product, 'sizes')[idx] || size }}
+                                                    </option>
+                                                </select>
+                                                <select v-model="productSelections[product.id].color"
+                                                    @change="updateColor(product.id, $event.target.value)"
+                                                    class="variation-select" :disabled="!product.inStock">
+                                                    <option v-for="(color, idx) in product.colors" :key="color"
+                                                        :value="color">
+                                                        {{ tArray(product, 'colors')[idx] || color }}
+                                                    </option>
+                                                </select>
+                                            </template>
+                                        </div>
+
+                                        <!-- Price -->
+                                        <div class="td-price">
+                                            <span class="price-currency">฿</span>
+                                            <span class="price-amount">{{ product.price }}</span>
+                                        </div>
+
+                                        <!-- Action Button -->
+                                        <div class="td-action">
+                                            <button class="add-to-cart-btn" :disabled="!product.inStock"
+                                                @click="addToCart(product)">
+                                                <span class="btn-icon">+</span>
+                                                {{ t('order.add') }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </template>
                         </div>
                     </div>
@@ -994,9 +1055,14 @@ const closeOrderDetails = () => {
     margin: 0 auto 40px;
     padding: 0 5%;
     display: flex;
-    justify-content: space-between;
+    flex-wrap: wrap;
     align-items: center;
     gap: 20px;
+}
+
+.category-filters {
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
 .search-box {
@@ -1054,9 +1120,9 @@ const closeOrderDetails = () => {
 
 /* Content Wrapper */
 .content-wrapper {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 0 5%;
+    /* max-width: 1400px; */
+    /* margin: 0 auto; */
+    /* padding: 0 5%; */
     display: grid;
     grid-template-columns: 1fr 380px;
     gap: 40px;
@@ -1066,7 +1132,7 @@ const closeOrderDetails = () => {
 /* Products Section */
 .products-container {
     background: white;
-    border-radius: 20px;
+    /* border-radius: 20px; */
     border: 1px solid #F4EDE6;
     overflow: hidden;
 }
@@ -1094,7 +1160,7 @@ const closeOrderDetails = () => {
     border-bottom: 1px solid #F4EDE6;
     align-items: center;
     transition: background 0.3s ease;
-    height: 160px;
+    /* height: 160px; */
     box-sizing: border-box;
 }
 
@@ -1964,19 +2030,80 @@ const closeOrderDetails = () => {
     .order-card-actions {
         flex-direction: column;
     }
-
-    .product-row {
-        grid-template-columns: 1fr;
-        gap: 20px;
-    }
-
     .table-header {
         display: none;
     }
 
+    .scroller {
+        height: 600px;
+    }
+
+    .product-row {
+        display: grid;
+        grid-template-columns: 80px 1fr auto;
+        grid-template-rows: auto auto;
+        height: auto;
+        min-height: unset;
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .product-desc{
+        font-size: 12px !important;
+    }
+
+    /* Fix 1: shrink image to fit its column */
     .image-wrapper {
+        width: 80px;
+        height: 80px;
+    }
+
+    /* Fix 2: prevent grid children from overflowing */
+    .td-details,
+    .td-variations {
+        min-width: 0;
+        /* font-size: 6px !important; */
+    }
+
+    /* Fix 3: stack variations vertically, full width selects */
+    .td-variations {
+        flex-direction: row;
+    }
+
+    .variation-select,
+    .standard-spec-badge {
         width: 100%;
-        height: 200px;
+        font-size: 12px !important;
+        padding: 5px 10px;
+    }
+
+    /* Fix 4: shrink button text on mobile */
+    .add-to-cart-btn {
+        padding: 8px 10px;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    .td-image { grid-column: 1; grid-row: 1 / 3; }
+    .td-details { grid-column: 2; grid-row: 1; }
+    .td-variations { grid-column: 2; grid-row: 2; }
+    .td-price { grid-column: 3; grid-row: 1; align-self: end; }
+    .td-action { grid-column: 3; grid-row: 2; align-self: end; }
+}
+
+@media (max-width: 480px) {
+    .td-variations {
+        flex: 1 1 100%;
+    }
+
+    .variation-select,
+    .standard-spec-badge {
+        max-width: 130px;
+    }
+
+    .add-to-cart-btn {
+        padding: 7px 10px;
+        font-size: 12px;
     }
 }
 

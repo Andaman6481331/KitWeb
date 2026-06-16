@@ -285,7 +285,7 @@ const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
               </div>
             </transition>
           </div>
-          <template v-if="isDev">
+          <!-- <template v-if="isDev"> -->
             <router-link v-if="authStore.isAuthenticated" :to="{ name: 'orderpage', params: { lang: currentLang } }" @click="scrollToTop" class="order-capsule">
               {{ $t('nav.startOrder') }}
             </router-link>
@@ -306,7 +306,7 @@ const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
                   </svg>
               </button>
             </div>
-          </template>
+          <!-- </template> -->
         </div>
       </div>
     </div>
