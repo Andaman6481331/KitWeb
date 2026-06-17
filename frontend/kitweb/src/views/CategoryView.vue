@@ -12,6 +12,10 @@ const props = defineProps({
   category: {
     type: String,
     default: null
+  },
+  sortBy: {
+    type: String,
+    default: null
   }
 });
 
@@ -100,7 +104,8 @@ const loading = ref(true);
 const hasLoaded = ref(false);
 const showPopup = ref(false);
 const selectedProduct = ref(null);
-const sortBy = ref('popular');
+const internalSortBy = ref('popular');
+const activeSortBy = computed(() => props.sortBy || internalSortBy.value);
 
 // Cart & Confirmation Modal
 const showConfirmModal = ref(false);
@@ -317,11 +322,11 @@ const getImageUrl = (key, variant = 'large') => {
 
 const sortedProducts = computed(() => {
     let sorted = [...products.value];
-    if (sortBy.value === 'price_asc') {
+    if (activeSortBy.value === 'price_asc') {
         sorted.sort((a, b) => (a.price_1 || a.price || 0) - (b.price_1 || b.price || 0));
-    } else if (sortBy.value === 'price_desc') {
+    } else if (activeSortBy.value === 'price_desc') {
         sorted.sort((a, b) => (b.price_1 || b.price || 0) - (a.price_1 || a.price || 0));
-    } else if (sortBy.value === 'name') {
+    } else if (activeSortBy.value === 'name') {
         sorted.sort((a, b) => a.name.localeCompare(b.name));
     }
     return sorted;
@@ -330,36 +335,20 @@ const sortedProducts = computed(() => {
 
 <template>
     <div class="category-page">
-        <div style="background-color: #E5E2DD;">
-            <!-- Hero Section -->
-            <div class="hero-section">
-                <div class="hero-text">
-                    <div class="since-badge">
-                        <ion-icon name="star"></ion-icon> {{ $t('catalog.since') }}
-                    </div>
-                    <h1 class="hero-title">{{ $t('catalog.collection', { category: tCategory(currentCategory) }) }}</h1>
-                    <p class="hero-desc">{{ tCategoryDesc(currentCategory) }}</p>
+        <!-- Compact category header -->
+        <div class="category-bar">
+            <div class="category-bar-left">
+                <div class="category-bar-image" v-if="heroImage">
+                    <img :src="heroImage" :alt="tCategory(currentCategory)">
                 </div>
-                <div class="hero-image-container">
-                    <img v-if="heroImage" :src="heroImage" alt="Category Hero" />
-                    <div v-else class="hero-placeholder"></div>
+                <div>
+                    <h2 class="category-bar-title">{{ tCategory(currentCategory) }}</h2>
+                    <p class="category-bar-desc">{{ tCategoryDesc(currentCategory) }}</p>
                 </div>
             </div>
-        </div>
-
-        <div class="controls-section">
-            <div class="product-count">
+            <span class="product-count-badge">
                 {{ $t('catalog.showing', { count: products.length }) }}
-            </div>
-            <div class="sort-control">
-                <label>{{ $t('catalog.sortBy') }}</label>
-                <select v-model="sortBy">
-                    <option value="popular">{{ $t('catalog.sortPopular') }}</option>
-                    <option value="price_asc">{{ $t('catalog.sortPriceAsc') }}</option>
-                    <option value="price_desc">{{ $t('catalog.sortPriceDesc') }}</option>
-                    <option value="name">{{ $t('catalog.sortName') }}</option>
-                </select>
-            </div>
+            </span>
         </div>
 
         <!-- Product Grid -->
@@ -540,121 +529,67 @@ const sortedProducts = computed(() => {
     padding-bottom: 60px;
 }
 
-/* HERO SECTION */
-.hero-section {
-    max-width: 1300px;
-    margin: 0 auto;
-    padding: 50px 5%;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+/* COMPACT CATEGORY BAR */
+.category-bar {
+    display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 20px;
+    background: #fff;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    flex-wrap: wrap;
 }
 
-
-.hero-text {
-    flex: 1;
-}
-
-.since-badge {
-    display: inline-flex;
+.category-bar-left {
+    display: flex;
     align-items: center;
-    gap: 6px;
-    background: #fdfaf6;
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 700;
-    color: #5d4037;
-    letter-spacing: 1px;
-    margin-bottom: 20px;
-    border: 1px solid #f0e6d2;
+    gap: 14px;
 }
 
-.since-badge ion-icon {
-    font-size: 14px;
-    color: #b89968;
-}
-
-.hero-title {
-    font-family: 'ZCOOL XiaoWei', serif;
-    font-size: 3.5rem;
-    color: #35231d;
-    margin: 0 0 20px 0;
-    line-height: 1.1;
-}
-
-.hero-desc {
-    font-size: 1.1rem;
-    color: #5d4037;
-    line-height: 1.8;
-    opacity: 0.85;
-}
-
-.hero-image-container {
-    flex: 1.2;
-    height: 400px;
-    border-radius: 24px;
+.category-bar-image {
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    flex-shrink: 0;
 }
 
-.hero-image-container img {
+.category-bar-image img {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-.hero-placeholder {
-    width: 100%;
-    height: 100%;
-    background: #e9ecef;
+.category-bar-title {
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 1.4rem;
+    color: #35231d;
+    margin: 0 0 4px;
+    line-height: 1.2;
 }
 
-/* CONTROLS SECTION */
-.controls-section {
-    max-width: 1300px;
-    margin: 0 auto;
-    padding: 20px 5%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 20px;
+.category-bar-desc {
+    font-size: 12px;
+    color: #8b6f47;
+    margin: 0;
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.product-count {
-    color: #636e72;
-    font-size: 14px;
+.product-count-badge {
+    font-size: 12px;
     font-weight: 600;
-}
-
-.sort-control {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.sort-control label {
-    font-size: 14px;
-    color: #636e72;
-    font-weight: 600;
-}
-
-.sort-control select {
-    border: none;
-    background: transparent;
-    font-size: 14px;
-    font-weight: 600;
-    color: #2d3436;
-    cursor: pointer;
-    outline: none;
-    border-bottom: 2px solid transparent;
-    padding-bottom: 4px;
-    transition: all 0.2s;
-}
-
-.sort-control select:hover {
-    border-bottom-color: #008080;
+    color: #9e8272;
+    background: #FDF3E6;
+    padding: 5px 12px;
+    border-radius: 20px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 /* PRODUCT GRID */
@@ -1168,26 +1103,8 @@ const sortedProducts = computed(() => {
 }
 /* RESPONSIVE */
 @media (max-width: 900px) {
-    .hero-section {
-        grid-template-columns: 1fr;
-        text-align: center;
-    }
-
-    .hero-title {
-        font-size: 2.5rem;
-    }
-
-    .hero-desc {
-        font-size: 1rem;
-    }
-
-    .since-badge {
-        margin: 0 auto 20px auto;
-    }
-
-    .hero-image-container {
-        width: 100%;
-        height: 300px;
+    .category-bar-desc {
+        display: none;
     }
 
     .popup-body {
@@ -1235,9 +1152,17 @@ const sortedProducts = computed(() => {
 }
 
 @media (max-width: 600px) {
-    .controls-section {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 15px;
+    .category-bar {
+        padding: 12px 14px;
+        gap: 10px;
+    }
+
+    .category-bar-image {
+        width: 44px;
+        height: 44px;
+    }
+
+    .category-bar-title {
+        font-size: 1.1rem;
     }
 }</style>
