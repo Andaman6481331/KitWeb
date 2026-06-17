@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import VideoCard from '../components/video-card.vue';
 import InstagramSection from '../components/InstagramSection.vue';
@@ -16,7 +16,37 @@ const route = useRoute();
 const currentLang = computed(() => route.params.lang || defaultLang);
 const loading = ref(true);
 
+// ── Hero Carousel ──────────────────────────────
+const slides = [
+  '/banner-main.png',
+  '/banner-needles.png',
+  '/banner-thread.png',
+  '/banner-tools.png',
+  '/banner-yarn.png',
+];
+
+const currentSlide = ref(0);
+let slideInterval = null;
+let touchStartX = 0;
+
+const nextSlide = () => { currentSlide.value = (currentSlide.value + 1) % slides.length; };
+const prevSlide = () => { currentSlide.value = (currentSlide.value - 1 + slides.length) % slides.length; };
+const goToSlide = (i) => { currentSlide.value = i; };
+
+const restartSlideInterval = () => {
+  if (slideInterval) clearInterval(slideInterval);
+  slideInterval = setInterval(nextSlide, 5000);
+};
+
+const onTouchStart = (e) => { touchStartX = e.touches[0].clientX; };
+const onTouchEnd = (e) => {
+  const diff = touchStartX - e.changedTouches[0].clientX;
+  if (Math.abs(diff) > 50) diff > 0 ? nextSlide() : prevSlide();
+  restartSlideInterval();
+};
+
 onMounted(async () => {
+  restartSlideInterval();
   try {
     products.value = await api.getProducts();
   } catch (error) {
@@ -25,18 +55,36 @@ onMounted(async () => {
     loading.value = false;
   }
 });
+
+onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
 </script>
 <template>
   <div class="content">
 
-    <!-- Hero Section -->
-     <section class="hero-section" :style="{ backgroundImage: `url(${getUtilsUrl('home-banner.png')})`}" fetchpriority="high">
+    <!-- Hero Carousel -->
+    <section
+      class="hero-carousel"
+      @touchstart.passive="onTouchStart"
+      @touchend.passive="onTouchEnd"
+    >
+      <!-- Slide backgrounds -->
+      <div
+        v-for="(slide, i) in slides"
+        :key="slide"
+        class="carousel-slide"
+        :class="{ active: i === currentSlide }"
+        :style="{ backgroundImage: `url(${slide})` }"
+      />
+
+      <!-- Gradient overlay -->
+      <div class="carousel-overlay" />
+
+      <!-- Hero content -->
       <div class="hero-content">
         <div class="hero-text">
           <div class="hero-eyebrow">{{ $t('home.eyebrow') }}</div>
           <h1 class="hero-title">{{ $t('home.heroTitle') }}</h1>
-          <p class="hero-subtitle">{{ $t('home.heroSubtitle') }}
-          </p>
+          <p class="hero-subtitle">{{ $t('home.heroSubtitle') }}</p>
           <div class="hero-buttons">
             <router-link :to="{ name: 'orderpage', params: { lang: currentLang } }" class="no-style">
               <button class="cta-primary">{{ $t('home.shopNow') }}</button>
@@ -46,38 +94,30 @@ onMounted(async () => {
             </router-link>
           </div>
         </div>
-        <!-- <div class="hero-decoration">
-          <div class="floating-card-container container-group-1">
-            <div class="floating-card card-1">
-              <img :src="getUtilsUrl('card-img09-thumb.webp')" alt="">
-            </div>
-            <div class="floating-card card-2">
-              <img :src="getUtilsUrl('card-img01-thumb.webp')" alt="">
-            </div>
-            <div class="floating-card card-3">
-              <img :src="getUtilsUrl('card-img07-thumb.webp')" alt="">
-            </div>
-          </div>
-          <div class="floating-card-container container-group-2">
-            <div class="floating-card card-5">
-              <img :src="getUtilsUrl('card-img09-thumb.webp')" alt="">
-            </div>
-            <div class="floating-card card-6">
-              <img :src="getUtilsUrl('card-img06-thumb.webp')" alt="">
-            </div>
-          </div>
-          <div class="floating-card-container container-group-3">
-            <div class="floating-card card-7">
-              <img :src="getUtilsUrl('card-img09-thumb.webp')" alt="">
-            </div>
-            <div class="floating-card card-8">
-              <img :src="getUtilsUrl('card-img09-thumb.webp')" alt="">
-            </div>
-            <div class="floating-card card-9">
-              <img :src="getUtilsUrl('card-img09-thumb.webp')" alt="">
-            </div>
-          </div>
-        </div> -->
+      </div>
+
+      <!-- Arrow buttons -->
+      <button class="carousel-arrow carousel-arrow--prev" @click="prevSlide(); restartSlideInterval()" aria-label="Previous slide">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+      <button class="carousel-arrow carousel-arrow--next" @click="nextSlide(); restartSlideInterval()" aria-label="Next slide">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </button>
+
+      <!-- Dot indicators -->
+      <div class="carousel-dots">
+        <button
+          v-for="(_, i) in slides"
+          :key="i"
+          class="carousel-dot"
+          :class="{ active: i === currentSlide }"
+          @click="goToSlide(i); restartSlideInterval()"
+          :aria-label="`Go to slide ${i + 1}`"
+        />
       </div>
     </section>
       <div class="feature-bar">
@@ -175,25 +215,20 @@ onMounted(async () => {
     </div>
   </div>
 
+    <!-- Featured Categories -->
+    <FeaturedCategories />
+
     <!-- About us / History / Location -->
     <AboutKitcharoen />
 
     <!-- Video Card Display -->
     <VideoCard />
 
-    <!-- <RecommendedItemSlider /> -->
-
-    <!-- Featured Categories -->
-    <FeaturedCategories />
-
-    <!-- KitCraft Instagram Ads -->
-    <InstagramSection />
-
     <!-- Auto Item Scroll Banner -->
     <AutoScrollBanner />
 
-        <!-- Product Stock -->
-    <ProductStock />
+    <!-- KitCraft Instagram Ads -->
+    <InstagramSection />
 
     <!-- Customer Review -->
     <customerReview />
@@ -201,9 +236,11 @@ onMounted(async () => {
     <!-- Promotional Banner -->
     <section class="promo-section">
       <div class="promo-content">
-        <h1>{{ $t('home.specialOffer') }}</h1>
+        <h2>{{ $t('home.specialOffer') }}</h2>
         <p>{{ $t('home.promoText') }}</p>
-        <button class="promo-button">{{ $t('home.shopSale') }}</button>
+        <router-link :to="{ name: 'catalog', params: { lang: currentLang } }" class="no-style">
+          <button class="promo-button">{{ $t('home.shopSale') }}</button>
+        </router-link>
       </div>
     </section>
   </div>
@@ -224,47 +261,50 @@ onMounted(async () => {
   background-color: #FBF7F2;
 }
 
-/* ===== HERO SECTION ===== */
-.hero-section {
-    background-size: cover;
-    background-repeat: no-repeat;
-    background-position: center top;
-    min-height: 600px;
-    height: auto;
-    padding: 60px 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    overflow: hidden;
+/* ===== HERO CAROUSEL ===== */
+.hero-carousel {
+  position: relative;
+  min-height: 620px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.hero-section::before {
-  content: '';
+.carousel-slide {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(to right, #f3e7d793 0%, transparent 100%);
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+  will-change: opacity;
+}
+
+.carousel-slide.active {
+  opacity: 1;
+}
+
+.carousel-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, rgba(243, 231, 215, 0.72) 0%, rgba(243, 231, 215, 0.2) 60%, transparent 100%);
+  z-index: 1;
 }
 
 .hero-content {
-  max-width: 1200px;
-  width: 100%;
-  display: grid;
-  grid-template-columns: 4fr 1fr;
-  gap: 40px;
   position: relative;
   z-index: 2;
-  padding: 0 40px;
+  max-width: 1200px;
+  width: 100%;
+  padding: 80px 40px;
 }
 
 .hero-text {
-  flex: 1;
-  min-width: 280px;
-  margin-top: 4rem;
+  max-width: 600px;
 }
+
 .hero-eyebrow {
   color: #604539e0;
   font-weight: 600;
@@ -291,27 +331,23 @@ onMounted(async () => {
   font-weight: 500;
   line-height: 1.1;
   margin: 0 0 20px 0;
-  animation: fadeInUp 0.8s ease;
   max-width: 720px;
 }
 
 .hero-subtitle {
   font-family: 'Work Sans', sans-serif;
-  font-size: clamp(0.9rem, 2.0vw, 1.2rem);
+  font-size: clamp(0.9rem, 2vw, 1.2rem);
   color: #604539e0;
   font-weight: 400;
   line-height: 1.6;
   margin: 0 0 32px 0;
-  opacity: 0.95;
-  animation: fadeInUp 0.8s ease 0.2s backwards;
-  max-width: 620px;
+  max-width: 560px;
   text-indent: 1rem;
 }
 
 .hero-buttons {
   display: flex;
   gap: 20px;
-  animation: fadeInUp 0.8s ease 0.4s backwards;
 }
 
 .cta-primary,
@@ -338,191 +374,81 @@ onMounted(async () => {
 
 .cta-secondary {
   background: rgba(255, 255, 255, 0.2);
-  color: #E7C9A2;
+  color: #604539;
   backdrop-filter: blur(10px);
   border: 1px solid #d9b585;
 }
 
 .cta-secondary:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.35);
   transform: translateY(-3px);
 }
 
-.hero-decoration {
-  flex: 1;
-  position: relative;
-  height: 400px;
-}
-
-.floating-card-container {
+/* ── Arrow buttons ────────────────────────────── */
+.carousel-arrow {
   position: absolute;
-  top: 0;
-  left: -40px;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  /* Hidden by default */
-  /* 16s total duration (8s per group), infinite loop */
-  animation: fade-in-up-sequence 24s infinite;
-}
-
-/* Group 2 starts halfway through the 16s cycle */
-.container-group-2 {
-  animation-delay: 8s;
-}
-
-.container-group-3 {
-  animation-delay: 16s;
-}
-
-@keyframes fade-in-up-sequence {
-
-  /* 0-5%: Fade In and Move Up */
-  0% {
-    opacity: 0;
-    transform: translateY(30px);
-    pointer-events: none;
-  }
-
-  5% {
-    opacity: 1;
-    transform: translateY(0);
-    pointer-events: auto;
-  }
-
-  /* 5-28%: Stay Visible */
-  30% {
-    opacity: 1;
-    transform: translateY(0);
-    pointer-events: auto;
-  }
-
-  /* 28-33%: Fade Out and continue moving Down slightly */
-  33% {
-    opacity: 0;
-    transform: translateY(20px);
-    pointer-events: none;
-  }
-
-  /* 33-100%: Remain Hidden while other groups play */
-  100% {
-    opacity: 0;
-    pointer-events: none;
-  }
-}
-
-.floating-card {
-  position: absolute;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 20px;
-  animation: float 6s ease-in-out infinite;
-  overflow: hidden;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(6px);
+  color: #604539;
+  cursor: pointer;
   display: flex;
-  z-index: 99;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
 }
 
-.floating-card img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.carousel-arrow svg { width: 20px; height: 20px; }
+
+.carousel-arrow:hover {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(255, 255, 255, 0.9);
 }
 
-.card-1 {
-  width: 280px;
-  height: 320px;
-  top: 40px;
-  right: -10px;
-  animation-delay: 0s;
+.carousel-arrow--prev { left: 20px; }
+.carousel-arrow--next { right: 20px; }
+
+/* ── Dot indicators ───────────────────────────── */
+.carousel-dots {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  gap: 8px;
 }
 
-.card-2 {
-  width: 250px;
-  height: 280px;
-  top: 200px;
-  right: -120px;
-  animation-delay: 2s;
+.carousel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.3s ease;
 }
 
-.card-3 {
-  width: 200px;
-  height: 220px;
-  top: 310px;
-  right: 100px;
-  animation-delay: 1.5s;
+.carousel-dot.active {
+  width: 24px;
+  border-radius: 4px;
+  background: #fff;
 }
 
-.card-4 {
-  width: 200px;
-  height: 200px;
-  top: 410px;
-  right: -20px;
-  animation-delay: 1s;
-}
-
-.card-5 {
-  width: 250px;
-  height: 400px;
-  top: 40px;
-  right: -40px;
-  animation-delay: 1s;
-}
-
-.card-6 {
-  width: 200px;
-  height: 200px;
-  top: 280px;
-  right: -120px;
-  animation-delay: 2s;
-}
-
-.card-7 {
-  width: 220px;
-  height: 280px;
-  top: 40px;
-  right: -40px;
-  animation-delay: 1s;
-}
-
-.card-8 {
-  width: 220px;
-  height: 220px;
-  top: 180px;
-  right: 130px;
-  animation-delay: 2s;
-}
-
-.card-9 {
-  width: 210px;
-  height: 170px;
-  top: 300px;
-  right: 20px;
-  animation-delay: 1.5s;
-}
-
-@keyframes float {
-
-  0%,
-  100% {
-    transform: translateY(0px);
-  }
-
-  50% {
-    transform: translateY(-10px);
-  }
+.carousel-dot:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.8);
 }
 
 @keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .feature-bar {
@@ -598,7 +524,7 @@ onMounted(async () => {
 
 /* ===== PROMO SECTION ===== */
 .promo-section {
-  background: linear-gradient(135deg, #ff6b6b, #ff9f43);
+  background: linear-gradient(135deg, #604539, #8b6f47);
   padding: 80px 5%;
   text-align: center;
   color: white;
@@ -620,7 +546,7 @@ onMounted(async () => {
 .promo-button {
   padding: 16px 48px;
   background: white;
-  color: #ff6b6b;
+  color: #604539;
   border: none;
   border-radius: 12px;
   font-size: 18px;
@@ -636,105 +562,49 @@ onMounted(async () => {
 }
 
 /* ===== RESPONSIVE ===== */
-@media (max-width: 1200px) {
-  .hero-content {
-    padding: 0 32px;
-    gap: 24px;
-  }
-
-  .hero-decoration {
-    flex: 0.9;
-  }
-}
-
 @media (max-width: 992px) {
-  .hero-section {
-    min-height: 520px;
-    padding: 50px 0;
-  }
-
-  .hero-content {
-    align-items: flex-start;
-    grid-template-columns: 1fr;
-  }
-
-  .hero-decoration {
-    transform: scale(0.75);
-    flex: 0.85;
-  }
-  .hero-eyebrow {
-    font-size: clamp(0.8rem, 1.5vw, 1rem);
-  }
-
-  .feature-bar {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .hero-carousel { min-height: 520px; }
+  .feature-bar { grid-template-columns: repeat(2, 1fr); }
+  .carousel-arrow { width: 40px; height: 40px; }
 }
 
 @media (max-width: 768px) {
-  .hero-section {
-    min-height: 470px;
-    padding: 40px 0;
-  }
+  .hero-carousel { min-height: 460px; }
 
-  .hero-content {
-    flex-direction: column;
-    text-align: center;
-    padding: 0 20px;
-  }
+  .hero-content { padding: 60px 20px; text-align: center; }
 
-  .hero-text {
-    padding-right: 0;
-  }
+  .hero-eyebrow { justify-content: center; }
 
   .hero-title {
     font-size: clamp(1.9rem, 7vw, 2.6rem);
-    margin-bottom: 18px;
+    margin-bottom: 16px;
   }
 
   .hero-subtitle {
-    font-size: clamp(0.95rem, 3.2vw, 1.2rem);
-    margin-bottom: 26px;
+    font-size: clamp(0.9rem, 3.2vw, 1.1rem);
+    text-indent: 0;
+    margin-bottom: 24px;
   }
 
-  .hero-decoration {
-    display: none;
-  }
-
-  .hero-buttons {
-    justify-content: center;
-    flex-wrap: wrap;
-  }
+  .hero-buttons { justify-content: center; flex-wrap: wrap; }
 
   .cta-primary,
-  .cta-secondary {
-    padding: 12px 28px;
-    font-size: 15px;
-  }
+  .cta-secondary { padding: 12px 28px; font-size: 15px; }
+
+  .carousel-arrow { display: none; }
 
   .feature-bar {
     grid-template-columns: 1fr;
     padding: 30px 24px;
   }
-
-  .feature-item {
-    align-items: center;
-  }
 }
 
 @media (max-width: 480px) {
-  .hero-title {
-    font-size: 1.85rem;
-  }
+  .hero-title { font-size: 1.85rem; }
 
-  .hero-buttons {
-    flex-direction: column;
-    width: 100%;
-  }
+  .hero-buttons { flex-direction: column; width: 100%; }
 
   .cta-primary,
-  .cta-secondary {
-    width: 100%;
-  }
+  .cta-secondary { width: 100%; }
 }
 </style>

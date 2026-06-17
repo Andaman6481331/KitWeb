@@ -73,7 +73,7 @@ const handleStartCrafting = () => {
 }
 
 .eyebrow {
-    color: #e91e63;
+    color: #DD876E;
     font-weight: 600;
     font-size: 0.9rem;
     letter-spacing: 2px;
@@ -88,12 +88,12 @@ const handleStartCrafting = () => {
     content: '';
     width: 40px;
     height: 2px;
-    background: #e91e63;
+    background: #DD876E;
 }
 
 h2 {
     font-size: 2.5rem;
-    color: #1a1a1a;
+    color: #604539;
     line-height: 1.2;
     margin-bottom: 24px;
     font-weight: 700;
@@ -120,7 +120,7 @@ h2 {
 .benefit-icon {
     width: 24px;
     height: 24px;
-    background: linear-gradient(135deg, #e91e63, #f06292);
+    background: linear-gradient(135deg, #DD876E, #e6957c);
     border-radius: 50%;
     flex-shrink: 0;
     display: flex;
@@ -159,7 +159,7 @@ h2 {
     align-items: center;
     justify-content: center;
     text-decoration: none;
-    background: linear-gradient(135deg, #e91e63, #f06292);
+    background: linear-gradient(135deg, #DD876E, #e6957c);
     color: white;
     border: none;
     padding: 16px 36px;
@@ -168,12 +168,12 @@ h2 {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(233, 30, 99, 0.3);
+    box-shadow: 0 4px 15px rgba(221, 135, 110, 0.3);
 }
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(233, 30, 99, 0.4);
+    box-shadow: 0 6px 20px rgba(221, 135, 110, 0.4);
 }
 
 .btn-secondary {
@@ -182,8 +182,8 @@ h2 {
     justify-content: center;
     text-decoration: none;
     background: transparent;
-    color: #e91e63;
-    border: 2px solid #e91e63;
+    color: #DD876E;
+    border: 2px solid #DD876E;
     padding: 14px 34px;
     border-radius: 50px;
     font-size: 1rem;
@@ -193,7 +193,7 @@ h2 {
 }
 
 .btn-secondary:hover {
-    background: #e91e63;
+    background: #DD876E;
     color: white;
 }
 

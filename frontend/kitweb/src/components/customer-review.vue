@@ -1,521 +1,335 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref } from 'vue';
 import { getUtilsUrl } from '@/services/api';
 
 const reviews = ref([
     {
         id: 1,
-        name: 'Sabrina.',
-        role: 'Authentic Handicraft Shop Owner',
-        rating: 5,
-        date: 'January 2025',
-        review: 'J’adore 💕 These threads are perfect for making couple bracelets and handmade crafts. The colors are beautiful, strong, and very good quality. Highly recommend!” — Sabrina, France',
+        tab: 'Craft Shop',
+        name: 'Sabrina',
+        role: 'Handicraft Shop Owner, France',
+        review: '"Kitcharoen took the time to understand exactly what my shop needs. The threads are beautiful, strong, and consistently high quality. The pre-sales advice and ongoing support really stood out — they committed to working side-by-side with us and have more than delivered on that promise."',
         image: getUtilsUrl('customer-img01-large.webp'),
-        product: 'Premium Thread Collection'
+        stats: [
+            { value: '10+', label: 'years sourcing craft supplies from Kitcharoen' },
+            { value: '5★', label: 'rating across every single order placed' },
+        ],
     },
     {
         id: 2,
+        tab: 'Instructor',
         name: 'คุณ หน่อย',
-        role: 'Craft Workshop Instructor',
-        rating: 5,
-        date: 'December 2024',
-        review: 'ฉันจัดเวิร์กช็อปงานฝีมือมาหลายปีแล้ว และร้านกิจเจริญคือร้านที่สั่งประจำ ลูกปัดสีสวย วัสดุมีคุณภาพสม่ำเสมอ และจัดส่งตรงเวลาตลอด นักเรียนของฉันก็ชอบคุณภาพสินค้ามากค่ะ\!(I\'ve been running workshops for years and Kitcharoen is my go-to supplier. The beads are vibrant, the materials are consistent, and they never let me down on delivery. My students love the quality!)',
+        role: 'Craft Workshop Instructor, Thailand',
+        review: '"ฉันจัดเวิร์กช็อปงานฝีมือมาหลายปีแล้ว และร้านกิจเจริญคือร้านที่สั่งประจำ ลูกปัดสีสวย วัสดุมีคุณภาพสม่ำเสมอ และจัดส่งตรงเวลาตลอด นักเรียนของฉันก็ชอบคุณภาพสินค้ามากค่ะ"',
         image: getUtilsUrl('customer-img02-large.webp'),
-        product: 'Beaded Craft Supplies'
+        stats: [
+            { value: '30+', label: 'students served every month using these supplies' },
+            { value: '100%', label: 'on-time delivery across all workshop orders' },
+        ],
     },
     {
         id: 3,
+        tab: 'Craft Studio',
         name: 'Sao Samui',
-        role: 'Stationary, Craft Shop, and Cafe Owner',
-        rating: 5,
-        date: 'November 2024',
-        review: 'เป็นลูกค้ากับทางร้านมาตั้งแต่รุ่นคุณแม่จนตอนนี้เป็นรุ่นลูกแล้วค่ะ 😊 สินค้ามีให้เลือกเยอะมากทั้งอุปกรณ์งานฝีมือ และไหมพรมคุณภาพดี ราคาเป็นกันเอง ประทับใจมากค่ะ (We’ve been customers since my mother’s generation, and now to mine 😊 There are so many craft supplies and quality yarns to choose from at friendly prices. Very impressed!)',
+        role: 'Stationery, Craft & Café Owner, Thailand',
+        review: '"เป็นลูกค้ากับทางร้านมาตั้งแต่รุ่นคุณแม่จนตอนนี้เป็นรุ่นลูกแล้วค่ะ สินค้ามีให้เลือกเยอะมากทั้งอุปกรณ์งานฝีมือและไหมพรมคุณภาพดี ราคาเป็นกันเอง ประทับใจมากค่ะ"',
         image: getUtilsUrl('customer-img03-large.webp'),
-        product: 'Decorative Yarns Supplies'
+        stats: [
+            { value: '2', label: 'generations of our family loyal to Kitcharoen' },
+            { value: '40+', label: 'years of trusted partnership together' },
+        ],
     },
     {
         id: 4,
+        tab: 'Retail Store',
         name: 'Emily Carter',
-        role: 'Retail Store Manager',
-        rating: 5,
-        date: 'October 2024',
-        review: 'Great selection and competitive pricing. We\'ve been ordering from Kitcharoen for our store for over a year. The variety of products keeps our customers coming back. Would love to see more eco-friendly options!',
+        role: 'Retail Store Manager, United States',
+        review: '"Great selection and very competitive pricing. We\'ve been ordering from Kitcharoen for our store for over a year now. The variety of products keeps our customers coming back — truly a reliable international partner we can count on."',
         image: getUtilsUrl('customer-img04-large.webp'),
-        product: 'Premium Yarns Collection'
+        stats: [
+            { value: '1 yr+', label: 'of consistent international orders fulfilled' },
+            { value: '98%', label: 'customer satisfaction rate in our store' },
+        ],
     },
 ]);
 
 const currentIndex = ref(0);
-const isAutoPlaying = ref(true);
-let autoPlayInterval = null;
-
-const currentReview = computed(() => reviews.value[currentIndex.value]);
-
-const nextReview = () => {
-    currentIndex.value = (currentIndex.value + 1) % reviews.value.length;
-};
-
-const prevReview = () => {
-    currentIndex.value = currentIndex.value === 0 ? reviews.value.length - 1 : currentIndex.value - 1;
-};
-
-const goToReview = (index) => {
-    currentIndex.value = index;
-};
-
-const startAutoPlay = () => {
-    if (autoPlayInterval) clearInterval(autoPlayInterval);
-    autoPlayInterval = setInterval(() => {
-        if (isAutoPlaying.value) {
-            nextReview();
-        }
-    }, 30000);
-};
-
-const toggleAutoPlay = () => {
-    isAutoPlaying.value = !isAutoPlaying.value;
-    if (isAutoPlaying.value) {
-        startAutoPlay();
-    }
-};
-
-onMounted(() => {
-    startAutoPlay();
-});
-
-onUnmounted(() => {
-    if (autoPlayInterval) clearInterval(autoPlayInterval);
-});
-
-const getStars = (rating) => {
-    return '⭐'.repeat(rating);
-};
 </script>
 
 <template>
     <section class="review-section">
-        <div class="container">
-            <div class="carousel-wrapper">
-                <!-- Main Review Card -->
-                <div class="review-card" :key="currentReview.id">
-                    <div class="card-grid">
-                        <!-- Left Side - Image -->
-                        <div class="review-image">
-                            <img :src="currentReview.image" :alt="currentReview.product" />
-                            <div class="image-overlay">
-                                <span class="product-tag">{{ currentReview.product }}</span>
-                            </div>
-                        </div>
+        <!-- Section Header -->
+        <div class="section-header" v-reveal>
+            <p class="eyebrow">{{ $t('customerReview.eyebrow') || 'CUSTOMER STORIES' }}</p>
+            <h2 class="section-title">{{ $t('customerReview.title') || 'What Our Customers Say' }}</h2>
+        </div>
 
-                        <!-- Right Side - Content -->
-                        <div class="review-content">
+        <!-- Tabs -->
+        <div class="tabs-row" v-reveal>
+            <button
+                v-for="(r, i) in reviews"
+                :key="r.id"
+                class="tab-btn"
+                :class="{ active: i === currentIndex }"
+                @click="currentIndex = i"
+            >
+                {{ r.tab }}
+            </button>
+        </div>
 
-                            <div class="rating">
-                                <span class="stars">{{ getStars(currentReview.rating) }}</span>
-                                <span class="date">{{ currentReview.date }}</span>
-                            </div>
+        <!-- Card -->
+        <div class="card-outer" v-reveal>
+            <Transition name="fade" mode="out-in">
+                <div class="review-card" :key="reviews[currentIndex].id">
+                    <!-- Left: photo -->
+                    <div class="card-photo">
+                        <img :src="reviews[currentIndex].image" :alt="reviews[currentIndex].name" />
+                    </div>
 
-                            <p class="review-text">{{ currentReview.review }}</p>
+                    <!-- Right: content -->
+                    <div class="card-content">
+                        <div class="quote-body">
+                            <p class="review-text">{{ reviews[currentIndex].review }}</p>
 
                             <div class="reviewer-info">
-                                <div class="reviewer-details">
-                                    <h4 class="reviewer-name">{{ currentReview.name }}</h4>
-                                    <p class="reviewer-role">{{ currentReview.role }}</p>
-                                </div>
-                                <div class="verified-badge">
-                                    <span class="badge-icon">✓</span>
-                                    Verified
-                                </div>
+                                <strong class="reviewer-name">{{ reviews[currentIndex].name }}</strong>
+                                <span class="reviewer-role">{{ reviews[currentIndex].role }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Stats row inside card -->
+                        <div class="card-stats">
+                            <div
+                                v-for="(stat, si) in reviews[currentIndex].stats"
+                                :key="si"
+                                class="stat-col"
+                                :class="{ 'has-divider': si < reviews[currentIndex].stats.length - 1 }"
+                            >
+                                <span class="stat-value">{{ stat.value }}</span>
+                                <span class="stat-label">{{ stat.label }}</span>
                             </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Navigation Controls -->
-                <div class="carousel-controls">
-                    <button class="nav-btn prev" @click="prevReview" aria-label="Previous review">
-                        ‹
-                    </button>
-
-                    <div class="dots-container">
-                        <button v-for="(review, index) in reviews" :key="review.id" class="dot"
-                            :class="{ active: index === currentIndex }" @click="goToReview(index)"
-                            :aria-label="`Go to review ${index + 1}`"></button>
-                    </div>
-
-                    <button class="nav-btn next" @click="nextReview" aria-label="Next review">
-                        ›
-                    </button>
-                </div>
-
-                <!-- Auto-play Toggle -->
-                <button class="autoplay-toggle" @click="toggleAutoPlay" :class="{ paused: !isAutoPlaying }">
-                    {{ isAutoPlaying ? '⏸' : '▶' }}
-                </button>
-            </div>
-
-            <!-- Stats Section -->
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <div class="stat-number">4,000+</div>
-                    <div class="stat-label">Happy Customers</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number">4.9/5</div>
-                    <div class="stat-label">Average Rating</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number">98%</div>
-                    <div class="stat-label">Satisfaction Rate</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number">40+</div>
-                    <div class="stat-label">Years in Business</div>
-                </div>
-            </div>
+            </Transition>
         </div>
     </section>
 </template>
 
 <style scoped>
-.container {
-    max-width: 1400px;
-    margin: 4rem auto;
-    padding: 0 4rem;
+.review-section {
+    background: #FBF7F2;
+    padding: 80px 0 80px;
 }
 
-.carousel-wrapper {
-    position: relative;
-    margin-bottom: 2rem;
+/* ── Header ─────────────────────────────────── */
+.section-header {
+    text-align: center;
+    padding: 0 24px;
+    margin-bottom: 40px;
 }
 
-/* Review Card */
+.eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: #8b6f47;
+    margin: 0 0 12px;
+}
+
+.section-title {
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 2.6rem;
+    color: #604539;
+    font-weight: 400;
+    margin: 0;
+    letter-spacing: -0.3px;
+}
+
+/* ── Tabs ────────────────────────────────────── */
+.tabs-row {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    margin-bottom: 28px;
+    padding: 0 24px;
+    flex-wrap: wrap;
+}
+
+.tab-btn {
+    padding: 10px 28px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #9e8272;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.3px;
+}
+
+.tab-btn:hover {
+    color: #604539;
+}
+
+.tab-btn.active {
+    color: #3d2b1f;
+    font-weight: 600;
+    border-bottom-color: #DD876E;
+}
+
+/* ── Card Outer ──────────────────────────────── */
+.card-outer {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+
+/* ── Review Card ─────────────────────────────── */
 .review-card {
-    background: rgba(255, 255, 255, 0.079);
-    overflow: hidden;
-    box-shadow: 0 10px 50px rgba(0, 0, 0, 0.1);
-    animation: fadeSlideIn 0.5s ease;
-}
-
-@keyframes fadeSlideIn {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.card-grid {
     display: grid;
-    grid-template-columns: minmax(300px, 400px) 1fr;
-    min-height: 400px;
-}
-
-.review-image {
-    position: relative;
+    grid-template-columns: 420px 1fr;
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid #ede4d9;
     overflow: hidden;
+    box-shadow: 0 4px 24px rgba(80, 55, 35, 0.07);
 }
 
-.review-image img {
+/* ── Left Photo ──────────────────────────────── */
+.card-photo {
+    overflow: hidden;
+    min-height: 420px;
+}
+
+.card-photo img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    display: block;
 }
 
-.image-overlay {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 24px;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
-}
-
-.product-tag {
-    display: inline-block;
-    background: white;
-    color: #2d2d2d;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    font-weight: 600;
-}
-
-.review-content {
-    padding: 48px;
+/* ── Right Content ───────────────────────────── */
+.card-content {
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    position: relative;
-}
-
-.rating {
-    display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
 }
 
-.stars {
-    font-size: 1.3rem;
-    letter-spacing: 4px;
-}
-
-.date {
-    font-size: 0.9rem;
-    color: #999;
+.quote-body {
+    padding: 48px 44px 32px;
+    flex: 1;
 }
 
 .review-text {
-    font-size: 1.15rem;
-    line-height: 1.8;
-    color: #444;
-    margin-bottom: 32px;
-    font-style: italic;
-    position: relative;
-    z-index: 1;
+    font-size: 1.05rem;
+    line-height: 1.85;
+    color: #4a3728;
+    margin: 0 0 32px;
 }
 
 .reviewer-info {
     display: flex;
-    align-items: center;
-    gap: 16px;
-}
-
-.avatar {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 3px solid #e9ecef;
-}
-
-.reviewer-details {
-    flex: 1;
+    flex-direction: column;
+    gap: 4px;
 }
 
 .reviewer-name {
-    font-size: 1.2rem;
-    color: #2d2d2d;
-    margin-bottom: 4px;
+    font-size: 1rem;
     font-weight: 700;
+    color: #3d2b1f;
 }
 
 .reviewer-role {
-    font-size: 0.95rem;
-    color: #666;
-}
-
-.verified-badge {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: #e7f5ff;
-    color: #1971c2;
-    padding: 6px 12px;
-    border-radius: 20px;
     font-size: 0.85rem;
-    font-weight: 600;
+    color: #DD876E;
 }
 
-.badge-icon {
-    width: 18px;
-    height: 18px;
-    background: #1971c2;
-    color: white;
-    border-radius: 50%;
+/* ── Stats Row (inside card) ─────────────────── */
+.card-stats {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.7rem;
+    border-top: 1px solid #ede4d9;
+    margin: 0 44px;
+    padding: 28px 0 36px;
+    gap: 0;
 }
 
-/* Carousel Controls */
-.carousel-controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 1rem;
-    margin-top: 1rem;
+.stat-col {
+    flex: 1;
+    padding: 0 24px 0 0;
 }
 
-.nav-btn {
-    width: 50px;
-    height: 50px;
-    background: white;
-    border: 2px solid #e9ecef;
-    border-radius: 50%;
-    font-size: 2rem;
-    color: #2d2d2d;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.stat-col.has-divider {
+    border-right: 1px solid #ede4d9;
+    margin-right: 24px;
 }
 
-.nav-btn:hover {
-    background: linear-gradient(135deg, #8b6f47, #b89968);
-    color: white;
-    border-color: #8b6f47;
-    transform: scale(1.1);
-}
-
-.nav-btn.prev {
-    padding-right: 3px;
-}
-
-.nav-btn.next {
-    padding-left: 3px;
-}
-
-.dots-container {
-    display: flex;
-    gap: 12px;
-}
-
-.dot {
-    width: 12px;
-    height: 12px;
-    background: #d9d9d9;
-    border: none;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.dot.active {
-    background: linear-gradient(135deg, #8b6f47, #b89968);
-    width: 32px;
-    border-radius: 6px;
-}
-
-.dot:hover {
-    background: #b89968;
-}
-
-.autoplay-toggle {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    width: 44px;
-    height: 44px;
-    background: white;
-    border: 2px solid #e9ecef;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 1rem;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-.autoplay-toggle:hover {
-    background: #f8f9fa;
-    transform: scale(1.05);
-}
-
-.autoplay-toggle.paused {
-    border-color: #8b6f47;
-    color: #8b6f47;
-}
-
-/* Stats Grid */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 32px;
-    padding: 40px;
-    border-radius: 20px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-}
-
-.stat-item {
-    text-align: center;
-}
-
-.stat-number {
-    font-size: 2.5rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, #8b6f47, #b89968);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 8px;
+.stat-value {
+    display: block;
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 2.4rem;
+    font-weight: 400;
+    color: #3d2b1f;
+    line-height: 1.1;
+    margin-bottom: 6px;
 }
 
 .stat-label {
-    font-size: 1rem;
-    color: #666;
-    font-weight: 500;
+    display: block;
+    font-size: 0.8rem;
+    color: #9e8272;
+    line-height: 1.4;
 }
 
-/* Responsive */
-@media (max-width: 1024px) {
-    .card-grid {
+/* ── Transition ──────────────────────────────── */
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.25s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+}
+
+/* ── Responsive ──────────────────────────────── */
+@media (max-width: 860px) {
+    .review-card {
         grid-template-columns: 1fr;
     }
 
-    .review-image {
-        height: 350px;
-    }
-
-    .review-content {
-        padding: 32px;
-    }
-
-    .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 24px;
+    .card-photo {
+        min-height: 280px;
+        max-height: 320px;
     }
 }
 
-@media (max-width: 640px) {
-    .container {
-        padding: 0 20px;
+@media (max-width: 600px) {
+    .section-title { font-size: 2rem; }
+
+    .tab-btn {
+        padding: 8px 16px;
+        font-size: 0.82rem;
     }
 
-    .section-header h2 {
-        font-size: 2rem;
+    .quote-body { padding: 32px 24px 24px; }
+
+    .card-stats {
+        margin: 0 24px;
+        padding: 20px 0 28px;
+        flex-direction: column;
+        gap: 20px;
     }
 
-    .review-content {
-        padding: 24px;
+    .stat-col.has-divider {
+        border-right: none;
+        border-bottom: 1px solid #ede4d9;
+        padding-bottom: 20px;
+        margin-right: 0;
     }
 
-    .quote-icon {
-        font-size: 4rem;
-        top: 16px;
-        right: 24px;
-    }
-
-    .review-text {
-        font-size: 1rem;
-    }
-
-    .carousel-controls {
-        gap: 16px;
-    }
-
-    .nav-btn {
-        width: 44px;
-        height: 44px;
-        font-size: 1.5rem;
-    }
-
-    .stats-grid {
-        grid-template-columns: 1fr;
-        padding: 24px;
-    }
-
-    .stat-number {
-        font-size: 2rem;
-    }
+    .stat-value { font-size: 2rem; }
 }
 </style>

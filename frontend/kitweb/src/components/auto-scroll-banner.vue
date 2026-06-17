@@ -84,12 +84,12 @@ const isPaused = ref(false);
 
 .scroll-banner::before {
     left: 0;
-    background: linear-gradient(to right, #f8f9fa, transparent);
+    background: linear-gradient(to right, #FBF7F2, transparent);
 }
 
 .scroll-banner::after {
     right: 0;
-    background: linear-gradient(to left, #f8f9fa, transparent);
+    background: linear-gradient(to left, #FBF7F2, transparent);
 }
 
 /* Scroll Track */

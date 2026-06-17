@@ -31,6 +31,14 @@ const videos = computed(() => [
     title: t('videoSection.videos.clip3.title'),
     description: t('videoSection.videos.clip3.description'),
     duration: '2:44'
+  },
+  {
+    id: 4,
+    src: getUtilsUrl('shop-clip03.mp4'),
+    poster: getUtilsUrl('video-clip04-tn-large.webp'),
+    title: t('videoSection.videos.clip4.title'),
+    description: t('videoSection.videos.clip4.description'),
+    duration: '1:34'
   }
 ])
 

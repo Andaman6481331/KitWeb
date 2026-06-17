@@ -7,6 +7,7 @@ import Login from '../views/Login.vue'
 import EventPage from '../views/EventPage.vue'
 import PartnerPage from '../views/PartnerPage.vue'
 import AdminDashboard from '../views/AdminDashboard.vue'
+import FaqPage from '../views/FaqPage.vue'
 
 import { authStore } from '../stores/authStore'
 import { pathToCode } from '../i18n'
@@ -25,6 +26,7 @@ export const routes = [
       { path: 'login', name: 'login', component: Login },
       { path: 'event', name: 'event', component: EventPage },
       { path: 'partners', name: 'partners', component: PartnerPage },
+      { path: 'faq', name: 'faq', component: FaqPage },
       { path: 'admin', name: 'admin', component: AdminDashboard, meta: { requiresAuth: true } },
       { path: ':pathMatch(.*)*', redirect: (to) => `/${to.params.lang}` },
     ],

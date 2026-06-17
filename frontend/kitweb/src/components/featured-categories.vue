@@ -1,332 +1,314 @@
 <script setup>
 import { useRoute } from 'vue-router';
 import { defaultLang } from '../utils/localeRoutes';
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { getUtilsUrl } from '@/services/api';
 
 const route = useRoute();
 const currentLang = computed(() => route.params.lang || defaultLang);
-
 const { t } = useI18n();
-const activeCat = ref(null);
 
-const categories = [
-    {
-        id: 1,
-        key: 'needles',
-        image: getUtilsUrl('card-img06-large.webp'),
-    },
-    {
-        id: 2,
-        key: 'yarn',
-        image: getUtilsUrl('card-img01-large.webp'),
-    },
-    {
-        id: 3,
-        key: 'tools',
-        image: getUtilsUrl('card-img10-large.webp'),
-    },
-    {
-        id: 4,
-        key: 'beads',
-        image: getUtilsUrl('card-img04-large.webp'),
-    }
+const topCategories = [
+    { id: 1, key: 'yarn',    image: getUtilsUrl('card-img01-large.webp') },
+    { id: 2, key: 'needles', image: getUtilsUrl('card-img06-large.webp') },
+    { id: 3, key: 'thread',  image: getUtilsUrl('card-img03-large.webp') },
+];
+
+const bottomLeft = [
+    { id: 4, key: 'tools', image: getUtilsUrl('card-img10-large.webp') },
+    { id: 5, key: 'beads', image: getUtilsUrl('card-img04-large.webp') },
+];
+
+const bottomRight = [
+    { id: 6, key: 'decorative', image: getUtilsUrl('card-img05-large.webp') },
+    { id: 7, key: 'flora',      image: getUtilsUrl('card-img07-large.webp') },
 ];
 </script>
 
 <template>
     <section class="categories-section">
         <div v-reveal class="section-header">
-            <h2 class="section-title" style="margin: 0;">{{ $t('featuredCategories.title') }}</h2>
+            <p class="section-eyebrow">{{ $t('featuredCategories.eyebrow') || 'OUR COLLECTIONS' }}</p>
+            <h2 class="section-title">{{ $t('featuredCategories.title') }}</h2>
             <p class="section-subtitle">{{ $t('featuredCategories.subtitle') }}</p>
         </div>
 
-        <div class="categories-accordion" v-reveal>
-    <div v-for="cat in categories" :key="cat.id" class="accordion-item"
-        :class="{ active: activeCat === cat.id }" 
-        
-        @mouseenter="activeCat = cat.id"
-        @mouseleave="activeCat = null"
-        
-        @touchstart.passive="handleTouch(cat.id)">
-
-        <div class="cat-image-wrapper">
-            <img :src="cat.image" :alt="$t(`featuredCategories.items.${cat.key}.name`)" class="cat-bg" />
-            <div class="cat-overlay"></div>
-        </div>
-
-        <div class="cat-content">
-            <div class="cat-icon-container">
-                <span class="cat-icon">{{ cat.icon }}</span>
-                <h3 class="cat-name-vertical">{{ $t(`featuredCategories.items.${cat.key}.name`) }}</h3>
-            </div>
-
-            <div class="cat-details">
-                <h3 class="cat-name">{{ $t(`featuredCategories.items.${cat.key}.name`) }}</h3>
-                <p class="cat-desc">{{ $t(`featuredCategories.items.${cat.key}.description`) }}</p>
-                
-                <router-link 
-                    :to="{ path: `/${currentLang}/catalog/${cat.key}` }" 
-                    class="explore-btn"
-                    :style="{ pointerEvents: activeCat === cat.id ? 'auto' : 'none' }">
-                    {{ $t('featuredCategories.explore') }}
-                    <span class="btn-arrow">→</span>
+        <div class="catalog-grid" v-reveal>
+            <!-- Top row: 3 main categories -->
+            <div class="top-row">
+                <router-link
+                    v-for="cat in topCategories"
+                    :key="cat.id"
+                    :to="{ path: `/${currentLang}/catalog/${cat.key}` }"
+                    class="cat-card large"
+                >
+                    <img :src="cat.image" :alt="$t(`featuredCategories.items.${cat.key}.name`)" class="cat-img" />
+                    <div class="cat-overlay">
+                        <div class="cat-info">
+                            <span class="cat-name">{{ $t(`featuredCategories.items.${cat.key}.name`) }}</span>
+                            <span class="cat-explore">{{ $t('featuredCategories.explore') }} <span class="arrow">→</span></span>
+                        </div>
+                    </div>
                 </router-link>
             </div>
+
+            <!-- Bottom section: 2 labeled groups -->
+            <div class="bottom-section">
+                <div class="bottom-group">
+                    <div class="group-label">{{ $t('featuredCategories.groupCrafting') || 'Crafting Tools & Supplies' }}</div>
+                    <div class="bottom-row">
+                        <router-link
+                            v-for="cat in bottomLeft"
+                            :key="cat.id"
+                            :to="{ path: `/${currentLang}/catalog/${cat.key}` }"
+                            class="cat-card small"
+                        >
+                            <img :src="cat.image" :alt="$t(`featuredCategories.items.${cat.key}.name`)" class="cat-img" />
+                            <div class="cat-overlay">
+                                <div class="cat-info">
+                                    <span class="cat-name">{{ $t(`featuredCategories.items.${cat.key}.name`) }}</span>
+                                    <span class="cat-explore">{{ $t('featuredCategories.explore') }} <span class="arrow">→</span></span>
+                                </div>
+                            </div>
+                        </router-link>
+                    </div>
+                </div>
+
+                <div class="bottom-group">
+                    <div class="group-label">{{ $t('featuredCategories.groupDecor') || 'Decorative & Flora' }}</div>
+                    <div class="bottom-row">
+                        <router-link
+                            v-for="cat in bottomRight"
+                            :key="cat.id"
+                            :to="{ path: `/${currentLang}/catalog/${cat.key}` }"
+                            class="cat-card small"
+                        >
+                            <img :src="cat.image" :alt="$t(`featuredCategories.items.${cat.key}.name`)" class="cat-img" />
+                            <div class="cat-overlay">
+                                <div class="cat-info">
+                                    <span class="cat-name">{{ $t(`featuredCategories.items.${cat.key}.name`) }}</span>
+                                    <span class="cat-explore">{{ $t('featuredCategories.explore') }} <span class="arrow">→</span></span>
+                                </div>
+                            </div>
+                        </router-link>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
-</div>
     </section>
 </template>
 
 <style scoped>
 .categories-section {
-    max-width: 1400px;
-    margin: 0 auto;
+    padding: 2rem;
+    background: #FBF7F2;
+    overflow: hidden;
 }
 
+/* ── Section Header ───────────────────────────── */
 .section-header {
     text-align: center;
-    margin-bottom: 60px;
+    padding: 0 40px;
+    margin-bottom: 48px;
+}
+
+.section-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: #8b6f47;
+    margin: 0 0 12px;
 }
 
 .section-title {
-  font-size: 42px;
-  font-weight: 700;
-  color: #604539;
-  letter-spacing: -0.5px;
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 2.8rem;
+    color: #604539;
+    letter-spacing: -0.5px;
+    margin: 0 0 12px;
+    font-weight: 400;
 }
 
-.section-subtitle{
-  /* font-size: 18px; */
-  color: #8b6f47;
-  margin: 0;
-  font-weight: 400;
+.section-subtitle {
+    color: #8b6f47;
+    font-size: 1rem;
+    margin: 0;
+    font-weight: 400;
 }
 
-/* Accordion Layout */
-.categories-accordion {
+/* ── Grid Structure ───────────────────────────── */
+.catalog-grid {
     display: flex;
-    gap: 20px;
-    height: 30rem;
-    padding: 0 40px;
+    flex-direction: column;
+    gap: 6px;
 }
 
-.accordion-item {
-    flex: 1;
+.top-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.bottom-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    padding: 28px 40px 56px;
+    background: #FBF7F2;
+}
+
+.bottom-group {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.group-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #9e8272;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e0d4c8;
+}
+
+.bottom-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+/* ── Category Card ────────────────────────────── */
+.cat-card {
     position: relative;
-    border-radius: 30px;
     overflow: hidden;
-    cursor: pointer;
-    transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1);
-    background: #f8f4f0;
+    display: block;
+    text-decoration: none;
+    background: #c9b9a8;
 }
 
-.accordion-item.active {
-    flex: 3;
-    box-shadow: 0 30px 60px rgba(94, 69, 53, 0.2);
-}
+.cat-card.large  { height: 340px; }
+.cat-card.small  { height: 210px; }
 
-/* Image Handling */
-.cat-image-wrapper {
-    position: absolute;
-    inset: 0;
-}
-
-.cat-bg {
+.cat-img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 1s ease;
-    filter: saturate(0.8) contrast(1.1);
+    display: block;
+    transition: transform 0.6s ease;
 }
 
-.accordion-item.active .cat-bg {
-    transform: scale(1.1);
-    filter: saturate(1.1) contrast(1.1);
+.cat-card:hover .cat-img {
+    transform: scale(1.06);
 }
 
+/* ── Overlay ──────────────────────────────────── */
 .cat-overlay {
     position: absolute;
     inset: 0;
-    background: linear-gradient(to bottom,
-            rgba(94, 69, 53, 0.1) 0%,
-            rgba(0, 0, 0, 0.4) 100%);
-    transition: opacity 0.5s ease;
-}
-
-.accordion-item.active .cat-overlay {
-    background: linear-gradient(to bottom,
-            rgba(0, 0, 0, 0) 0%,
-            rgba(0, 0, 0, 0.7) 100%);
-}
-
-/* Content Layout */
-.cat-content {
-    position: absolute;
-    inset: 0;
-    padding: 40px;
+    background: linear-gradient(
+        to top,
+        rgba(40, 25, 15, 0.75) 0%,
+        rgba(40, 25, 15, 0.08) 50%,
+        transparent 100%
+    );
     display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    z-index: 2;
+    align-items: flex-end;
+    padding: 20px 22px;
+    transition: background 0.3s ease;
 }
 
-.cat-icon-container {
-    position: absolute;
-    top: 40px;
-    left: 40px;
+.cat-card:hover .cat-overlay {
+    background: linear-gradient(
+        to top,
+        rgba(40, 25, 15, 0.88) 0%,
+        rgba(40, 25, 15, 0.3) 65%,
+        transparent 100%
+    );
+}
+
+.cat-info {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 20px;
-    transition: opacity 0.3s ease;
-}
-
-.cat-icon {
-    font-size: 3rem;
-    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.3));
-}
-
-.cat-name-vertical {
-    font-family: 'ZCOOL XiaoWei', serif;
-    font-size: 2rem;
-    color: white;
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    margin: 0;
-    letter-spacing: 4px;
-    opacity: 1;
-    transition: opacity 0.3s ease, transform 0.5s ease;
-}
-
-.accordion-item.active .cat-name-vertical {
-    opacity: 0;
-    transform: translateY(-20px);
-}
-
-/* Expanded Details */
-.cat-details {
-    opacity: 0;
-    transform: translateY(30px);
-    transition: all 0.5s ease 0.2s;
-    pointer-events: none;
-    max-width: 500px;
-}
-
-.accordion-item.active .cat-details {
-    opacity: 1;
-    transform: translateY(0);
-    pointer-events: auto;
+    justify-content: space-between;
+    width: 100%;
+    gap: 8px;
 }
 
 .cat-name {
-    font-family: 'ZCOOL XiaoWei', serif;
-    font-size: 3rem;
-    color: white;
-    margin-bottom: 15px;
-}
-
-.cat-desc {
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 1.1rem;
-    line-height: 1.6;
-    margin-bottom: 30px;
-}
-
-.explore-btn {
-    background: white;
-    color: #5E4535;
-    border: none;
-    padding: 15px 35px;
-    border-radius: 50px;
-    font-size: 1rem;
+    font-family: 'Work Sans', sans-serif;
+    font-size: 0.95rem;
     font-weight: 700;
-    cursor: pointer;
+    color: white;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.cat-card.small .cat-name {
+    font-size: 0.8rem;
+}
+
+.cat-explore {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #E7C9A2;
+    opacity: 0;
+    transform: translateX(-6px);
+    transition: opacity 0.28s ease, transform 0.28s ease;
+    white-space: nowrap;
     display: flex;
     align-items: center;
-    gap: 15px;
-    transition: all 0.3s ease;
-    width: fit-content;
+    gap: 3px;
+    flex-shrink: 0;
 }
 
-.explore-btn:hover {
-    background: #5E4535;
-    color: white;
-    transform: translateX(10px);
+.cat-card:hover .cat-explore {
+    opacity: 1;
+    transform: translateX(0);
 }
 
-.btn-arrow {
-    transition: transform 0.3s ease;
+.arrow {
+    display: inline-block;
+    transition: transform 0.28s ease;
 }
 
-.explore-btn:hover .btn-arrow {
-    transform: translateX(5px);
+.cat-card:hover .arrow {
+    transform: translateX(3px);
 }
 
-/* Responsive */
+/* ── Responsive ───────────────────────────────── */
 @media (max-width: 1024px) {
-    .categories-accordion {
-        flex-direction: column;
-        height: auto;
-        min-height: 800px;
-        padding: 0 20px;
-        gap: 15px;
-    }
+    .cat-card.large { height: 280px; }
+    .cat-card.small { height: 180px; }
 
-    .accordion-item {
-        width: 100%;
-        flex: 1;
-        min-height: 120px;
-    }
-
-    .accordion-item.active {
-        flex: 4;
-    }
-
-    .cat-name-vertical {
-        writing-mode: horizontal-tb;
-        transform: none !important;
-        opacity: 1 !important;
-    }
-
-    .cat-icon-container {
-        flex-direction: row;
-        align-items: center;
-        top: 20px;
-        left: 20px;
-    }
-
-    .cat-content {
-        padding: 20px;
+    .bottom-section {
+        gap: 24px;
+        padding: 24px 24px 48px;
     }
 }
 
 @media (max-width: 768px) {
-    .section-title {
-        font-size: 2.5rem;
+    .categories-section { padding-top: 60px; }
+
+    .section-title { font-size: 2.2rem; }
+
+    .top-row { grid-template-columns: 1fr; }
+    .cat-card.large { height: 220px; }
+
+    .bottom-section {
+        grid-template-columns: 1fr;
+        gap: 28px;
+        padding: 20px 16px 40px;
     }
 
-    .categories-accordion {
-        min-height: 1000px;
-    }
+    .cat-card.small { height: 170px; }
+}
 
-    .cat-name {
-        font-size: 2.2rem;
-    }
-
-    .cat-desc {
-        font-size: 1rem;
-        margin-bottom: 20px;
-    }
-
-    .cat-icon {
-        font-size: 2rem;
-    }
-
-    .cat-name-vertical {
-        font-size: 1.5rem;
-    }
+@media (max-width: 480px) {
+    .bottom-row { grid-template-columns: 1fr; }
+    .cat-card.small { height: 190px; }
 }
 </style>

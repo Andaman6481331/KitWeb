@@ -1,6 +1,6 @@
 <script setup>
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useHead } from '@unhead/vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale } from './i18n'
@@ -26,6 +26,7 @@ const pageTitleMap = {
   event: 'events.heroTagline',
   partners: 'partner.heroTitle',
   orderpage: 'order.title',
+  faq: 'faq.title',
   admin: 'admin.loginTitle'
 }
 
@@ -245,6 +246,41 @@ watch(locale, (newLocale) => {
 }, { immediate: true })
 
 const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
+
+// ── Dropdown menus ────────────────────────────
+const showCatalogMenu = ref(false)
+const showCompanyMenu = ref(false)
+let catalogTimer = null
+let companyTimer = null
+
+const navCategories = [
+  { key: 'yarn',       icon: 'color-wand-outline' },
+  { key: 'needles',    icon: 'cut-outline' },
+  { key: 'thread',     icon: 'git-network-outline' },
+  { key: 'tools',      icon: 'construct-outline' },
+  { key: 'beads',      icon: 'radio-button-on-outline' },
+  { key: 'decorative', icon: 'sparkles-outline' },
+  { key: 'flora',      icon: 'leaf-outline' },
+]
+
+const openCatalog  = () => { clearTimeout(catalogTimer); showCatalogMenu.value = true }
+const closeCatalog = () => { catalogTimer = setTimeout(() => { showCatalogMenu.value = false }, 130) }
+const toggleCatalog = () => { showCatalogMenu.value = !showCatalogMenu.value; showCompanyMenu.value = false }
+
+const openCompany  = () => { clearTimeout(companyTimer); showCompanyMenu.value = true }
+const closeCompany = () => { companyTimer = setTimeout(() => { showCompanyMenu.value = false }, 130) }
+const toggleCompany = () => { showCompanyMenu.value = !showCompanyMenu.value; showCatalogMenu.value = false }
+
+const closeAllMenus = () => { showCatalogMenu.value = false; showCompanyMenu.value = false }
+const isCompanyActive = computed(() => ['partners', 'faq'].includes(String(route.name)))
+
+onMounted(() => {
+  document.addEventListener('click', closeAllMenus)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeAllMenus)
+})
 </script>
 
 <template>
@@ -259,11 +295,98 @@ const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
 
       <!-- Center: Links -->
       <div class="nav-center" style="justify-content: center; align-items: center; text-align: center;">
-        <router-link :to="{ name: 'home', params: { lang: currentLang } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.home') }}</router-link>
-        <router-link :to="{ name: 'catalog', params: { lang: currentLang, category: 'needles' } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.products') }}</router-link>
-        <router-link :to="{ name: 'event', params: { lang: currentLang } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.events') }}</router-link>
-        <router-link :to="{ name: 'partners', params: { lang: currentLang } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.partners') }}</router-link>
-        <router-link :to="{ name: 'contactus', params: { lang: currentLang } }" @click="scrollToTop" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.contactUs') }}</router-link>
+
+        <!-- Home -->
+        <router-link :to="{ name: 'home', params: { lang: currentLang } }" @click="scrollToTop; closeAllMenus()" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.home') }}</router-link>
+
+        <!-- Catalog dropdown -->
+        <div class="nav-item-wrap" @mouseenter="openCatalog" @mouseleave="closeCatalog" @click.stop>
+          <router-link
+            :to="{ name: 'catalog', params: { lang: currentLang, category: 'needles' } }"
+            class="nav-link nav-link-dd"
+            active-class="active"
+            @click="scrollToTop; closeAllMenus()"
+          >
+            {{ $t('nav.products') }}
+            <svg class="dd-chevron" :class="{ open: showCatalogMenu }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </router-link>
+          <span class="dd-trigger-area" @click="toggleCatalog" aria-hidden="true"></span>
+          <Transition name="nav-dd">
+            <div v-if="showCatalogMenu" class="dd-menu catalog-dd" @click.stop>
+              <div class="catalog-dd-grid">
+                <router-link
+                  v-for="cat in navCategories"
+                  :key="cat.key"
+                  :to="{ name: 'catalog', params: { lang: currentLang, category: cat.key } }"
+                  class="dd-cat-item"
+                  @click="scrollToTop; closeAllMenus()"
+                >
+                  <ion-icon :name="cat.icon" class="dd-cat-icon"></ion-icon>
+                  <span>{{ $t(`categories.${cat.key}`) }}</span>
+                </router-link>
+              </div>
+              <router-link
+                :to="{ name: 'catalog', params: { lang: currentLang } }"
+                class="dd-footer-link"
+                @click="scrollToTop; closeAllMenus()"
+              >
+                {{ $t('nav.viewAll') || 'View All Products' }}
+                <ion-icon name="arrow-forward-outline"></ion-icon>
+              </router-link>
+            </div>
+          </Transition>
+        </div>
+
+        <!-- Events -->
+        <router-link :to="{ name: 'event', params: { lang: currentLang } }" @click="scrollToTop; closeAllMenus()" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.events') }}</router-link>
+
+        <!-- Company dropdown -->
+        <div class="nav-item-wrap" @mouseenter="openCompany" @mouseleave="closeCompany" @click.stop>
+          <button
+            class="nav-link nav-link-dd nav-link-btn"
+            :class="{ active: isCompanyActive }"
+            @click="toggleCompany"
+          >
+            {{ $t('nav.company') || 'Company' }}
+            <svg class="dd-chevron" :class="{ open: showCompanyMenu }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+          <Transition name="nav-dd">
+            <div v-if="showCompanyMenu" class="dd-menu company-dd" @click.stop>
+              <router-link
+                :to="{ name: 'partners', params: { lang: currentLang } }"
+                class="dd-page-link"
+                active-class="dd-page-link-active"
+                @click="scrollToTop; closeAllMenus()"
+              >
+                <span class="dd-page-icon"><ion-icon name="people-outline"></ion-icon></span>
+                <span class="dd-page-text">
+                  <span class="dd-page-title">{{ $t('nav.partners') }}</span>
+                  <span class="dd-page-desc">{{ $t('nav.partnersDesc') || 'Our wholesale clients & partners' }}</span>
+                </span>
+              </router-link>
+              <router-link
+                :to="{ name: 'faq', params: { lang: currentLang } }"
+                class="dd-page-link"
+                active-class="dd-page-link-active"
+                @click="scrollToTop; closeAllMenus()"
+              >
+                <span class="dd-page-icon"><ion-icon name="help-circle-outline"></ion-icon></span>
+                <span class="dd-page-text">
+                  <span class="dd-page-title">{{ $t('nav.faq') || 'FAQ' }}</span>
+                  <span class="dd-page-desc">{{ $t('nav.faqDesc') || 'Common questions answered' }}</span>
+                </span>
+              </router-link>
+            </div>
+          </Transition>
+        </div>
+
+        <!-- Contact Us -->
+        <router-link :to="{ name: 'contactus', params: { lang: currentLang } }" @click="scrollToTop; closeAllMenus()" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.contactUs') }}</router-link>
+
       </div>
 
       <!-- Right: Actions -->
@@ -521,6 +644,182 @@ body {
   height: 2px;
   background-color: #DD876E;
   /* Teal underline */
+}
+
+/* ── Dropdown Nav Items ──────────────────────── */
+.nav-item-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.nav-link-dd {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav-link-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.dd-trigger-area {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  display: none;
+}
+
+.dd-chevron {
+  width: 12px;
+  height: 12px;
+  margin-left: 1px;
+  transition: transform 0.22s ease;
+  flex-shrink: 0;
+}
+
+.dd-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* ── Dropdown Panel ──────────────────────────── */
+.dd-menu {
+  position: absolute;
+  top: calc(100% + 14px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(60, 35, 15, 0.14);
+  border: 1px solid rgba(220, 195, 165, 0.45);
+  z-index: 300;
+  overflow: hidden;
+}
+
+/* Catalog dropdown */
+.catalog-dd {
+  width: 300px;
+}
+
+.catalog-dd-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 10px;
+  gap: 2px;
+}
+
+.dd-cat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #5d4037;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.14s;
+}
+
+.dd-cat-item:hover {
+  background: #FDF3E6;
+  color: #604539;
+}
+
+.dd-cat-icon {
+  font-size: 15px;
+  color: #DD876E;
+  flex-shrink: 0;
+}
+
+.dd-footer-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 11px;
+  border-top: 1px solid #f2e8de;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: #DD876E;
+  letter-spacing: 0.3px;
+  transition: background 0.14s;
+}
+
+.dd-footer-link:hover {
+  background: #FDF3E6;
+}
+
+/* Company dropdown */
+.company-dd {
+  width: 250px;
+  padding: 8px;
+}
+
+.dd-page-link {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: #5d4037;
+  transition: background 0.14s;
+}
+
+.dd-page-link:hover,
+.dd-page-link-active {
+  background: #FDF3E6;
+}
+
+.dd-page-icon {
+  width: 36px;
+  height: 36px;
+  background: #FDF3E6;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dd-page-link-active .dd-page-icon {
+  background: #DD876E;
+  color: white;
+}
+
+.dd-page-icon ion-icon {
+  font-size: 18px;
+  color: #DD876E;
+}
+
+.dd-page-link-active .dd-page-icon ion-icon {
+  color: white;
+}
+
+.dd-page-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 2px;
+}
+
+.dd-page-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #3d2b1f;
+  display: block;
+}
+
+.dd-page-desc {
+  font-size: 11.5px;
+  color: #9e8272;
+  font-weight: 400;
+  display: block;
 }
 
 /* Right: Search & Actions */
@@ -904,7 +1203,7 @@ body {
   }
 }
 
-/* Dropdown Animation */
+/* Language dropdown animation */
 .dropdown-fade-enter-active,
 .dropdown-fade-leave-active {
   transition: all 0.3s ease;
@@ -914,6 +1213,18 @@ body {
 .dropdown-fade-leave-to {
   opacity: 0;
   transform: translateX(-50%) translateY(10px);
+}
+
+/* Nav dropdown animation */
+.nav-dd-enter-active,
+.nav-dd-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.nav-dd-enter-from,
+.nav-dd-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(8px);
 }
 
 /* Confirmation Popup Styles */
