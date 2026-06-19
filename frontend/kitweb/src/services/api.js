@@ -2,7 +2,11 @@
 // const API_URL = 'http://127.0.0.1:8787';
 export const API_URL = 'https://hidden-water-ed9d.shop-backend-kitweb.workers.dev';
 export const getImageUrl = (filename) => `${API_URL}/images/${filename}`;
-export const getUtilsUrl = (filename) => `${API_URL}/utils/${filename}`;
+// Pass a version (e.g. getUtilsUrl('x.webp', 2)) to bust browser/CDN cache after
+// re-uploading a file under the same name. The worker serves utils as immutable,
+// so a new ?v= value is the only way to force a fresh fetch. Bump it on re-upload.
+export const getUtilsUrl = (filename, version) =>
+  `${API_URL}/utils/${filename}${version != null ? `?v=${version}` : ''}`;
 
 export const getCategoryImageUrl = (category) => {
   if (!category) return '';
@@ -49,6 +53,17 @@ export const api = {
       localStorage.setItem('admin_token', data.token);
     }
     return data;
+  },
+
+  // POS in-store cash sale. payload: { total_amount, items: [{ product_type, input_price }] }
+  async submitCashSale(payload) {
+    const response = await fetch(`${API_URL}/sellcash/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(await parseApiError(response, 'Sale failed'));
+    return await response.json();
   },
 
   async signup(customerData) {
@@ -174,11 +189,20 @@ export const api = {
     return await response.json();
   },
 
-  async submitOrder(message, orderData = null) {
-    const response = await fetch(`${API_URL}/notify`, {
+  async submitOrderWithSlip(formData) {
+    // FormData with slipImage file — browser sets multipart boundary automatically
+    const response = await fetch(`${API_URL}/order/submit`, {
+      method: 'POST',
+      body: formData
+    });
+    return await response.json();
+  },
+
+  async exchangeLineCode(code, redirectUri) {
+    const response = await fetch(`${API_URL}/line/exchange`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, orderData })
+      body: JSON.stringify({ code, redirectUri })
     });
     return await response.json();
   },

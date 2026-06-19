@@ -15,6 +15,7 @@ import { getDefaultLang } from '../utils/localeRoutes'
 
 export const routes = [
   { path: '/', redirect: () => `/${getDefaultLang()}` },
+  { path: '/line-callback', name: 'line-callback', component: () => import('../views/LineCallbackPage.vue') },
   {
     path: '/:lang',
     component: RouterView,
@@ -28,6 +29,8 @@ export const routes = [
       { path: 'partners', name: 'partners', component: PartnerPage },
       { path: 'faq', name: 'faq', component: FaqPage },
       { path: 'admin', name: 'admin', component: AdminDashboard, meta: { requiresAuth: true } },
+      { path: 'sellcash', name: 'sellcash', component: () => import('../views/SellCashPage.vue') },
+      { path: 'thank-you', name: 'thank-you', component: () => import('../views/ThankYouPage.vue') },
       { path: ':pathMatch(.*)*', redirect: (to) => `/${to.params.lang}` },
     ],
   },
@@ -79,6 +82,16 @@ export function installRouterGuards(router, i18n) {
     if (to.name === 'category-products') {
       return
     }
+
+    // Keep staff-only pages out of search indexes (global meta is "index, follow").
+    const isPrivate = to.name === 'sellcash' || to.name === 'admin'
+    let robotsMeta = document.querySelector('meta[name="robots"]')
+    if (!robotsMeta) {
+      robotsMeta = document.createElement('meta')
+      robotsMeta.setAttribute('name', 'robots')
+      document.head.appendChild(robotsMeta)
+    }
+    robotsMeta.setAttribute('content', isPrivate ? 'noindex, nofollow' : 'index, follow')
 
     const isThai = to.path.startsWith('/th')
     const engTitle = 'Kitcharoen - Premium Yarn & Sewing Supplies'

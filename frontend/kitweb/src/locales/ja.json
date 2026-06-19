@@ -511,6 +511,29 @@
         "status": "ステータス",
         "qty": "数量",
         "goCheckout": "チェックアウトへ進む",
-        "standard": "標準"
+        "standard": "標準",
+        "phoneNumber": "電話番号",
+        "phoneNumberPlaceholder": "例: 081-234-5678",
+        "shippingAddress": "配送先住所",
+        "shippingAddressPlaceholder": "番地、通り、区、都市...",
+        "uploadSlip": "PromptPay振込証明書をアップロード",
+        "slipPreview": "証明書プレビュー",
+        "lineConnectPrompt": "LINEで注文の領収書と配送状況を受け取る",
+        "connectLine": "LINEアカウントを連携",
+        "lineConnected": "LINE連携済み",
+        "verifyAndOrder": "確認して注文する",
+        "pleaseUploadSlip": "PromptPay振込証明書をアップロードしてください",
+        "slipInvalid": "証明書を確認できませんでした。画像を確認して再試行してください",
+        "amountMismatch": "振込金額が注文合計と一致しません",
+        "wrongAccount": "証明書が当社口座への振込ではありません",
+        "duplicateSlip": "この証明書は他の注文に使用済みです"
+    },
+    "thankYou": {
+        "title": "注文が確認されました！",
+        "subtitle": "ご注文ありがとうございます",
+        "received": "注文番号 #{orderId} を受け付けました",
+        "processing": "できるだけ早く処理・発送いたします",
+        "lineCtaButton": "LINE OAでリアルタイム配送情報を受け取る",
+        "continueShopping": "ショッピングを続ける"
     }
 }

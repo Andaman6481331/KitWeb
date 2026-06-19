@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { api, API_URL, getDiyImageUrl } from '../services/api'
 import { useProducts } from '../composables/useProducts';
@@ -9,6 +9,7 @@ import { authStore } from '../stores/authStore';
 import { codeToPath, defaultLang } from '@/utils/localeRoutes';
 
 const route = useRoute();
+const router = useRouter();
 const currentLang = computed(() => route.params.lang || defaultLang);
 const { t, te, locale } = useI18n()
 
@@ -113,6 +114,49 @@ const isSubmittingOrder = ref(false)
 const activeTab = ref('new-order')
 const showOrderDetails = ref(false)
 const selectedOrder = ref(null)
+
+// Checkout form — new fields
+const phoneNumber = ref('')
+const shippingAddress = ref('')
+const slipImage = ref(null)
+const slipPreview = ref(null)
+const lineUserId = ref('')
+const lineDisplayName = ref('')
+const lineLoginEnabled = ref(false)
+
+const handleSlipUpload = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    slipImage.value = file
+    slipPreview.value = URL.createObjectURL(file)
+  }
+}
+
+const triggerLineLogin = () => {
+  const state = crypto.randomUUID()
+  sessionStorage.setItem('line_oauth_state', state)
+  const callbackBase = window.location.origin
+  const redirectUri = encodeURIComponent(`${callbackBase}/line-callback`)
+  const channelId = import.meta.env.VITE_LINE_LOGIN_CHANNEL_ID
+  const url =
+    `https://access.line.me/oauth2/v2.1/authorize?response_type=code` +
+    `&client_id=${channelId}` +
+    `&redirect_uri=${redirectUri}` +
+    `&state=${state}` +
+    `&scope=profile%20openid` +
+    `&bot_prompt=aggressive`
+  const popup = window.open(url, 'lineLogin', 'width=500,height=700')
+  const handler = (e) => {
+    if (e.origin !== window.location.origin) return
+    if (e.data?.type === 'LINE_AUTH') {
+      lineUserId.value = e.data.lineUserId
+      lineDisplayName.value = e.data.displayName
+      window.removeEventListener('message', handler)
+      popup?.close()
+    }
+  }
+  window.addEventListener('message', handler)
+}
 
 // Order history data
 const orders = ref([])
@@ -372,49 +416,50 @@ const submitOrder = async () => {
         showNotificationMsg(t('order.pleaseEnterName'))
         return
     }
+    if (!slipImage.value) {
+        showNotificationMsg(t('order.pleaseUploadSlip'))
+        return
+    }
     isSubmittingOrder.value = true
-    const orderId = generateOrderId()
+
+    const formData = new FormData()
+    formData.append('customerName', customerName.value)
+    formData.append('phoneNumber', phoneNumber.value)
+    formData.append('shippingAddress', shippingAddress.value)
+    formData.append('totalAmount', String(cartTotal.value))
+    formData.append('lineUserId', lineUserId.value)
+    formData.append('cartItems', JSON.stringify(cart.value.map(item => ({
+        id: item.id,
+        name: item.name,
+        name_th: item.name_th || null,
+        selectedSize: item.selectedSize,
+        selectedColor: item.selectedColor,
+        quantity: item.quantity,
+        price: item.price
+    }))))
+    formData.append('slipImage', slipImage.value)
 
     try {
-        console.log('start try catch')
-        const orderMessage = formatOrderMessage(orderId)
-        console.log(orderMessage)
-
-        // Prepare structured data for persistence
-        const orderData = {
-            id: orderId,
-            customerName: customerName.value,
-            customerId: authStore.user?.id || null,
-            totalAmount: cartTotal.value,
-            paymentMethod: paymentMethod.value,
-            note: orderNote.value,
-            cartItems: cart.value.map(item => ({
-                id: item.id,
-                name: item.name,
-                selectedSize: item.selectedSize,
-                selectedColor: item.selectedColor,
-                quantity: item.quantity,
-                price: item.price
-            }))
-        }
-
-        const result = await api.submitOrder(orderMessage, orderData)
-        console.log(result.message)
-        if (result.status === 200 || result.success || result.message === 'ok') {
-            showNotificationMsg(t('order.orderSuccess'))
+        const result = await api.submitOrderWithSlip(formData)
+        if (result.success) {
             cartStore.clearCart()
-            customerName.value = ''
-            paymentMethod.value = 'Bank Transfer'
-            orderNote.value = ''
             showCheckoutPopup.value = false
-
-            // Refresh order history
-            fetchOrders()
+            router.push({
+                name: 'thank-you',
+                params: { lang: currentLang.value },
+                query: { orderId: result.orderId }
+            })
         } else {
-            throw new Error(result.error || 'Failed to send order')
+            const errMap = {
+                SLIP_INVALID: t('order.slipInvalid'),
+                AMOUNT_MISMATCH: t('order.amountMismatch'),
+                WRONG_ACCOUNT: t('order.wrongAccount'),
+                DUPLICATE: t('order.duplicateSlip'),
+            }
+            showNotificationMsg(errMap[result.error] || t('order.orderFailed'))
         }
     } catch (error) {
-        console.error('Error sending order:', error)
+        console.error('Error submitting order:', error)
         showNotificationMsg(t('order.orderFailed'))
     } finally {
         isSubmittingOrder.value = false
@@ -969,30 +1014,78 @@ const closeOrderDetails = () => {
                         </div>
                     </div>
                 </div>
+                <!-- Customer details -->
                 <div class="form-group">
                     <label>{{ t('order.fullName') }}</label>
                     <input v-model="customerName" type="text" :placeholder="t('order.fullNamePlaceholder')"
                         class="form-input" required />
                 </div>
 
+                <div class="form-row-two">
+                    <div class="form-group">
+                        <label>{{ t('order.phoneNumber') }}</label>
+                        <input v-model="phoneNumber" type="tel" :placeholder="t('order.phoneNumberPlaceholder')"
+                            class="form-input" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>{{ t('order.shippingAddress') }}</label>
+                    <textarea v-model="shippingAddress" :placeholder="t('order.shippingAddressPlaceholder')"
+                        class="form-textarea" rows="2"></textarea>
+                </div>
+
+                <!-- PromptPay slip upload -->
+                <div class="form-group">
+                    <label>{{ t('order.uploadSlip') }} <span class="required-star">*</span></label>
+                    <div class="slip-upload-zone" @click="$refs.slipInput.click()">
+                        <img v-if="slipPreview" :src="slipPreview" class="slip-preview-img" alt="Slip preview" />
+                        <div v-else class="slip-placeholder">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8C7B6E" stroke-width="1.5">
+                                <rect x="3" y="3" width="18" height="18" rx="3"/>
+                                <path d="M3 9l4-4 4 4 4-6 4 6"/>
+                            </svg>
+                            <span>{{ t('order.uploadSlip') }}</span>
+                        </div>
+                        <input type="file" ref="slipInput" class="hidden-input" accept="image/*"
+                            @change="handleSlipUpload" />
+                    </div>
+                </div>
+
+                <!-- Optional LINE Login -->
+                <div class="line-connect-section">
+                    <label class="line-toggle-label">
+                        <input type="checkbox" v-model="lineLoginEnabled" class="line-toggle-checkbox" />
+                        <span class="line-toggle-text">{{ t('order.lineConnectPrompt') }}</span>
+                    </label>
+                    <div v-if="lineLoginEnabled" class="line-connect-action">
+                        <button v-if="!lineUserId" type="button" class="line-connect-btn" @click="triggerLineLogin">
+                            <svg width="18" height="18" viewBox="0 0 40 40" fill="none">
+                                <rect width="40" height="40" rx="8" fill="#06C755"/>
+                                <path d="M20 8C13.4 8 8 12.5 8 18c0 3.7 2.4 6.9 6 8.8l-.8 3.9 4.5-2.4c.7.1 1.5.2 2.3.2 6.6 0 12-4.5 12-10S26.6 8 20 8z" fill="white"/>
+                            </svg>
+                            {{ t('order.connectLine') }}
+                        </button>
+                        <div v-else class="line-connected-badge">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#06C755" stroke-width="2.5">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            {{ t('order.lineConnected') }}: {{ lineDisplayName }}
+                        </div>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label>{{ t('order.orderNote') }}</label>
                     <textarea v-model="orderNote" :placeholder="t('order.orderNotePlaceholder')" class="form-textarea"
-                        rows="3"></textarea>
+                        rows="2"></textarea>
                 </div>
             </div>
 
             <div class="popup-footer">
                 <button @click="closeCheckoutPopup" class="cancel-btn">{{ t('order.cancel') }}</button>
                 <button @click="submitOrder" class="submit-order-btn" :disabled="isSubmittingOrder">
-                    <span v-if="!isSubmittingOrder">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                            <path
-                                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                                stroke="currentColor" stroke-width="2" />
-                        </svg>
-                        {{ t('order.sendToLine') }}
-                    </span>
+                    <span v-if="!isSubmittingOrder">{{ t('order.verifyAndOrder') }}</span>
                     <span v-else>{{ t('order.sending') }}</span>
                 </button>
             </div>
@@ -2231,6 +2324,111 @@ const closeOrderDetails = () => {
     padding: 0 40px 40px;
     display: flex;
     gap: 16px;
+}
+
+.required-star {
+    color: #d63031;
+    margin-left: 2px;
+}
+
+.slip-upload-zone {
+    border: 2px dashed #E6E0D9;
+    border-radius: 12px;
+    background: #FDFAF7;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+
+.slip-upload-zone:hover {
+    border-color: #8C7B6E;
+}
+
+.slip-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #8C7B6E;
+    font-size: 13px;
+    padding: 20px;
+}
+
+.slip-preview-img {
+    width: 100%;
+    max-height: 200px;
+    object-fit: contain;
+}
+
+.line-connect-section {
+    background: #F0FFF6;
+    border: 1px solid #C3EFD4;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.line-toggle-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    color: #2d6a4f;
+    user-select: none;
+}
+
+.line-toggle-checkbox {
+    width: auto;
+    padding: 0;
+    border: none;
+    background: none;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.line-toggle-text {
+    line-height: 1.4;
+}
+
+.line-connect-action {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #C3EFD4;
+}
+
+.line-connect-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #06C755;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    width: auto;
+    transition: background 0.2s;
+}
+
+.line-connect-btn:hover {
+    background: #05a847;
+}
+
+.line-connected-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #2d6a4f;
 }
 
 .cancel-btn {

@@ -29,6 +29,7 @@ export const cartStore = {
         } else {
             state.cart.push({
                 ...product,
+                name_th: product.name_th || null,
                 cartItemKey,
                 selectedSize: selection.size,
                 selectedColor: selection.color,

@@ -33,6 +33,10 @@
 		{
 			"binding": "KIT_IMAGE",
 			"bucket_name": "kit-image"
+		},
+		{
+			"binding": "SLIPS",
+			"bucket_name": "order-slips"
 		}
 	],
 	"ai": {

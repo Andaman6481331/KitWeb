@@ -1099,7 +1099,7 @@ const deleteDiyProduct = async (id) => {
                   <img :src="getImageUrl(product.image_key || product.image)" :alt="product.name">
                 </div>
                 <div class="item-info">
-                  <strong>{{ product.name_th ? `${product.name} (${product.name_th})` : product.name }}</strong>
+                  <strong>{{ product.name_th ? `${product.name_th} (${product.name})` : product.name }}</strong>
                   <span class="p-meta">SKU: {{ product.sku }} | {{ formatProductCategories(product) }} | ${{ product.price_1 || product.price }}</span>
                   <div class="stock-control">
                     <span :class="['stock-count', 

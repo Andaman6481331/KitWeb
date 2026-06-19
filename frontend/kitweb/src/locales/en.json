@@ -608,6 +608,29 @@
     "status": "Status",
     "qty": "Qty",
     "goCheckout": "Go to Checkout",
-    "standard": "Standard"
+    "standard": "Standard",
+    "phoneNumber": "Phone Number",
+    "phoneNumberPlaceholder": "e.g. 081-234-5678",
+    "shippingAddress": "Shipping Address",
+    "shippingAddressPlaceholder": "House number, street, district, city...",
+    "uploadSlip": "Upload PromptPay Slip",
+    "slipPreview": "Slip Preview",
+    "lineConnectPrompt": "Get order receipts & tracking updates via LINE",
+    "connectLine": "Connect LINE Account",
+    "lineConnected": "LINE Connected",
+    "verifyAndOrder": "Verify & Place Order",
+    "pleaseUploadSlip": "Please upload your PromptPay transfer slip.",
+    "slipInvalid": "Slip could not be verified. Please check the image and try again.",
+    "amountMismatch": "Transfer amount does not match your order total.",
+    "wrongAccount": "Slip was not transferred to our account.",
+    "duplicateSlip": "This slip has already been used for another order."
+  },
+  "thankYou": {
+    "title": "Order Confirmed!",
+    "subtitle": "Thank you for your order.",
+    "received": "Order #{orderId} has been received.",
+    "processing": "We will process and ship your order shortly.",
+    "lineCtaButton": "Get Instant Tracking Updates on LINE OA",
+    "continueShopping": "Continue Shopping"
   }
 }

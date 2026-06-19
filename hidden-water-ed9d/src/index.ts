@@ -16,10 +16,15 @@ interface Env {
 	IMAGES: R2Bucket;
 	WEB_UTILS: R2Bucket;
 	KIT_IMAGE: R2Bucket;
+	SLIPS: R2Bucket;
 	AI: any;
 	LINE_CHANNEL_ACCESS_TOKEN?: string;
 	LINE_NOTIFY_TOKEN?: string;
 	LINE_USER_ID?: string;
+	LINE_LOGIN_CHANNEL_ID?: string;
+	LINE_LOGIN_CHANNEL_SECRET?: string;
+	EASYSLIP_API_KEY?: string;
+	PROMPTPAY_ACCOUNT?: string;
 	ADMIN_PASSWORD?: string;
 	JWT_SECRET?: string;
 }
@@ -447,78 +452,197 @@ export default {
 				return await handleR2Request(env.KIT_IMAGE, key, request, true);
 			}
 
-			if (url.pathname === "/notify" && request.method === "POST") {
+			// LINE Login code → userId exchange
+			if (url.pathname === "/line/exchange" && request.method === "POST") {
 				const body = await request.json() as any;
-				const { message, orderData } = body;
-				const token = env.LINE_CHANNEL_ACCESS_TOKEN || env.LINE_NOTIFY_TOKEN;
-				const userId = env.LINE_USER_ID;
+				const { code, redirectUri } = body;
 
-				if (!token || !userId) {
-					return corsResponse({ error: "LINE Messaging API credentials (LINE_CHANNEL_ACCESS_TOKEN and LINE_USER_ID) not configured" }, { status: 500 });
+				if (!code || !redirectUri) {
+					return corsResponse({ error: "code and redirectUri are required" }, { status: 400 });
+				}
+				if (!env.LINE_LOGIN_CHANNEL_ID || !env.LINE_LOGIN_CHANNEL_SECRET) {
+					return corsResponse({ error: "LINE Login channel credentials not configured" }, { status: 500 });
 				}
 
-				// 1. Persist order if orderData is provided
-				if (orderData) {
-					try {
-						const { id, customerName, totalAmount, paymentMethod, note, cartItems } = orderData;
+				// Step 1: Exchange code for access token
+				const tokenRes = await fetch("https://api.line.me/oauth2/v2.1/token", {
+					method: "POST",
+					headers: { "Content-Type": "application/x-www-form-urlencoded" },
+					body: new URLSearchParams({
+						grant_type: "authorization_code",
+						code,
+						redirect_uri: redirectUri,
+						client_id: env.LINE_LOGIN_CHANNEL_ID,
+						client_secret: env.LINE_LOGIN_CHANNEL_SECRET,
+					}).toString()
+				});
+				if (!tokenRes.ok) {
+					const err = await tokenRes.json().catch(() => ({})) as any;
+					return corsResponse({ error: "Token exchange failed", detail: err }, { status: 400 });
+				}
+				const tokenData = await tokenRes.json() as any;
+				const accessToken = tokenData.access_token;
 
-						// Insert order metadata
-						await env.DB.prepare(
-							"INSERT INTO orders (id, customer_name, total_amount, payment_method, note, customer_id) VALUES (?, ?, ?, ?, ?, ?)"
-						).bind(id, customerName, totalAmount, paymentMethod, note, orderData.customerId || null).run();
+				// Step 2: GET user profile
+				const profileRes = await fetch("https://api.line.me/v2/profile", {
+					method: "GET",
+					headers: { "Authorization": `Bearer ${accessToken}` }
+				});
+				if (!profileRes.ok) {
+					return corsResponse({ error: "Profile fetch failed" }, { status: 400 });
+				}
+				const profile = await profileRes.json() as any;
+				return corsResponse({ userId: profile.userId, displayName: profile.displayName });
+			}
 
-						// Insert order items and update stock
-						for (const item of cartItems) {
+			// Verified order submission with PromptPay slip
+			if (url.pathname === "/order/submit" && request.method === "POST") {
+				const token = env.LINE_CHANNEL_ACCESS_TOKEN || env.LINE_NOTIFY_TOKEN;
+				const staffUserId = env.LINE_USER_ID;
+
+				if (!token || !staffUserId) {
+					return corsResponse({ error: "LINE Messaging API credentials not configured" }, { status: 500 });
+				}
+				if (!env.EASYSLIP_API_KEY) {
+					return corsResponse({ error: "EasySlip API key not configured" }, { status: 500 });
+				}
+				if (!env.PROMPTPAY_ACCOUNT) {
+					return corsResponse({ error: "PromptPay account not configured" }, { status: 500 });
+				}
+
+				const formData = await request.formData();
+				const customerName = formData.get("customerName") as string;
+				const phoneNumber = formData.get("phoneNumber") as string;
+				const shippingAddress = formData.get("shippingAddress") as string;
+				const totalAmount = parseFloat(formData.get("totalAmount") as string);
+				const lineUserId = (formData.get("lineUserId") as string) || "";
+				const cartItemsRaw = formData.get("cartItems") as string;
+				const slipFile = formData.get("slipImage") as File;
+
+				if (!customerName || !slipFile || isNaN(totalAmount)) {
+					return corsResponse({ error: "Missing required fields" }, { status: 400 });
+				}
+
+				const cartItems: any[] = JSON.parse(cartItemsRaw || "[]");
+
+				// Convert slip to base64 (stack-safe reduce — do NOT spread Uint8Array)
+				const arrayBuffer = await slipFile.arrayBuffer();
+				const base64String = btoa(
+					new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), "")
+				);
+				const dataUri = `data:image/jpeg;base64,${base64String}`;
+
+				// Call EasySlip API v2
+				const easySlipRes = await fetch("https://api.easyslip.com/v2/verify/bank", {
+					method: "POST",
+					headers: {
+						"Authorization": `Bearer ${env.EASYSLIP_API_KEY}`,
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify({ base64: dataUri })
+				});
+
+				if (!easySlipRes.ok) {
+					const errBody = await easySlipRes.json().catch(() => ({})) as any;
+					console.error("EasySlip error:", easySlipRes.status, errBody);
+					return corsResponse({ error: "SLIP_INVALID" }, { status: 400 });
+				}
+
+				const slipData = await easySlipRes.json() as any;
+
+				// Validate amount
+				const slipAmount = slipData?.data?.amount ?? slipData?.amount;
+				if (Math.abs(parseFloat(slipAmount) - totalAmount) > 0.01) {
+					return corsResponse({ error: "AMOUNT_MISMATCH" }, { status: 400 });
+				}
+
+				// Validate receiver account
+				const receiverAccount =
+					slipData?.data?.receiver?.accountNo ??
+					slipData?.data?.receiver?.promptpay ??
+					slipData?.receiver?.accountNo ?? "";
+				if (!receiverAccount.replace(/[-\s]/g, "").includes(env.PROMPTPAY_ACCOUNT.replace(/[-\s]/g, ""))) {
+					return corsResponse({ error: "WRONG_ACCOUNT" }, { status: 400 });
+				}
+
+				// Check duplicate transaction ref
+				const transRef: string =
+					slipData?.data?.transRef ?? slipData?.transRef ?? crypto.randomUUID();
+				const dupCheck = await env.DB.prepare(
+					"SELECT id FROM orders WHERE slip_transaction_ref = ?"
+				).bind(transRef).first();
+				if (dupCheck) {
+					return corsResponse({ error: "DUPLICATE" }, { status: 400 });
+				}
+
+				// Generate order ID
+				const now = new Date();
+				const random = Math.floor(Math.random() * 99999).toString().padStart(5, "0");
+				const orderId = `WH-${now.getFullYear()}-${random}`;
+
+				// Upload slip to R2
+				const slipKey = `slips/${orderId}-${Date.now()}.jpg`;
+				await env.SLIPS.put(slipKey, arrayBuffer, {
+					httpMetadata: { contentType: slipFile.type || "image/jpeg" }
+				});
+				const slipUrl = `slips/${slipKey}`;
+
+				// Persist order to D1
+				await env.DB.prepare(
+					"INSERT INTO orders (id, customer_name, total_amount, payment_method, note, customer_id, phone_number, shipping_address, slip_url, line_user_id, slip_transaction_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+				).bind(orderId, customerName, totalAmount, "PromptPay", "", null, phoneNumber, shippingAddress, slipUrl, lineUserId || null, transRef).run();
+
+				// Persist order items + update stock
+				for (const item of cartItems) {
+					const productName = item.name_th || item.name;
+					await env.DB.prepare(
+						"INSERT INTO order_items (order_id, product_id, product_name, size, color, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?)"
+					).bind(orderId, item.id, productName, item.selectedSize, item.selectedColor, item.quantity, item.price).run();
+
+					const isDiy = typeof item.id === "string" && item.id.startsWith("diy-");
+					const dbTable = isDiy ? "diy_products" : "products";
+					const productId = isDiy ? parseInt((item.id as string).substring(4), 10) : item.id;
+
+					const p = await env.DB.prepare(`SELECT stock FROM ${dbTable} WHERE id = ?`).bind(productId).first() as any;
+					if (p) {
+						const newStock = p.stock - item.quantity;
+						await env.DB.prepare(`UPDATE ${dbTable} SET stock = ? WHERE id = ?`).bind(newStock, productId).run();
+						if (!isDiy) {
 							await env.DB.prepare(
-								"INSERT INTO order_items (order_id, product_id, product_name, size, color, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?)"
-							).bind(id, item.id, item.name, item.selectedSize, item.selectedColor, item.quantity, item.price).run();
-
-							// Update stock
-							const isDiy = typeof item.id === 'string' && item.id.startsWith('diy-');
-							const dbTable = isDiy ? 'diy_products' : 'products';
-							const productId = isDiy ? parseInt(item.id.substring(4), 10) : item.id;
-
-							const p = await env.DB.prepare(`SELECT stock FROM ${dbTable} WHERE id = ?`).bind(productId).first() as any;
-							if (p) {
-								const newStock = p.stock - item.quantity;
-								await env.DB.prepare(`UPDATE ${dbTable} SET stock = ? WHERE id = ?`).bind(newStock, productId).run();
-
-								// Log history
-								if (!isDiy) {
-									await env.DB.prepare(
-										"INSERT INTO stock_history (product_id, admin_id, change_amount, new_stock, reason) VALUES (?, ?, ?, ?, ?)"
-									).bind(productId, 'SYSTEM', -item.quantity, newStock, `ORDER_${id}`).run();
-								}
-							}
+								"INSERT INTO stock_history (product_id, admin_id, change_amount, new_stock, reason) VALUES (?, ?, ?, ?, ?)"
+							).bind(productId, "SYSTEM", -item.quantity, newStock, `ORDER_${orderId}`).run();
 						}
-					} catch (dbError: any) {
-						console.error("Database error saving order:", dbError);
-						// We continue with notification even if DB fails for now, 
-						// but in production you might want to handle this more strictly.
 					}
 				}
 
-				// 2. Send LINE Notification using Messaging API
-				const response = await fetch("https://api.line.me/v2/bot/message/push", {
+				// Build staff LINE notification (use name_th)
+				let lineMsg = `🧾 คำสั่งซื้อใหม่ (เว็บไซต์)\n`;
+				lineMsg += `รหัส: ${orderId}\n`;
+				lineMsg += `ชื่อ: ${customerName}  โทร: ${phoneNumber}\n`;
+				lineMsg += `ที่อยู่: ${shippingAddress}\n\n`;
+				cartItems.forEach((item: any, i: number) => {
+					const name = item.name_th || item.name;
+					lineMsg += `${i + 1}) ${name}\n`;
+					lineMsg += `   ขนาด: ${item.selectedSize} | สี: ${item.selectedColor}\n`;
+					lineMsg += `   จำนวน: ${item.quantity} ชิ้น × ${item.price} บาท\n`;
+					lineMsg += `   รวม: ${(item.price * item.quantity).toFixed(2)} บาท\n\n`;
+				});
+				lineMsg += `รวมทั้งหมด: ${totalAmount.toFixed(2)} บาท\n`;
+				lineMsg += `หลักฐานการโอน: ${slipUrl}`;
+
+				await fetch("https://api.line.me/v2/bot/message/push", {
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
 						"Authorization": `Bearer ${token}`
 					},
 					body: JSON.stringify({
-						to: userId,
-						messages: [
-							{
-								type: "text",
-								text: message
-							}
-						]
+						to: staffUserId,
+						messages: [{ type: "text", text: lineMsg }]
 					})
 				});
 
-				const result = await response.json().catch(() => ({})) as any;
-				console.log("LINE API Response:", { status: response.status, result });
-				return corsResponse({ success: response.ok, ...result, persisted: !!orderData }, { status: response.status });
+				return corsResponse({ success: true, orderId });
 			}
 
 			// 2. CUSTOMER AUTH
@@ -635,6 +759,31 @@ export default {
 			const auth = request.headers.get("Authorization");
 			if (auth !== (env.ADMIN_PASSWORD || "").trim()) {
 				return corsResponse("Unauthorized", { status: 401 });
+			}
+
+			// POS in-store cash sale: records a walk-in sale into pos_orders / pos_order_items
+			if (url.pathname === "/sellcash/submit" && request.method === "POST") {
+				const body = await request.json() as any;
+				const items = Array.isArray(body.items) ? body.items : [];
+				if (items.length === 0) {
+					return corsResponse({ error: "No items" }, { status: 400 });
+				}
+				const orderId = crypto.randomUUID();
+				const totalAmount = Number(body.total_amount) || 0;
+
+				const statements = [
+					env.DB.prepare(
+						"INSERT INTO pos_orders (order_id, total_amount) VALUES (?, ?)"
+					).bind(orderId, totalAmount),
+					...items.map((it: any) =>
+						env.DB.prepare(
+							"INSERT INTO pos_order_items (order_id, product_type, input_price) VALUES (?, ?, ?)"
+						).bind(orderId, String(it.product_type || ""), Number(it.input_price) || 0)
+					)
+				];
+				await env.DB.batch(statements);
+
+				return corsResponse({ success: true, order_id: orderId });
 			}
 
 			if (url.pathname === "/products/next-sku" && request.method === "GET") {

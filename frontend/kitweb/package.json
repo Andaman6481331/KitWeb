@@ -13,6 +13,8 @@
     "@unhead/vue": "^2.1.15",
     "browser-image-compression": "^2.0.2",
     "ionicons": "^8.0.13",
+    "promptpay-qr": "^0.5.0",
+    "qrcode": "^1.5.4",
     "vue": "^3.4.29",
     "vue-i18n": "^9.14.5",
     "vue-instagram-embed": "^1.0.0",

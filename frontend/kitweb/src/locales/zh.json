@@ -502,6 +502,29 @@
         "status": "状态",
         "qty": "数量",
         "goCheckout": "前往结账",
-        "standard": "标准"
+        "standard": "标准",
+        "phoneNumber": "电话号码",
+        "phoneNumberPlaceholder": "例如 081-234-5678",
+        "shippingAddress": "送货地址",
+        "shippingAddressPlaceholder": "门牌号、街道、区、城市...",
+        "uploadSlip": "上传PromptPay转账凭证",
+        "slipPreview": "凭证预览",
+        "lineConnectPrompt": "通过LINE接收订单收据和物流追踪",
+        "connectLine": "连接LINE账号",
+        "lineConnected": "LINE已连接",
+        "verifyAndOrder": "验证并下单",
+        "pleaseUploadSlip": "请上传PromptPay转账凭证",
+        "slipInvalid": "无法验证凭证，请检查图片后重试",
+        "amountMismatch": "转账金额与订单总额不符",
+        "wrongAccount": "凭证未转账至我们的账户",
+        "duplicateSlip": "此凭证已用于其他订单"
+    },
+    "thankYou": {
+        "title": "订单已确认！",
+        "subtitle": "感谢您的订购",
+        "received": "订单 #{orderId} 已收到",
+        "processing": "我们将尽快处理并发货",
+        "lineCtaButton": "通过LINE OA获取实时物流更新",
+        "continueShopping": "继续购物"
     }
 }

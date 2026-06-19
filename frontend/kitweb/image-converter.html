@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Morph Pro | Standalone Local Converter</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="vendor/jszip.min.js"></script>
+    <script src="vendor/FileSaver.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -384,7 +384,7 @@
                     <label class="chip"><input type="checkbox" class="output-size" value="original"><span
                             class="chip-label">Original (No resize)</span></label>
                     <label class="chip"><input type="checkbox" class="output-size" value="large" checked><span
-                            class="chip-label">Large (max 800px)</span></label>
+                            class="chip-label">Large (max 1920px)</span></label>
                     <label class="chip"><input type="checkbox" class="output-size" value="thumb" checked><span
                             class="chip-label">Thumb (max 250px)</span></label>
                 </div>
@@ -539,7 +539,7 @@
                         let suffix = '';
 
                         if (size === 'large') {
-                            currentCanvas = await resizeCanvas(originalCanvas, 800);
+                            currentCanvas = await resizeCanvas(originalCanvas, 1920);
                             suffix = '-large';
                         } else if (size === 'thumb') {
                             currentCanvas = await resizeCanvas(originalCanvas, 250);

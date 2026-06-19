@@ -2,7 +2,17 @@
   "permissions": {
     "allow": [
       "Skill(run)",
-      "Skill(run:*)"
+      "Skill(run:*)",
+      "Bash(mkdir -p vendor)",
+      "Bash(curl -sSL -o vendor/jszip.min.js https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js)",
+      "Bash(curl -sSL -o vendor/FileSaver.min.js https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js)",
+      "Read(//d/d/GitHub/KitWeb/frontend/kitweb/**)",
+      "Bash(npx wrangler *)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(npx vite *)",
+      "Bash(echo \"vite build exit: $?\")"
     ]
   }
 }

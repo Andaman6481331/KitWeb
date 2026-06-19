@@ -17,12 +17,15 @@ const currentLang = computed(() => route.params.lang || defaultLang);
 const loading = ref(true);
 
 // ── Hero Carousel ──────────────────────────────
+// Bump BANNER_VERSION whenever you re-upload a banner to R2 under the same name.
+const BANNER_VERSION = 4;
 const slides = [
-  '/banner-main.png',
-  '/banner-needles.png',
-  '/banner-thread.png',
-  '/banner-tools.png',
-  '/banner-yarn.png',
+  getUtilsUrl('banner-beads-large.webp', BANNER_VERSION),
+  getUtilsUrl('banner-main-large.webp', BANNER_VERSION),
+  getUtilsUrl('banner-needles-large.webp', BANNER_VERSION),
+  getUtilsUrl('banner-thread-large.webp', BANNER_VERSION),
+  getUtilsUrl('banner-tools-large.webp', BANNER_VERSION),
+  getUtilsUrl('banner-yarn-large.webp', BANNER_VERSION)
 ];
 
 const currentSlide = ref(0);
@@ -35,7 +38,7 @@ const goToSlide = (i) => { currentSlide.value = i; };
 
 const restartSlideInterval = () => {
   if (slideInterval) clearInterval(slideInterval);
-  slideInterval = setInterval(nextSlide, 5000);
+  slideInterval = setInterval(nextSlide, 10000);
 };
 
 const onTouchStart = (e) => { touchStartX = e.touches[0].clientX; };
@@ -248,7 +251,7 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
 
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;600&family=Work+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;600&family=Prompt:wght@300;400;500;600;700&family=Work+Sans:wght@300;400;500;600&display=swap');
 
 * {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -264,12 +267,18 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
 /* ===== HERO CAROUSEL ===== */
 .hero-carousel {
   position: relative;
-  min-height: 620px;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 80vh;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+  image-rendering: high-quality;
+  object-fit: cover;
+  object-position: top;
 }
+
 
 .carousel-slide {
   position: absolute;
@@ -328,7 +337,7 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
   font-family: 'Crimson Pro', serif;
   font-size: clamp(2.2rem, 6vw, 3.6rem);
   color: #604539;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.1;
   margin: 0 0 20px 0;
   max-width: 720px;
@@ -563,13 +572,13 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 992px) {
-  .hero-carousel { min-height: 520px; }
+  .hero-carousel { max-height: 70vh; }
   .feature-bar { grid-template-columns: repeat(2, 1fr); }
   .carousel-arrow { width: 40px; height: 40px; }
 }
 
 @media (max-width: 768px) {
-  .hero-carousel { min-height: 460px; }
+  .hero-carousel { max-height: 60vh; }
 
   .hero-content { padding: 60px 20px; text-align: center; }
 
