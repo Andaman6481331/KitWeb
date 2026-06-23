@@ -339,6 +339,12 @@
         "varieties": "种类",
         "availableSizes": "可选尺寸",
         "availableColors": "可选颜色",
+        "cheapestAt": "最低价",
+        "moq": "起订量",
+        "pricing": "价格",
+        "priceTier1": "1 件",
+        "priceTier2": "20+ 件",
+        "priceTier3": "50+ 件",
         "categoryDescriptions": {
             "Default": "我们为您的创意项目精心挑选的优质材料。"
         }
@@ -526,5 +532,35 @@
         "processing": "我们将尽快处理并发货",
         "lineCtaButton": "通过LINE OA获取实时物流更新",
         "continueShopping": "继续购物"
+    },
+    "customerReview": {
+        "eyebrow": "客户故事",
+        "title": "客户对我们的评价"
+    },
+    "manageOrders": {
+        "title": "订单管理",
+        "passwordPlaceholder": "管理员密码",
+        "signIn": "登录",
+        "incorrectPassword": "密码错误",
+        "loading": "加载中...",
+        "refresh": "刷新",
+        "noOrders": "暂无订单",
+        "loadFailed": "加载订单失败",
+        "lineReachable": "可通过LINE联系",
+        "lineUnreachable": "无法通过LINE联系",
+        "lineNotConnected": "未连接LINE",
+        "trackingPlaceholder": "快递单号",
+        "saving": "保存中...",
+        "updateNotify": "更新并通知",
+        "saved": "订单已更新",
+        "savedNotified": "订单已更新，并已通过LINE通知客户",
+        "saveFailed": "更新订单失败",
+        "status": {
+            "PENDING": "待处理",
+            "PAID": "已付款",
+            "SHIPPED": "已发货",
+            "DELIVERED": "已送达",
+            "CANCELLED": "已取消"
+        }
     }
 }

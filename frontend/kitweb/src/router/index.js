@@ -30,6 +30,7 @@ export const routes = [
       { path: 'faq', name: 'faq', component: FaqPage },
       { path: 'admin', name: 'admin', component: AdminDashboard, meta: { requiresAuth: true } },
       { path: 'sellcash', name: 'sellcash', component: () => import('../views/SellCashPage.vue') },
+      { path: 'manageorders', name: 'manageorders', component: () => import('../views/ManageOrdersPage.vue') },
       { path: 'thank-you', name: 'thank-you', component: () => import('../views/ThankYouPage.vue') },
       { path: ':pathMatch(.*)*', redirect: (to) => `/${to.params.lang}` },
     ],
@@ -84,7 +85,7 @@ export function installRouterGuards(router, i18n) {
     }
 
     // Keep staff-only pages out of search indexes (global meta is "index, follow").
-    const isPrivate = to.name === 'sellcash' || to.name === 'admin'
+    const isPrivate = to.name === 'sellcash' || to.name === 'admin' || to.name === 'manageorders'
     let robotsMeta = document.querySelector('meta[name="robots"]')
     if (!robotsMeta) {
       robotsMeta = document.createElement('meta')

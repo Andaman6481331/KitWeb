@@ -348,6 +348,12 @@
         "varieties": "種類",
         "availableSizes": "利用可能なサイズ",
         "availableColors": "利用可能な色",
+        "cheapestAt": "最安値",
+        "moq": "最小ロット",
+        "pricing": "価格",
+        "priceTier1": "1個",
+        "priceTier2": "20個以上",
+        "priceTier3": "50個以上",
         "categoryDescriptions": {
             "Default": "あなたの創造的なプロジェクトのために厳選された高品質の素材です。"
         }
@@ -535,5 +541,35 @@
         "processing": "できるだけ早く処理・発送いたします",
         "lineCtaButton": "LINE OAでリアルタイム配送情報を受け取る",
         "continueShopping": "ショッピングを続ける"
+    },
+    "customerReview": {
+        "eyebrow": "お客様の声",
+        "title": "お客様の評価"
+    },
+    "manageOrders": {
+        "title": "注文管理",
+        "passwordPlaceholder": "管理者パスワード",
+        "signIn": "ログイン",
+        "incorrectPassword": "パスワードが正しくありません",
+        "loading": "読み込み中...",
+        "refresh": "更新",
+        "noOrders": "注文はまだありません",
+        "loadFailed": "注文の読み込みに失敗しました",
+        "lineReachable": "LINEで連絡可能",
+        "lineUnreachable": "LINEで連絡不可",
+        "lineNotConnected": "LINE未連携",
+        "trackingPlaceholder": "追跡番号",
+        "saving": "保存中...",
+        "updateNotify": "更新して通知",
+        "saved": "注文を更新しました",
+        "savedNotified": "注文を更新し、LINEでお客様に通知しました",
+        "saveFailed": "注文の更新に失敗しました",
+        "status": {
+            "PENDING": "保留中",
+            "PAID": "支払い済み",
+            "SHIPPED": "発送済み",
+            "DELIVERED": "配達完了",
+            "CANCELLED": "キャンセル済み"
+        }
     }
 }

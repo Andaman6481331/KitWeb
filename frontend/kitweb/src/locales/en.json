@@ -186,6 +186,7 @@
     "sortName": "Name",
     "artisanChoice": "Kitcharoen's Selected",
     "addToOrder": "Add to Order",
+    "addToOrderShort": "Order Now",
     "confirmAddToCart": "Add to Order?",
     "confirmMessage": "Would you like to add this item to your order list?",
     "cancel": "Cancel",
@@ -195,6 +196,12 @@
     "varieties": "Varieties",
     "availableSizes": "Available Sizes",
     "availableColors": "Available Colors",
+    "cheapestAt": "Cheapest at",
+    "moq": "MOQ",
+    "pricing": "Pricing",
+    "priceTier1": "1 piece",
+    "priceTier2": "20+ pcs",
+    "priceTier3": "50+ pcs",
     "categoryDescriptions": {
       "Yarns": "Hand-dyed cotton and northern Thai silk, perfect for weaving stories into every stitch.",
       "Ribbons": "Bespoke satin and velvet trims, gathered from the finest looms across Southeast Asia.",
@@ -391,6 +398,11 @@
     "level5": "Level 5",
     "stock": "Stock",
     "baseProduct": "Base Product",
+    "moq": "Minimum Order Quantity (MOQ)",
+    "displayOnWebsite": "Display on Website",
+    "displayOnHint": "Visible to customers on the storefront",
+    "displayOffHint": "Hidden from the storefront (staff only)",
+    "hidden": "Hidden",
     "galleryOnly": "Gallery Only",
     "colorLink": "Color Link",
     "sizeLink": "Size Link",
@@ -632,5 +644,35 @@
     "processing": "We will process and ship your order shortly.",
     "lineCtaButton": "Get Instant Tracking Updates on LINE OA",
     "continueShopping": "Continue Shopping"
+  },
+  "customerReview": {
+    "eyebrow": "CUSTOMER STORIES",
+    "title": "What Our Customers Say"
+  },
+  "manageOrders": {
+    "title": "Manage Orders",
+    "passwordPlaceholder": "Admin password",
+    "signIn": "Sign In",
+    "incorrectPassword": "Incorrect password",
+    "loading": "Loading...",
+    "refresh": "Refresh",
+    "noOrders": "No orders yet.",
+    "loadFailed": "Failed to load orders.",
+    "lineReachable": "Reachable on LINE",
+    "lineUnreachable": "LINE unreachable",
+    "lineNotConnected": "LINE not connected",
+    "trackingPlaceholder": "Tracking number",
+    "saving": "Saving...",
+    "updateNotify": "Update & Notify",
+    "saved": "Order updated.",
+    "savedNotified": "Order updated & customer notified on LINE.",
+    "saveFailed": "Failed to update order.",
+    "status": {
+      "PENDING": "Pending",
+      "PAID": "Paid",
+      "SHIPPED": "Shipped",
+      "DELIVERED": "Delivered",
+      "CANCELLED": "Cancelled"
+    }
   }
 }

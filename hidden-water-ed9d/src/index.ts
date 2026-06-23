@@ -346,6 +346,8 @@ export default {
 
 			if (url.pathname === "/products" && request.method === "GET") {
 				const category = url.searchParams.get("category");
+				// Admin views pass include_hidden=1 to also retrieve products hidden from the storefront
+				const includeHidden = url.searchParams.get("include_hidden") === "1";
 				let query = `
 					SELECT 
 						p.*,
@@ -380,18 +382,25 @@ export default {
 					FROM products p
 				`;
 				let params: any[] = [];
+				const conditions: string[] = [];
 				if (category) {
-					query += ` WHERE (
+					conditions.push(`(
 						p.category = ?
 						OR EXISTS (
 							SELECT 1 FROM product_categories pc
 							WHERE pc.product_id = p.id AND pc.category_path = ?
 						)
-					) ORDER BY p.created_at DESC`;
+					)`);
 					params.push(category, category);
-				} else {
-					query += " ORDER BY p.created_at DESC";
 				}
+				if (!includeHidden) {
+					// Treat NULL as visible so existing rows stay on the storefront
+					conditions.push("(p.is_visible IS NULL OR p.is_visible = 1)");
+				}
+				if (conditions.length > 0) {
+					query += " WHERE " + conditions.join(" AND ");
+				}
+				query += " ORDER BY p.created_at DESC";
 				const { results: products } = await env.DB.prepare(query).bind(...params).all();
 
 				// Map and parse nested JSON
@@ -642,6 +651,100 @@ export default {
 					})
 				});
 
+				// Push an order-confirmation Flex Message to the customer.
+				// This opens a 1:1 chat with them in the OA console and delivers their receipt.
+				if (lineUserId) {
+					const itemRows = cartItems.map((item: any) => {
+						const name = item.name_th || item.name;
+						const lineTotal = (item.price * item.quantity).toFixed(2);
+						return {
+							type: "box",
+							layout: "horizontal",
+							margin: "md",
+							contents: [
+								{
+									type: "text",
+									text: `${name}\n${item.selectedSize} / ${item.selectedColor} ×${item.quantity}`,
+									size: "sm",
+									color: "#555555",
+									flex: 5,
+									wrap: true
+								},
+								{
+									type: "text",
+									text: `฿${lineTotal}`,
+									size: "sm",
+									color: "#111111",
+									align: "end",
+									flex: 2
+								}
+							]
+						};
+					});
+
+					const flexMessage = {
+						type: "flex",
+						altText: `คำสั่งซื้อ ${orderId} ได้รับแล้ว`,
+						contents: {
+							type: "bubble",
+							body: {
+								type: "box",
+								layout: "vertical",
+								contents: [
+									{ type: "text", text: "Kitcharoen", weight: "bold", color: "#DD876E", size: "sm" },
+									{ type: "text", text: "ยืนยันคำสั่งซื้อ", weight: "bold", size: "xl", margin: "md" },
+									{ type: "text", text: `รหัส: ${orderId}`, size: "sm", color: "#888888", margin: "sm" },
+									{ type: "text", text: `ชื่อ: ${customerName}`, size: "sm", color: "#888888" },
+									{ type: "separator", margin: "lg" },
+									{
+										type: "box",
+										layout: "vertical",
+										margin: "lg",
+										spacing: "sm",
+										contents: itemRows
+									},
+									{ type: "separator", margin: "lg" },
+									{
+										type: "box",
+										layout: "horizontal",
+										margin: "lg",
+										contents: [
+											{ type: "text", text: "รวมทั้งหมด", size: "md", weight: "bold", flex: 3 },
+											{ type: "text", text: `฿${totalAmount.toFixed(2)}`, size: "md", weight: "bold", color: "#DD876E", align: "end", flex: 2 }
+										]
+									},
+									{ type: "text", text: "เราได้รับคำสั่งซื้อของคุณแล้ว และจะจัดส่งให้เร็วที่สุด ขอบคุณค่ะ 🧵", size: "xs", color: "#888888", margin: "lg", wrap: true }
+								]
+							}
+						}
+					};
+
+					// Flag-and-log if the push fails (e.g. customer connected LINE Login but
+					// never added the OA as a friend, so they're unreachable). The order still
+					// succeeds; line_push_failed lets staff see who can't be contacted on LINE.
+					try {
+						const pushResp = await fetch("https://api.line.me/v2/bot/message/push", {
+							method: "POST",
+							headers: {
+								"Content-Type": "application/json",
+								"Authorization": `Bearer ${token}`
+							},
+							body: JSON.stringify({
+								to: lineUserId,
+								messages: [flexMessage]
+							})
+						});
+						if (!pushResp.ok) {
+							const errBody = await pushResp.text();
+							console.error(`LINE customer push failed for order ${orderId} (user ${lineUserId}): ${pushResp.status} ${errBody}`);
+							await env.DB.prepare("UPDATE orders SET line_push_failed = 1 WHERE id = ?").bind(orderId).run();
+						}
+					} catch (err) {
+						console.error(`LINE customer push error for order ${orderId} (user ${lineUserId}):`, err);
+						await env.DB.prepare("UPDATE orders SET line_push_failed = 1 WHERE id = ?").bind(orderId).run();
+					}
+				}
+
 				return corsResponse({ success: true, orderId });
 			}
 
@@ -761,6 +864,116 @@ export default {
 				return corsResponse("Unauthorized", { status: 401 });
 			}
 
+			// Update an order's status + tracking number, and notify the customer on LINE
+			// (in the same 1:1 OA thread) if they connected their LINE account at checkout.
+			if (url.pathname === "/orders/status" && request.method === "POST") {
+				const body = await request.json() as any;
+				const orderId = (body.orderId as string || "").trim();
+				const status = (body.status as string || "").trim();
+				const trackingNumber = (body.trackingNumber as string || "").trim();
+
+				if (!orderId || !status) {
+					return corsResponse({ error: "orderId and status are required" }, { status: 400 });
+				}
+
+				await env.DB.prepare(
+					"UPDATE orders SET status = ?, tracking_number = ? WHERE id = ?"
+				).bind(status, trackingNumber || null, orderId).run();
+
+				const order = await env.DB.prepare(
+					"SELECT id, customer_name, line_user_id, total_amount FROM orders WHERE id = ?"
+				).bind(orderId).first() as any;
+
+				if (!order) {
+					return corsResponse({ error: "Order not found" }, { status: 404 });
+				}
+
+				let customerNotified = false;
+				const token = env.LINE_CHANNEL_ACCESS_TOKEN || env.LINE_NOTIFY_TOKEN;
+				if (order.line_user_id && token) {
+					const statusLabels: Record<string, string> = {
+						PENDING: "รอดำเนินการ",
+						PAID: "ชำระเงินแล้ว",
+						SHIPPED: "จัดส่งแล้ว",
+						DELIVERED: "จัดส่งสำเร็จ",
+						CANCELLED: "ยกเลิกแล้ว"
+					};
+					const statusTh = statusLabels[status] || status;
+
+					const bodyContents: any[] = [
+						{ type: "text", text: "Kitcharoen", weight: "bold", color: "#DD876E", size: "sm" },
+						{ type: "text", text: "อัปเดตคำสั่งซื้อ", weight: "bold", size: "xl", margin: "md" },
+						{ type: "text", text: `รหัส: ${order.id}`, size: "sm", color: "#888888", margin: "sm" },
+						{ type: "separator", margin: "lg" },
+						{
+							type: "box",
+							layout: "horizontal",
+							margin: "lg",
+							contents: [
+								{ type: "text", text: "สถานะ", size: "md", color: "#555555", flex: 2 },
+								{ type: "text", text: statusTh, size: "md", weight: "bold", color: "#DD876E", align: "end", flex: 3, wrap: true }
+							]
+						}
+					];
+
+					if (trackingNumber) {
+						bodyContents.push({
+							type: "box",
+							layout: "horizontal",
+							margin: "md",
+							contents: [
+								{ type: "text", text: "เลขพัสดุ / Tracking", size: "md", color: "#555555", flex: 3, wrap: true },
+								{ type: "text", text: trackingNumber, size: "md", weight: "bold", color: "#111111", align: "end", flex: 3, wrap: true }
+							]
+						});
+					}
+
+					bodyContents.push({
+						type: "text",
+						text: "ขอบคุณที่อุดหนุนร้านกิจเจริญค่ะ 🧵",
+						size: "xs",
+						color: "#888888",
+						margin: "lg",
+						wrap: true
+					});
+
+					const statusFlex = {
+						type: "flex",
+						altText: `อัปเดตคำสั่งซื้อ ${order.id}: ${statusTh}`,
+						contents: {
+							type: "bubble",
+							body: { type: "box", layout: "vertical", contents: bodyContents }
+						}
+					};
+
+					try {
+						const pushResp = await fetch("https://api.line.me/v2/bot/message/push", {
+							method: "POST",
+							headers: {
+								"Content-Type": "application/json",
+								"Authorization": `Bearer ${token}`
+							},
+							body: JSON.stringify({
+								to: order.line_user_id,
+								messages: [statusFlex]
+							})
+						});
+						if (pushResp.ok) {
+							customerNotified = true;
+						} else {
+							const errBody = await pushResp.text();
+							console.error(`LINE status push failed for order ${order.id} (user ${order.line_user_id}): ${pushResp.status} ${errBody}`);
+							await env.DB.prepare("UPDATE orders SET line_push_failed = 1 WHERE id = ?").bind(order.id).run();
+						}
+					} catch (err) {
+						console.error(`LINE status push error for order ${order.id} (user ${order.line_user_id}):`, err);
+						await env.DB.prepare("UPDATE orders SET line_push_failed = 1 WHERE id = ?").bind(order.id).run();
+					}
+				}
+
+				return corsResponse({ success: true, customerNotified });
+			}
+
 			// POS in-store cash sale: records a walk-in sale into pos_orders / pos_order_items
 			if (url.pathname === "/sellcash/submit" && request.method === "POST") {
 				const body = await request.json() as any;
@@ -805,7 +1018,7 @@ export default {
 
 			if (url.pathname === "/products" && request.method === "POST") {
 				const body = await request.json() as any;
-				const { name, name_th, description, price, category, categories, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, images, stock, variants } = body;
+				const { name, name_th, description, price, category, categories, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images, stock, variants } = body;
 				const categoryList = normalizeCategoryList(categories, category);
 				const primaryCategory = categoryList[0] || category || null;
 				const activePrice = price || price_3 || 0;
@@ -820,11 +1033,11 @@ export default {
 					const sku = await allocateProductSku(env, primaryCategory, body.sku);
 
 					const { meta } = await env.DB.prepare(
-						"INSERT INTO products (name, name_th, description, description_th, price, category, image_key, usage, usage_th, use_for, use_for_th, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, stock, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+						"INSERT INTO products (name, name_th, description, description_th, price, category, image_key, usage, usage_th, use_for, use_for_th, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, stock, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 					).bind(
 						dbValue(name), dbValue(name_th), dbValue(description), dbValue(body.description_th || null), activePrice, primaryCategory,
 						dbValue(image_key), dbValue(usage), dbValue(body.usage_th || null), dbValue(use_for), dbValue(body.use_for_th || null), dbValue(varieties), dbValue(sizes), dbValue(colors),
-						price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, initialStock, sku
+						price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, dbValue(moq), is_visible === false ? 0 : 1, initialStock, sku
 					).run();
 
 					productId = meta.last_row_id;
@@ -874,7 +1087,7 @@ export default {
 			if (url.pathname.startsWith("/products/") && request.method === "PUT") {
 				const id = url.pathname.split("/products/")[1];
 				const body = await request.json() as any;
-				const { name, name_th, description, price, category, categories, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, images, stock, variants } = body;
+				const { name, name_th, description, price, category, categories, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images, stock, variants } = body;
 				const categoryList = normalizeCategoryList(categories, category);
 				const primaryCategory = categoryList[0] || category || null;
 				const activePrice = price_3 || price || 0;
@@ -886,11 +1099,11 @@ export default {
 				const currentProduct = await env.DB.prepare("SELECT stock FROM products WHERE id = ?").bind(id).first() as any;
 
 				await env.DB.prepare(
-					"UPDATE products SET name=?, name_th=?, description=?, description_th=?, price=?, category=?, image_key=?, usage=?, usage_th=?, use_for=?, use_for_th=?, varieties=?, sizes=?, colors=?, price_1=?, price_2=?, price_3=?, price_4=?, price_5=?, stock=? WHERE id=?"
+					"UPDATE products SET name=?, name_th=?, description=?, description_th=?, price=?, category=?, image_key=?, usage=?, usage_th=?, use_for=?, use_for_th=?, varieties=?, sizes=?, colors=?, price_1=?, price_2=?, price_3=?, price_4=?, price_5=?, moq=?, is_visible=?, stock=? WHERE id=?"
 				).bind(
 					dbValue(name), dbValue(name_th), dbValue(description), dbValue(body.description_th || null), activePrice, primaryCategory,
 					dbValue(image_key), dbValue(usage), dbValue(body.usage_th || null), dbValue(use_for), dbValue(body.use_for_th || null), dbValue(varieties), dbValue(sizes), dbValue(colors),
-					price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, stock ?? 0, id
+					price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, dbValue(moq), is_visible === false ? 0 : 1, stock ?? 0, id
 				).run();
 
 				await saveProductCategories(env, Number(id), categoryList);

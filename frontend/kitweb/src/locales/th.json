@@ -187,6 +187,7 @@
         "sortName": "ชื่อ",
         "artisanChoice": "ตัวเลือกช่างฝีมือ",
         "addToOrder": "เพิ่มในรายการสั่งซื้อ",
+        "addToOrderShort": "สั่งซื้อเลย",
         "confirmAddToCart": "เพิ่มเข้าใบสั่งซื้อ?",
         "confirmMessage": "คุณต้องการเพิ่มรายการนี้เข้าในรายการสั่งซื้อของคุณใช่หรือไม่?",
         "cancel": "ยกเลิก",
@@ -196,6 +197,12 @@
         "varieties": "ประเภท",
         "availableSizes": "ขนาดที่มี",
         "availableColors": "สีที่มี",
+        "cheapestAt": "ถูกสุดถึง",
+        "moq": "ขั้นต่ำ",
+        "pricing": "ราคา",
+        "priceTier1": "1 ชิ้น",
+        "priceTier2": "20+ ชิ้น",
+        "priceTier3": "50+ ชิ้น",
         "categoryDescriptions": {
             "Yarns": "คอตตอนย้อมมือและไหมไทยภาคเหนือ เหมาะสำหรับการถักทอเรื่องราวในทุกฝีเข็ม",
             "Ribbons": "ริบบิ้นซาตินและกำมะหยี่สั่งทำพิเศษ รวบรวมจากกี่ทอผ้าที่ดีที่สุดในเอเชียตะวันออกเฉียงใต้",
@@ -385,6 +392,11 @@
         "level5": "L5",
         "stock": "สต็อกของสินค้า",
         "baseProduct": "สินค้าหลัก",
+        "moq": "จำนวนสั่งซื้อขั้นต่ำ (MOQ)",
+        "displayOnWebsite": "แสดงบนเว็บไซต์",
+        "displayOnHint": "ลูกค้าเห็นสินค้านี้บนหน้าร้าน",
+        "displayOffHint": "ซ่อนจากหน้าร้าน (เฉพาะพนักงาน)",
+        "hidden": "ซ่อนอยู่",
         "galleryOnly": "คลังรูปภาพเท่านั้น",
         "colorLink": "ตัวเลือกสี",
         "sizeLink": "ตัวเลือกขนาด",
@@ -625,5 +637,35 @@
         "processing": "เราจะดำเนินการและจัดส่งสินค้าให้คุณโดยเร็วที่สุด",
         "lineCtaButton": "รับการอัปเดตการติดตามสินค้าผ่าน LINE OA",
         "continueShopping": "ช้อปปิ้งต่อ"
+    },
+    "customerReview": {
+        "eyebrow": "เสียงจากลูกค้า",
+        "title": "ลูกค้าของเราพูดถึงเราว่าอย่างไร"
+    },
+    "manageOrders": {
+        "title": "จัดการคำสั่งซื้อ",
+        "passwordPlaceholder": "รหัสผ่านผู้ดูแล",
+        "signIn": "เข้าสู่ระบบ",
+        "incorrectPassword": "รหัสผ่านไม่ถูกต้อง",
+        "loading": "กำลังโหลด...",
+        "refresh": "รีเฟรช",
+        "noOrders": "ยังไม่มีคำสั่งซื้อ",
+        "loadFailed": "โหลดคำสั่งซื้อไม่สำเร็จ",
+        "lineReachable": "ติดต่อผ่าน LINE ได้",
+        "lineUnreachable": "ติดต่อผ่าน LINE ไม่ได้",
+        "lineNotConnected": "ยังไม่ได้เชื่อม LINE",
+        "trackingPlaceholder": "เลขพัสดุ",
+        "saving": "กำลังบันทึก...",
+        "updateNotify": "อัปเดตและแจ้งลูกค้า",
+        "saved": "อัปเดตคำสั่งซื้อแล้ว",
+        "savedNotified": "อัปเดตแล้ว และแจ้งลูกค้าผ่าน LINE แล้ว",
+        "saveFailed": "อัปเดตคำสั่งซื้อไม่สำเร็จ",
+        "status": {
+            "PENDING": "รอดำเนินการ",
+            "PAID": "ชำระเงินแล้ว",
+            "SHIPPED": "จัดส่งแล้ว",
+            "DELIVERED": "จัดส่งสำเร็จ",
+            "CANCELLED": "ยกเลิกแล้ว"
+        }
     }
 }

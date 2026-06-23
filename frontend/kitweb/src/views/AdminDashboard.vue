@@ -46,6 +46,8 @@ const newProduct = ref({
   price_3: 0,
   price_4: 0,
   price_5: 0,
+  moq: '',
+  is_visible: true,
   stock: 0
 });
 
@@ -215,7 +217,7 @@ const loadAll = async () => {
 
 const loadProducts = async () => {
   try {
-    products.value = await api.getProducts();
+    products.value = await api.getProducts(null, { includeHidden: true });
   } catch (error) {
     console.error('Failed to load products', error);
   }
@@ -297,7 +299,7 @@ const resetForm = () => {
   newProduct.value = {
     name: '', name_th: '', description: '', description_th: '', price: 0, category: '', categories: [], image_key: '',
     usage: '', usage_th: '', use_for: '', use_for_th: '', varieties: '', varieties_th: '', sizes: '', sizes_th: '', colors: '', colors_th: '',
-    price_1: 0, price_2: 0, price_3: 0, price_4: 0, price_5: 0, stock: 0
+    price_1: 0, price_2: 0, price_3: 0, price_4: 0, price_5: 0, moq: '', is_visible: true, stock: 0
   };
   selectedFile.value = null;
   imagePreview.value = null;
@@ -314,6 +316,8 @@ const editProduct = (product) => {
   isEditing.value = true;
   editingId.value = product.id;
   newProduct.value = { ...product };
+  // Normalize DB integer (1/0/null) to a boolean for the toggle
+  newProduct.value.is_visible = product.is_visible !== 0;
   showDescTh.value = false;
   imagePreview.value = null; // Clear local preview to show saved image
 
@@ -540,6 +544,8 @@ const handleSubmit = async () => {
       price_3: newProduct.value.price_3,
       price_4: newProduct.value.price_4,
       price_5: newProduct.value.price_5,
+      moq: newProduct.value.moq || null,
+      is_visible: newProduct.value.is_visible !== false,
       stock: newProduct.value.stock,
       sku: newProduct.value.sku || undefined,
       images: finalImages.filter(img => img.image_key),
@@ -1099,7 +1105,12 @@ const deleteDiyProduct = async (id) => {
                   <img :src="getImageUrl(product.image_key || product.image)" :alt="product.name">
                 </div>
                 <div class="item-info">
-                  <strong>{{ product.name_th ? `${product.name_th} (${product.name})` : product.name }}</strong>
+                  <strong>
+                    {{ product.name_th ? `${product.name_th} (${product.name})` : product.name }}
+                    <span v-if="product.is_visible === 0" class="hidden-badge">
+                      {{ $t('admin.hidden') || 'Hidden' }}
+                    </span>
+                  </strong>
                   <span class="p-meta">SKU: {{ product.sku }} | {{ formatProductCategories(product) }} | ${{ product.price_1 || product.price }}</span>
                   <div class="stock-control">
                     <span :class="['stock-count', 
@@ -1259,6 +1270,28 @@ const deleteDiyProduct = async (id) => {
                 </tbody>
               </table>
             </div>
+
+            <div class="moq-visibility-row" style="margin-top: 16px;">
+              <div class="form-group moq-field">
+                <label>{{ $t('admin.moq') || 'Minimum Order Quantity (MOQ)' }}</label>
+                <input v-model="newProduct.moq" type="text" placeholder="e.g. 20 pcs" />
+              </div>
+              <div class="visibility-row">
+                <div class="visibility-label">
+                  <label>{{ $t('admin.displayOnWebsite') || 'Display on Website' }}</label>
+                  <span class="visibility-hint">
+                    {{ newProduct.is_visible
+                      ? ($t('admin.displayOnHint') || 'Visible to customers on the storefront')
+                      : ($t('admin.displayOffHint') || 'Hidden from the storefront (staff only)') }}
+                  </span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" v-model="newProduct.is_visible" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
           </div>
 
           <!-- Submit Button at the bottom of the page -->
@@ -2447,5 +2480,101 @@ select {
 
 .matrix-input.stock-input {
   width: 80px;
+}
+
+.hidden-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #b03030;
+  background: #fdecec;
+  border-radius: 10px;
+  vertical-align: middle;
+}
+
+/* MOQ + visibility side by side */
+.moq-visibility-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.moq-visibility-row .moq-field {
+  flex: 1;
+  min-width: 220px;
+  margin: 0;
+}
+
+.moq-visibility-row .visibility-row {
+  flex: 1;
+  min-width: 260px;
+}
+
+/* Visibility toggle */
+.visibility-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.visibility-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.visibility-hint {
+  font-size: 12px;
+  color: #8b6f47;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: #cfd4da;
+  border-radius: 28px;
+  transition: background 0.25s ease;
+}
+
+.toggle-slider::before {
+  content: "";
+  position: absolute;
+  height: 22px;
+  width: 22px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.25s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: #008080;
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(22px);
 }
 </style>

@@ -19,6 +19,15 @@ const props = defineProps({
   }
 });
 
+// Lowest available wholesale price across the three tiers
+const getCheapestPrice = (item) => {
+    if (!item) return 0;
+    const prices = [item.price_1, item.price_2, item.price_3]
+        .map(Number)
+        .filter(p => p > 0);
+    return prices.length ? Math.min(...prices) : 0;
+};
+
 const generateSlug = (name, id) => {
     if (!name) return String(id);
     const slugified = name
@@ -256,6 +265,49 @@ const setMainImage = (key) => {
     currentImageKey.value = key;
 };
 
+// Ordered list of all image keys for the popup gallery (main first, then extras)
+const galleryImageKeys = computed(() => {
+    if (!selectedProduct.value) return [];
+    const keys = [selectedProduct.value.image_key];
+    if (selectedProduct.value.images && selectedProduct.value.images.length > 0) {
+        selectedProduct.value.images.forEach(img => {
+            if (img.image_key) keys.push(img.image_key);
+        });
+    }
+    return keys.filter(Boolean);
+});
+
+const navigateImage = (step) => {
+    const keys = galleryImageKeys.value;
+    if (keys.length <= 1) return;
+    const activeKey = currentImageKey.value || selectedProduct.value?.image_key;
+    let index = keys.indexOf(activeKey);
+    if (index === -1) index = 0;
+    const nextIndex = (index + step + keys.length) % keys.length;
+    currentImageKey.value = keys[nextIndex];
+};
+
+// Cursor-following zoom for the main popup image
+const ZOOM_SCALE = 2.2;
+const isZooming = ref(false);
+const zoomOrigin = ref('50% 50%');
+
+const handleZoomMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 80;
+    const y = ((e.clientY - rect.top) / rect.height) * 80;
+    zoomOrigin.value = `${Math.max(0, Math.min(80, x))}% ${Math.max(0, Math.min(80, y))}%`;
+};
+
+const enableZoom = () => {
+    isZooming.value = true;
+};
+
+const disableZoom = () => {
+    isZooming.value = false;
+    zoomOrigin.value = '50% 50%';
+};
+
 // Cart Logic
 const handleAddToCartClick = (item) => {
     selectedProductForCart.value = item;
@@ -365,11 +417,18 @@ const sortedProducts = computed(() => {
                 </div>
                 <div class="card-content">
                     <h3 class="card-title">{{ tProduct(item, 'name') }}</h3>
-                    <p class="card-desc">{{ tProduct(item, 'description') || $t('catalog.categoryDescriptions.Default')
-                        }}</p>
-                    <div class="card-footer">
+                    <div class="card-bottom">
+                        <div class="card-desc">
+                            <div class="card-price" v-if="getCheapestPrice(item)">
+                                <span class="cheapest-label">{{ $t('catalog.cheapestAt') }}</span>
+                                <span class="price-value">฿{{ getCheapestPrice(item) }}</span>
+                            </div>
+                            <div class="card-moq" v-if="item.moq">
+                                {{ $t('catalog.moq') }}: {{ item.moq }}
+                            </div>
+                        </div>
                         <button class="add-btn" @click.prevent.stop="handleAddToCartClick(item)">
-                            <ion-icon name="cart"></ion-icon> {{ $t('catalog.addToOrder') }}
+                            <ion-icon name="cart"></ion-icon> {{ $t('catalog.addToOrderShort') }}
                         </button>
                     </div>
                 </div>
@@ -386,8 +445,20 @@ const sortedProducts = computed(() => {
                 <div class="popup-body">
                     <div class="popup-image">
                         <div class="main-image-display">
-                            <img :src="getImageUrl(currentImageKey || selectedProduct.image_key)"
-                                :alt="tProduct(selectedProduct, 'name')">
+                            <button v-if="galleryImageKeys.length > 1" class="image-nav prev"
+                                @click.stop="navigateImage(-1)" aria-label="Previous image">
+                                <ion-icon name="chevron-back-outline"></ion-icon>
+                            </button>
+                            <div class="zoom-frame" @mouseenter="enableZoom" @mousemove="handleZoomMove"
+                                @mouseleave="disableZoom">
+                                <img :src="getImageUrl(currentImageKey || selectedProduct.image_key)"
+                                    :alt="tProduct(selectedProduct, 'name')"
+                                    :style="{ transformOrigin: zoomOrigin, transform: isZooming ? `scale(${ZOOM_SCALE})` : 'scale(1)' }">
+                            </div>
+                            <button v-if="galleryImageKeys.length > 1" class="image-nav next"
+                                @click.stop="navigateImage(1)" aria-label="Next image">
+                                <ion-icon name="chevron-forward-outline"></ion-icon>
+                            </button>
                         </div>
 
                         <!-- Gallery Thumbnails -->
@@ -418,16 +489,21 @@ const sortedProducts = computed(() => {
                                 <ion-icon name="hammer-outline"></ion-icon>
                                 {{ $t('catalog.howItsUsed') }}
                             </h3>
-                            <p class="detail-text">{{ tProduct(selectedProduct, 'usage') }}</p>
+                            <div class="tags-container">
+                                <span v-for="use in tProduct(selectedProduct, 'usage').split(',').filter(u => u.trim())"
+                                    :key="use" class="tag usage-tag">
+                                    {{ use.trim() }}
+                                </span>
+                            </div>
                         </div>
 
-                        <div class="detail-section" v-if="tProduct(selectedProduct, 'use_for')">
+                        <!-- <div class="detail-section" v-if="tProduct(selectedProduct, 'use_for')">
                             <h3 class="detail-heading">
                                 <ion-icon name="checkmark-circle-outline"></ion-icon>
                                 {{ $t('catalog.whatItsFor') }}
                             </h3>
                             <p class="detail-text">{{ tProduct(selectedProduct, 'use_for') }}</p>
-                        </div>
+                        </div> -->
 
                         <div class="detail-section" v-if="tProduct(selectedProduct, 'varieties')">
                             <h3 class="detail-heading">
@@ -466,6 +542,32 @@ const sortedProducts = computed(() => {
                                     {{ color.trim() }}
                                 </span>
                             </div>
+                        </div>
+                        <div class="detail-section price-section"
+                            v-if="selectedProduct.price_1 || selectedProduct.price_2 || selectedProduct.price_3">
+                            <h3 class="detail-heading">
+                                <ion-icon name="pricetags-outline"></ion-icon>
+                                {{ $t('catalog.pricing') }}
+                            </h3>
+                            <div class="price-tiers">
+                                <div class="price-tier" v-if="selectedProduct.price_1">
+                                    <span class="price-tier-value">฿{{ selectedProduct.price_1 }}</span>
+                                    <span class="price-tier-note">{{ $t('catalog.priceTier1') }}</span>
+                                </div>
+                                <div class="price-tier" v-if="selectedProduct.price_2">
+                                    <span class="price-tier-value">฿{{ selectedProduct.price_2 }}</span>
+                                    <span class="price-tier-note">{{ $t('catalog.priceTier2') }}</span>
+                                </div>
+                                <div class="price-tier" v-if="selectedProduct.price_3">
+                                    <span class="price-tier-value">฿{{ selectedProduct.price_3 }}</span>
+                                    <span class="price-tier-note">{{ $t('catalog.priceTier3') }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer" style="justify-content: center; margin-top: 20px;">
+                            <button class="add-btn" @click.prevent.stop="handleAddToCartClick(selectedProduct)">
+                                <ion-icon name="cart"></ion-icon> {{ $t('catalog.addToOrder') }}
+                            </button>
                         </div>
                         <div v-if="!tProduct(selectedProduct, 'description') && !tProduct(selectedProduct, 'usage') && !tProduct(selectedProduct, 'use_for') && !tProduct(selectedProduct, 'varieties') && !tProduct(selectedProduct, 'sizes') && !tProduct(selectedProduct, 'colors')" class="no-details-message">
                             <p>{{ $t('catalog.noAdditionalDetails') || 'No additional details available for this product.' }}</p>
@@ -672,24 +774,56 @@ const sortedProducts = computed(() => {
 }
 
 .card-title {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     color: #2d3436;
-    margin: 0;
-    font-weight: 600;
+    margin: 0 0 12px;
+    font-weight: 500;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: calc(0.85rem * 1.35 * 2);
+}
+
+.card-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 10px;
+    margin-top: auto;
 }
 
 .card-desc {
-    display: -webkit-box !important;
-    -webkit-line-clamp: 2 !important;
-    -webkit-box-orient: vertical !important;
-    overflow: hidden !important;
-    /* text-overflow: ellipsis !important; */
-    font-size: 0.7rem;
-    color: #636e72;
-    line-height: 1.4;
-    margin-bottom: 20px;
     flex: 1;
-    text-align: justify;
+    min-width: 0;
+    margin-left: 0.2rem;
+}
+
+.card-price {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+    margin: 0;
+}
+
+.cheapest-label {
+    font-size: 0.6rem;
+    color: #9e8272;
+    font-weight: 500;
+}
+
+.price-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #ee4d2d;
+}
+
+.card-moq {
+    font-size: 0.65rem;
+    color: #9e8272;
+    margin: 3px 0 0;
 }
 
 .card-footer {
@@ -697,10 +831,6 @@ const sortedProducts = computed(() => {
     justify-content: center;
     align-items: center;
     margin-top: auto;
-}
-
-.card-price {
-    display: none;
 }
 
 .add-btn {
@@ -751,8 +881,7 @@ const sortedProducts = computed(() => {
 
 .popup-content {
     background: white;
-    border-radius: 20px;
-    max-width: 950px;
+    max-width: 1050px;
     width: 100%;
     max-height: 90vh;
     overflow-y: auto;
@@ -816,6 +945,7 @@ const sortedProducts = computed(() => {
 }
 
 .main-image-display {
+    position: relative;
     width: 100%;
     height: 400px;
     display: flex;
@@ -824,11 +954,61 @@ const sortedProducts = computed(() => {
     margin-bottom: 30px;
 }
 
+.image-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 5;
+    transition: all 0.2s ease;
+}
+
+.image-nav:hover {
+    background: #008080;
+    transform: translateY(-50%) scale(1.08);
+}
+
+.image-nav:hover ion-icon {
+    color: white;
+}
+
+.image-nav ion-icon {
+    font-size: 24px;
+    color: #2d2d2d;
+}
+
+.image-nav.prev {
+    left: 0;
+}
+
+.image-nav.next {
+    right: 0;
+}
+
+.zoom-frame {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 12px;
+    cursor: zoom-in;
+}
+
 .main-image-display img {
     width: 100%;
     height: 100%;
     object-fit: contain;
     border-radius: 12px;
+    transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
 }
 
 .gallery-thumbnails {
@@ -939,13 +1119,12 @@ const sortedProducts = computed(() => {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    padding-left: 30px;
 }
 
 .tag {
     background: #f5f5f5;
     color: #2d2d2d;
-    padding: 8px 16px;
+    padding: 4px 8px;
     border-radius: 8px;
     font-size: 13px;
     font-weight: 500;
@@ -960,6 +1139,54 @@ const sortedProducts = computed(() => {
 .color-tag {
     background: #fff3e0;
     color: #f57c00;
+}
+
+.usage-tag {
+    background: #f0ece4;
+    color: #8b6f47;
+    border-radius: 20px;
+}
+
+/* PRICE TIERS */
+.price-section {
+    border-top: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+    padding: 24px 0;
+}
+
+.price-tiers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    flex: 1;
+}
+
+.price-tier {
+    flex: 1;
+    min-width: 50px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 10px;
+    background: #f8f8f8;
+    border: 1px solid #eee;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.price-tier-note {
+    font-size: 12px;
+    font-weight: 600;
+    color: #8b6f47;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.price-tier-value {
+    font-size: 18px;
+    font-weight: 800;
+    color: #008080;
 }
 
 /* RESPONSIVE */
@@ -1118,36 +1345,12 @@ const sortedProducts = computed(() => {
 
 @media (max-width: 900px) {
     .product-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .product-card {
-        flex-direction: row;
-        max-height: 140px;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
     }
 
     .card-image {
-        width: 140px;
-        min-width: 140px;
-        height: 140px;
-        flex-shrink: 0;
-        border-radius: 0;
-    }
-
-    .card-content {
-        padding: 14px 16px;
-        justify-content: center;
-    }
-
-    .card-title {
-        font-size: 15px;
-        margin-bottom: 4px;
-    }
-
-    .card-desc {
-        -webkit-line-clamp: 2 !important;
-        font-size: 13px;
-        margin-bottom: 10px;
+        height: 200px;
     }
 }
 

@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS products (
     price_5 REAL,
     name_th TEXT,
     sku TEXT UNIQUE,
+    moq TEXT,
+    is_visible INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -46,6 +48,8 @@ CREATE TABLE IF NOT EXISTS orders (
     status TEXT DEFAULT 'PENDING',
     payment_method TEXT,
     note TEXT,
+    tracking_number TEXT,
+    line_push_failed INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

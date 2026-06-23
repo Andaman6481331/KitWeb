@@ -88,9 +88,12 @@ export const api = {
     return data;
   },
 
-  async getProducts(category = null) {
-    let url = `${API_URL}/products`;
-    if (category) url += `?category=${encodeURIComponent(category)}`;
+  async getProducts(category = null, { includeHidden = false } = {}) {
+    const params = new URLSearchParams();
+    if (category) params.set('category', category);
+    if (includeHidden) params.set('include_hidden', '1');
+    const qs = params.toString();
+    const url = qs ? `${API_URL}/products?${qs}` : `${API_URL}/products`;
     const response = await fetch(url);
     if (!response.ok) throw new Error('Failed to fetch products');
     return await response.json();
@@ -217,6 +220,23 @@ export const api = {
       }
     });
     if (!response.ok) throw new Error('Failed to fetch orders');
+    return await response.json();
+  },
+
+  // Admin: update an order's status + tracking number. The backend also pushes a
+  // status update to the customer on LINE if they connected at checkout.
+  async updateOrderStatus({ orderId, status, trackingNumber }) {
+    const response = await fetch(`${API_URL}/orders/status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': this.getToken()
+      },
+      body: JSON.stringify({ orderId, status, trackingNumber })
+    });
+    if (!response.ok) {
+      throw new Error(await parseApiError(response, 'Failed to update order'));
+    }
     return await response.json();
   },
 
