@@ -337,5 +337,21 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to fetch next DIY SKU');
     return await response.json();
+  },
+
+  async getInstitutionalCatalog() {
+    const response = await fetch(`${API_URL}/institutional/catalog`);
+    if (!response.ok) throw new Error('Failed to fetch institutional catalog');
+    return await response.json();
+  },
+
+  async submitRfq(rfqPayload) {
+    const response = await fetch(`${API_URL}/rfq/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(rfqPayload)
+    });
+    if (!response.ok) throw new Error('Failed to submit RFQ');
+    return await response.json();
   }
 };

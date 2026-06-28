@@ -446,6 +446,73 @@ export default {
 				return corsResponse(results);
 			}
 
+			if (url.pathname === "/institutional/catalog" && request.method === "GET") {
+				try {
+					// 1. Try querying the exact requested schema (product and product_img)
+					const query = `
+						SELECT 
+							p.id, 
+							p.sku, 
+							p.title, 
+							p.description, 
+							p.category_id,
+							img.image_key AS image_url
+						FROM product p
+						LEFT JOIN product_img img ON p.id = img.product_id
+					`;
+					const { results } = await env.DB.prepare(query).all();
+					
+					// Perform grouping by category_id
+					const grouped: { [key: string]: any[] } = {};
+					results.forEach((p: any) => {
+						const cat = p.category_id || "Other";
+						if (!grouped[cat]) {
+							grouped[cat] = [];
+						}
+						grouped[cat].push(p);
+					});
+
+					return corsResponse({
+						success: true,
+						grouped,
+						products: results
+					});
+				} catch (err: any) {
+					console.warn("D1 query on product/product_img failed, falling back to products/product_images: ", err.message);
+					
+					// 2. Fallback to existing products / product_images tables
+					// Fetch from products mapping name -> title, category -> category_id, image_key -> image_url
+					const query = `
+						SELECT 
+							p.id, 
+							p.sku, 
+							p.name AS title, 
+							p.description, 
+							p.category AS category_id,
+							p.image_key AS image_url
+						FROM products p
+						WHERE p.is_visible = 1 OR p.is_visible IS NULL
+					`;
+					const { results } = await env.DB.prepare(query).all();
+					
+					// Perform grouping by category_id
+					const grouped: { [key: string]: any[] } = {};
+					results.forEach((p: any) => {
+						const cat = p.category_id || "Other";
+						if (!grouped[cat]) {
+							grouped[cat] = [];
+						}
+						grouped[cat].push(p);
+					});
+
+					return corsResponse({
+						success: true,
+						grouped,
+						products: results
+					});
+				}
+			}
+
 			if (url.pathname.startsWith("/images/") && (request.method === "GET" || request.method === "HEAD")) {
 				const key = decodeURIComponent(url.pathname.split("/images/")[1]);
 				return await handleR2Request(env.IMAGES, key, request, true);
@@ -746,6 +813,52 @@ export default {
 				}
 
 				return corsResponse({ success: true, orderId });
+			}
+
+			if (url.pathname === "/rfq/submit" && request.method === "POST") {
+				try {
+					const body = await request.json() as any;
+					const { customerName, organization, email, phoneNumber, shippingAddress, notes, items } = body;
+
+					if (!customerName || !email || !items || !Array.isArray(items) || items.length === 0) {
+						return corsResponse({ error: "Missing required fields" }, { status: 400 });
+					}
+
+					// Generate a unique RFQ ID
+					const rfqId = `RFQ_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+
+					// Insert order
+					const noteText = `RFQ Contact Email: ${email}\nPhone: ${phoneNumber || 'N/A'}\nShipping Address: ${shippingAddress || 'N/A'}\nNotes: ${notes || 'None'}`;
+					
+					await env.DB.prepare(
+						"INSERT INTO orders (id, customer_name, total_amount, status, payment_method, note) VALUES (?, ?, ?, ?, ?, ?)"
+					).bind(
+						rfqId,
+						`${organization || 'Individual'} - ${customerName}`,
+						0.0,
+						"PENDING",
+						"RFQ",
+						noteText
+					).run();
+
+					// Insert items
+					for (const item of items) {
+						await env.DB.prepare(
+							"INSERT INTO order_items (order_id, product_id, product_name, quantity, price) VALUES (?, ?, ?, ?, ?)"
+						).bind(
+							rfqId,
+							item.id || null,
+							item.title || "Unknown Product",
+							parseInt(item.quantity) || 1,
+							0.0
+						).run();
+					}
+
+					return corsResponse({ success: true, orderId: rfqId });
+				} catch (err: any) {
+					console.error("RFQ Submit Error:", err);
+					return corsResponse({ error: "Failed to submit RFQ", details: err.message }, { status: 500 });
+				}
 			}
 
 			// 2. CUSTOMER AUTH

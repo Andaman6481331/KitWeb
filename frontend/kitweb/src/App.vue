@@ -342,6 +342,9 @@ onUnmounted(() => {
         <!-- Events -->
         <router-link :to="{ name: 'event', params: { lang: currentLang } }" @click="scrollToTop; closeAllMenus()" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.events') }}</router-link>
 
+        <!-- B2B Catalog -->
+        <router-link :to="{ name: 'institutional-catalog', params: { lang: currentLang } }" @click="scrollToTop; closeAllMenus()" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.b2bCatalog') }}</router-link>
+
         <!-- Company dropdown -->
         <div class="nav-item-wrap" @mouseenter="openCompany" @mouseleave="closeCompany" @click.stop>
           <button

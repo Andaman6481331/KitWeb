@@ -22,6 +22,7 @@ export const routes = [
     children: [
       { path: '', name: 'home', component: Home },
       { path: 'catalog/:category?/:productSlug?', name: 'catalog', component: Catalog },
+      { path: 'institutional-catalog', name: 'institutional-catalog', component: () => import('../views/InstitutionalCatalogPage.vue') },
       { path: 'orderpage', name: 'orderpage', component: OrderPage, meta: { requiresAuth: true } },
       { path: 'contactus', name: 'contactus', component: ContactUsPage },
       { path: 'login', name: 'login', component: Login },
