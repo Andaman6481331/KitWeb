@@ -1,9 +1,12 @@
 <script setup>
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import AutoScrollEvent from '../components/auto-scroll-event.vue';
 import { getUtilsUrl } from '@/services/api';
 import comingSoonImg from '../assets/card-img05.webp';
 import emailjs from '@emailjs/browser';
+
+const { t } = useI18n();
 
 const contactFormLoc = ref(null); // Create the template ref
 
@@ -156,6 +159,14 @@ const submitForm = async () => {
 
 <template>
     <div class="diy-page">
+        <!-- Info Banner -->
+        <div class="info-banner">
+            <div class="banner-content">
+                <span class="banner-badge">{{ t('events.bannerBadge') }}</span>
+                <span class="banner-text">{{ t('events.bannerText') }}</span>
+            </div>
+        </div>
+
         <!-- Hero Section -->
         <img :src="getUtilsUrl('shop05-large.webp')" fetchpriority="high" aria-hidden="true"
             style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">
@@ -471,6 +482,43 @@ const submitForm = async () => {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+}
+
+.info-banner {
+    background: linear-gradient(135deg, #604539 0%, #4a3429 100%);
+    color: #fff;
+    padding: 10px 20px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    animation: slideDown 0.5s ease-out;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.banner-content {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.banner-badge {
+    background-color: #DD876E;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+    flex-shrink: 0;
 }
 
 .diy-page {

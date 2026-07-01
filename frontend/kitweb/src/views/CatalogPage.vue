@@ -18,6 +18,7 @@ const currentCategory = computed(() => route.params.category || "yarn");
 
 const sortBy = ref('popular');
 const sidebarOpen = ref(false);
+const sortDropdownOpen = ref(false);
 
 const sortOptions = computed(() => [
   { value: 'popular', label: t('catalog.sortPopular') },
@@ -31,6 +32,7 @@ const selectCategory = (cat) => {
     name: 'catalog',
     params: { lang: currentLang.value, category: cat }
   });
+  window.scrollTo({ top: 400, behavior: 'smooth' });
 };
 </script>
 
@@ -72,7 +74,32 @@ const selectCategory = (cat) => {
 
             <!-- Category Navigation -->
             <div class="sidebar-section">
-                <h3 class="sidebar-heading">{{ $t('catalog.allCategories') || 'Categories' }}</h3>
+                <div class="sidebar-heading-row">
+                    <h3 class="sidebar-heading">{{ $t('catalog.allCategories') || 'Categories' }}</h3>
+                    <div class="sort-dropdown-wrapper">
+                        <button
+                            class="sort-btn"
+                            :class="{ active: sortBy !== 'popular' }"
+                            :title="$t('catalog.sortBy')"
+                            @click="sortDropdownOpen = !sortDropdownOpen"
+                        >
+                            <ion-icon name="swap-vertical-outline"></ion-icon>
+                        </button>
+                        <transition name="sort-drop">
+                            <div v-if="sortDropdownOpen" class="sort-dropdown-menu" @click.stop>
+                                <label
+                                    v-for="opt in sortOptions"
+                                    :key="opt.value"
+                                    class="sort-dropdown-option"
+                                    @click="sortDropdownOpen = false"
+                                >
+                                    <input type="radio" :value="opt.value" v-model="sortBy">
+                                    <span>{{ opt.label }}</span>
+                                </label>
+                            </div>
+                        </transition>
+                    </div>
+                </div>
                 <ul class="sidebar-category-list">
                     <li v-for="group in catalogGroups" :key="group.key">
                         <button
@@ -80,23 +107,13 @@ const selectCategory = (cat) => {
                             :class="{ active: currentCategory === group.key }"
                             @click="selectCategory(group.key); sidebarOpen = false"
                         >
-                            <ion-icon :name="group.icon || 'grid-outline'" class="cat-icon"></ion-icon>
+                            <ion-icon v-if="group.svgSrc" :src="group.svgSrc"></ion-icon>
+                            <ion-icon v-else-if="group.icon" :name="group.icon"></ion-icon>
                             <span>{{ $t(`categories.${group.key}`) }}</span>
                             <ion-icon name="chevron-forward-outline" class="arrow-icon"></ion-icon>
                         </button>
                     </li>
                 </ul>
-            </div>
-
-            <!-- Sort Section -->
-            <div class="sidebar-section">
-                <h3 class="sidebar-heading">{{ $t('catalog.sortBy') || 'Sort By' }}</h3>
-                <div class="sidebar-sort-options">
-                    <label v-for="opt in sortOptions" :key="opt.value" class="sort-option">
-                        <input type="radio" :value="opt.value" v-model="sortBy">
-                        <span>{{ opt.label }}</span>
-                    </label>
-                </div>
             </div>
         </aside>
 
@@ -224,10 +241,7 @@ const selectCategory = (cat) => {
 /* ── Layout ──────────────────────────────────────────── */
 .catalog-layout {
     display: flex;
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 24px 20px;
-    gap: 20px;
+    padding: 24px 10px;
     align-items: flex-start;
     background: #FBF7F2;
 }
@@ -239,20 +253,19 @@ const selectCategory = (cat) => {
     position: sticky;
     top: 80px;
     background: #fff;
-    border-radius: 12px;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
-    overflow: hidden;
-    max-height: calc(100vh - 100px);
-    overflow-y: auto;
+    /* overflow: hidden;
+    max-height: calc(100vh - 100px); */
+    /* overflow-y: auto; */
 }
 
-.catalog-sidebar::-webkit-scrollbar {
+/* .catalog-sidebar::-webkit-scrollbar {
     width: 4px;
 }
 .catalog-sidebar::-webkit-scrollbar-thumb {
     background: #d4b896;
     border-radius: 4px;
-}
+} */
 
 .sidebar-close-btn {
     display: none;
@@ -282,8 +295,82 @@ const selectCategory = (cat) => {
     color: #9e8272;
     text-transform: uppercase;
     letter-spacing: 1.5px;
-    margin: 0 0 10px 0;
+    margin: 0;
 }
+
+.sidebar-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.sort-dropdown-wrapper {
+    position: relative;
+}
+
+.sort-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: 1.5px solid #e4d5c6;
+    border-radius: 6px;
+    background: transparent;
+    color: #9e8272;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.sort-btn:hover,
+.sort-btn.active {
+    background: #DD876E;
+    border-color: #DD876E;
+    color: #fff;
+}
+
+.sort-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 180px;
+    background: #fff;
+    border: 1px solid #f0e6da;
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    padding: 6px;
+    z-index: 300;
+}
+
+.sort-dropdown-option {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #5d4037;
+    border-radius: 7px;
+    transition: background 0.13s;
+}
+
+.sort-dropdown-option:hover {
+    background: #FDF3E6;
+}
+
+.sort-dropdown-option input[type="radio"] {
+    accent-color: #DD876E;
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.sort-drop-enter-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+.sort-drop-leave-active { transition: opacity 0.1s ease, transform 0.1s ease; }
+.sort-drop-enter-from, .sort-drop-leave-to { opacity: 0; transform: translateY(-4px); }
 
 /* ── Category list ───────────────────────────────────── */
 .sidebar-category-list {
@@ -337,35 +424,6 @@ const selectCategory = (cat) => {
     opacity: 0.7;
 }
 
-/* ── Sort options ────────────────────────────────────── */
-.sidebar-sort-options {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.sort-option {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 8px 6px;
-    cursor: pointer;
-    font-size: 13.5px;
-    color: #5d4037;
-    border-radius: 6px;
-    transition: background 0.15s;
-}
-
-.sort-option:hover {
-    background: #FDF3E6;
-}
-
-.sort-option input[type="radio"] {
-    accent-color: #DD876E;
-    width: 15px;
-    height: 15px;
-    cursor: pointer;
-}
 
 /* ── Main content ────────────────────────────────────── */
 .catalog-main {
@@ -423,7 +481,6 @@ const selectCategory = (cat) => {
         width: 280px;
         height: 100vh;
         max-height: 100vh;
-        border-radius: 0;
         z-index: 99;
         transition: left 0.28s ease;
         box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);

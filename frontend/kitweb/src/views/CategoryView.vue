@@ -105,11 +105,10 @@ const currentCategory = computed(() => props.category || route.params.category);
 const group = computed(() => resolveCategoryGroup(currentCategory.value));
 
 const heroImage = computed(() => {
-    if (group.value) {
+    if (group.value && group.value.key !== 'all' && group.value.slugs.length) {
         return getCategoryImageUrl(group.value.slugs[0]);
     }
-
-    // Fallback to first product image if no category is set
+    // "all" group or no slugs — use the first loaded product's image
     if (products.value.length > 0 && products.value[0].image_key) {
         return getImageUrl(products.value[0].image_key);
     }
@@ -120,10 +119,15 @@ async function loadData() {
     loading.value = true;
     try {
         if (group.value) {
-            // Fetch every slug in the group, then merge and de-duplicate by id.
-            const lists = await Promise.all(group.value.slugs.map(s => api.getProducts(s)));
-            const seen = new Set();
-            const merged = lists.flat().filter(p => !seen.has(p.id) && seen.add(p.id));
+            let merged;
+            if (group.value.key === 'all') {
+                merged = await api.getProducts(null);
+            } else {
+                // Fetch every slug in the group, then merge and de-duplicate by id.
+                const lists = await Promise.all(group.value.slugs.map(s => api.getProducts(s)));
+                const seen = new Set();
+                merged = lists.flat().filter(p => !seen.has(p.id) && seen.add(p.id));
+            }
             products.value = merged.map(p => ({
                 ...p,
                 slug: p.slug || generateSlug(p.name, p.id)
@@ -146,6 +150,7 @@ onMounted(() => {
 });
 
 watch(() => props.category, () => {
+    letterFilter.value = null;
     hasLoaded.value = false;
     loadData();
 });
@@ -357,14 +362,45 @@ const getImageUrl = (key, variant = 'large') => {
 
 const sortedProducts = computed(() => {
     let sorted = [...products.value];
-    if (activeSortBy.value === 'price_asc') {
+    // "all" defaults to alphabetical; explicit sort options still work.
+    const isAll = currentCategory.value === 'all';
+    const effectiveSort = (isAll && activeSortBy.value === 'popular') ? 'name' : activeSortBy.value;
+
+    if (effectiveSort === 'price_asc') {
         sorted.sort((a, b) => (a.price_1 || a.price || 0) - (b.price_1 || b.price || 0));
-    } else if (activeSortBy.value === 'price_desc') {
+    } else if (effectiveSort === 'price_desc') {
         sorted.sort((a, b) => (b.price_1 || b.price || 0) - (a.price_1 || a.price || 0));
-    } else if (activeSortBy.value === 'name') {
-        sorted.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (effectiveSort === 'name') {
+        const bcp47 = locale.value === 'th' ? 'th-TH' : 'en';
+        sorted.sort((a, b) => {
+            const nameA = (locale.value === 'th' ? (a.name_th || a.name) : a.name) || '';
+            const nameB = (locale.value === 'th' ? (b.name_th || b.name) : b.name) || '';
+            return nameA.localeCompare(nameB, bcp47);
+        });
     }
     return sorted;
+});
+
+const letterFilter = ref(null);
+
+const getDisplayName = (p) =>
+    ((locale.value === 'th' ? (p.name_th || p.name) : p.name) || '').trim();
+
+const availableLetters = computed(() => {
+    const letters = new Set();
+    sortedProducts.value.forEach(p => {
+        const first = getDisplayName(p).charAt(0);
+        if (first) letters.add(first.toUpperCase());
+    });
+    const bcp47 = locale.value === 'th' ? 'th-TH' : 'en';
+    return [...letters].sort((a, b) => a.localeCompare(b, bcp47));
+});
+
+const displayedProducts = computed(() => {
+    if (!letterFilter.value) return sortedProducts.value;
+    return sortedProducts.value.filter(p =>
+        getDisplayName(p).charAt(0).toUpperCase() === letterFilter.value
+    );
 });
 </script>
 
@@ -383,14 +419,31 @@ const sortedProducts = computed(() => {
                 </div>
             </div>
             <span class="product-count-badge">
-                {{ $t('catalog.showing', { count: products.length }) }}
+                {{ $t('catalog.showing', { count: displayedProducts.length }) }}
+                <span v-if="letterFilter" class="letter-active-badge">{{ letterFilter }}</span>
             </span>
+        </div>
+
+        <!-- Letter filter bar -->
+        <div v-if="availableLetters.length > 1" class="letter-filter-bar">
+            <button
+                class="letter-btn"
+                :class="{ active: letterFilter === null }"
+                @click="letterFilter = null"
+            >All</button>
+            <button
+                v-for="letter in availableLetters"
+                :key="letter"
+                class="letter-btn"
+                :class="{ active: letterFilter === letter }"
+                @click="letterFilter = (letterFilter === letter ? null : letter)"
+            >{{ letter }}</button>
         </div>
 
         <!-- Product Grid -->
         <div class="product-grid">
-            <router-link 
-                v-for="item in sortedProducts" 
+            <router-link
+                v-for="item in displayedProducts"
                 :key="item.id" 
                 :to="{ name: 'catalog', params: { lang: currentLang, category: currentCategory, productSlug: item.slug } }"
                 class="product-card"
@@ -610,9 +663,9 @@ const sortedProducts = computed(() => {
 
 <style scoped>
 .category-page {
-    background: #FBF7F2;
-    min-height: 100vh;
-    padding-bottom: 60px;
+    /* background: #FBF7F2; */
+    /* min-height: 100vh; */
+    padding-bottom: 40px;
 }
 
 /* COMPACT CATEGORY BAR */
@@ -622,9 +675,7 @@ const sortedProducts = computed(() => {
     justify-content: space-between;
     gap: 16px;
     padding: 16px 20px;
-    background: #fff;
-    border-radius: 10px;
-    margin-bottom: 16px;
+    background-color: white;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     flex-wrap: wrap;
 }
@@ -667,6 +718,57 @@ const sortedProducts = computed(() => {
     white-space: nowrap;
 }
 
+.letter-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 10px 20px 12px;
+    background: #FDF3E6;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.letter-btn {
+    min-width: 32px;
+    height: 30px;
+    padding: 0 9px;
+    border: 1.5px solid #e4d5c6;
+    border-radius: 7px;
+    background-color: white;
+    color: #7a5c4a;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.14s, color 0.14s, border-color 0.14s;
+    line-height: 1;
+}
+
+.letter-btn:hover:not(.active) {
+    background: #FDF3E6;
+    border-color: #d4b896;
+}
+
+.letter-btn.active {
+    background: #DD876E;
+    border-color: #DD876E;
+    color: #fff;
+}
+
+.letter-active-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    background: #DD876E;
+    color: #fff;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    margin-left: 5px;
+    vertical-align: middle;
+}
+
 .product-count-badge {
     font-size: 12px;
     font-weight: 600;
@@ -681,7 +783,7 @@ const sortedProducts = computed(() => {
 /* PRODUCT GRID */
 .product-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     margin: 0 auto;
     padding: 0 1rem;
     gap: 2px;
@@ -706,7 +808,7 @@ const sortedProducts = computed(() => {
 }
 
 .card-image {
-    height: 280px;
+    aspect-ratio: 1 / 1;
     position: relative;
     overflow: hidden;
     background: #f5f6fa;
@@ -821,10 +923,10 @@ const sortedProducts = computed(() => {
     background: #008080;
     color: white;
     border: none;
-    padding: 10px 20px;
+    padding: 8px 12px;
     border-radius: 20px;
     font-size: 0.7rem;
-    font-weight: 600;
+    font-weight: 400;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -835,6 +937,7 @@ const sortedProducts = computed(() => {
 .add-btn:hover {
     background: #006666;
     transform: scale(1.05);
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24'%3E%3Cpath fill='%23ffffff' d='M11 9h2V6h3V4h-3V1h-2v3H8v2h3v3zm-4 9c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-1.99.9-1.99 2S15.9 22 17 22s2-.9 2-2-.9-2-2-2zm-9.83-3.25l.03-.12.9-1.63H15.55c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0019.88 4H5.21L4.27 2H1v2h2l3.6 7.59-1.35 2.44C5 14.62 5 15 5 15c0 1.1.9 2 2 2h12v-2H7.42a.25.25 0 01-.25-.25z'/%3E%3C/svg%3E") 2 2, pointer;
 }
 
 /* POPUP (Reused) */

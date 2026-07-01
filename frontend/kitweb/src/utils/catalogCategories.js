@@ -2,18 +2,18 @@
 // `slugs` = backend category_path values whose products are merged under this group.
 // `key`   = i18n label/desc key (categories.<key>) and the :category route param value.
 export const catalogGroups = [
-  { key: 'yarn',           slugs: ['yarn'],               icon: 'color-wand-outline' },
-  { key: 'threadString',   slugs: ['thread', 'strings'],  icon: 'git-network-outline' },
-  { key: 'elastics',       slugs: ['elastics'],           icon: 'ellipse-outline' },
-  { key: 'ribbons',        slugs: ['ribbons'],            icon: 'ribbon-outline' },
-  { key: 'needles',        slugs: ['needles'],            icon: 'medical-outline' },
-  { key: 'scissorsKnifes', slugs: ['scissors', 'knifes'], icon: 'cut-outline' },
-  { key: 'tools',          slugs: ['tools'],              icon: 'construct-outline' },
-  { key: 'decorative',     slugs: ['decorative'],         icon: 'sparkles-outline' },
-  { key: 'colors',         slugs: ['colors'],             icon: 'color-palette-outline' },
-  // Appended — not in the primary 9 but kept browsable
-  { key: 'beads',          slugs: ['beads'],              icon: 'radio-button-on-outline' },
-  { key: 'flora',          slugs: ['flora'],              icon: 'leaf-outline' },
+  { key: 'all',            slugs: [],                     icon: 'apps-outline' },
+  { key: 'yarn',           slugs: ['yarn'],               icon: null, svgSrc: '/icon/yarn.svg' },
+  { key: 'threadString',   slugs: ['thread', 'strings'],  icon: null, svgSrc: '/icon/thread-string.svg'  },
+  { key: 'elastics',       slugs: ['elastics'],           icon: null, svgSrc: '/icon/elastics.svg' },
+  { key: 'ribbons',        slugs: ['ribbons'],            icon: null, svgSrc: '/icon/ribbons.svg' },
+  { key: 'needles',        slugs: ['needles'],            icon: null, svgSrc: '/icon/needles.svg' },
+  { key: 'scissorsKnifes', slugs: ['scissors', 'knifes'], icon: null, svgSrc: '/icon/scissors.svg' },
+  { key: 'tools',          slugs: ['tools'],              icon: null, svgSrc: '/icon/tools.svg' },
+  { key: 'decorative',     slugs: ['decorative'],         icon: null, svgSrc: '/icon/decoratives.svg' },
+  { key: 'colors',         slugs: ['colors'],             icon: null, svgSrc: '/icon/colors.svg' },
+  { key: 'beads',          slugs: ['beads'],              icon: null, svgSrc: '/icon/beads.svg' },
+  { key: 'flora',          slugs: ['flora'],              icon: null, svgSrc: '/icon/floras.svg' },
 ];
 
 // Resolve a :category route value to a group. Falls back to a single-slug group

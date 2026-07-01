@@ -318,8 +318,9 @@ onUnmounted(() => {
                   class="dd-cat-item"
                   @click="scrollToTop; closeAllMenus()"
                 >
-                  <ion-icon :name="cat.icon" class="dd-cat-icon"></ion-icon>
-                  <span>{{ $t(`categories.${cat.key}`) }}</span>
+                  <ion-icon v-if="cat.svgSrc" :src="cat.svgSrc"></ion-icon>
+                  <ion-icon v-else-if="cat.icon" :name="cat.icon"></ion-icon>
+                  <span style="text-align:left">{{ $t(`categories.${cat.key}`) }}</span>
                 </router-link>
               </div>
               <router-link
@@ -804,6 +805,7 @@ body {
   flex-direction: column;
   gap: 2px;
   padding-top: 2px;
+  text-align: left;
 }
 
 .dd-page-title {
@@ -811,6 +813,7 @@ body {
   font-weight: 600;
   color: #3d2b1f;
   display: block;
+  text-align: left;
 }
 
 .dd-page-desc {

@@ -48,6 +48,8 @@
   "categories": {
     "title": "Shop by Category",
     "subtitle": "Find exactly what you need",
+      "all": "All Products",
+      "allDesc": "Browse our complete collection of craft supplies, threads, tools, and more — sorted alphabetically for easy discovery.",
       "yarn": "Yarn",
       "yarnDesc": "Premium wholesale knitting yarns and crochet threads carefully selected for makers, boutique brands, and DIY crafting enthusiasts. Available in a wide spectrum of vibrant colors, heavy-duty weights, and soft textures, our yarn collection is highly optimized for hand-knitting, crocheting, weaving, and structural handmade craft projects. We focus on consistent dye lots, comfortable handling, and dependable material quality at accessible bulk prices, making it the perfect sourcing hub for both retail shop inventories and independent fiber artists.",
       
@@ -116,7 +118,9 @@
     "communityFocusDesc": "Supporting local crafters and craft communities",
     "qualityAssured": "Quality Assured",
     "qualityAssuredDesc": "100% satisfaction guarantee on all products",
-    "headerTitle": "Let's Get Crafty Together",
+    "bannerBadge": "We’re Open",
+    "bannerText": "Visit us at Sampeng Market, Mon–Sat 8:00 AM – 5:30 PM · Line & WeChat available for quick enquiries",
+    "headerTitle": "Let’s Get Crafty Together",
     "headerDefinition": "Have a question about a specific material or need advice for your next DIY masterpiece? Our fellow makers are here to help. Reach out and let’s bring your vision to life!",
     "hub": {
       "title": "Heritage Hub",
@@ -150,6 +154,8 @@
     }
   },
   "events": {
+    "bannerBadge": "Community",
+    "bannerText": "Bringing craft lovers together — follow us for upcoming events, workshops & pop-ups in Bangkok",
     "heroTagline": "DIY Craft Workshops & Events",
     "heroSubtitle": "Join hands-on Sampeng workshops for yarn, ribbon, bead, and sewing craft lovers.",
     "joinNextEvent": "Join Our Next Event",
@@ -198,6 +204,8 @@
     "title": "Browse Our Collection",
     "subtitle": "Four decades of craftsman quality, curated by category for the modern maker and the traditional tailor.",
     "shopCategory": "Shop Category",
+    "filter": "Filter & Categories",
+    "allCategories": "All Categories",
     "backToCatalog": "Back to Categories",
     "collection": "{category} Collection",
     "showing": "Showing {count} products",
