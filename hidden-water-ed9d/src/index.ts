@@ -483,11 +483,13 @@ export default {
 					// 2. Fallback to existing products / product_images tables
 					// Fetch from products mapping name -> title, category -> category_id, image_key -> image_url
 					const query = `
-						SELECT 
-							p.id, 
-							p.sku, 
-							p.name AS title, 
-							p.description, 
+						SELECT
+							p.id,
+							p.sku,
+							p.name AS title,
+							p.name_th,
+							p.description,
+							p.description_th,
 							p.category AS category_id,
 							p.image_key AS image_url
 						FROM products p

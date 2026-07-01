@@ -7,6 +7,7 @@ import { setLocale } from './i18n'
 import { authStore } from './stores/authStore'
 import { api, getUtilsUrl } from './services/api';
 import { localizedRoute, codeToPath, pathToCode } from './utils/localeRoutes'
+import { catalogGroups } from './utils/catalogCategories'
 import { absoluteUrl } from './utils/siteUrl'
 
 const SEO_LOCALES = ['en', 'th', 'zh', 'ja']
@@ -253,15 +254,9 @@ const showCompanyMenu = ref(false)
 let catalogTimer = null
 let companyTimer = null
 
-const navCategories = [
-  { key: 'yarn',       icon: 'color-wand-outline' },
-  { key: 'needles',    icon: 'cut-outline' },
-  { key: 'thread',     icon: 'git-network-outline' },
-  { key: 'tools',      icon: 'construct-outline' },
-  { key: 'beads',      icon: 'radio-button-on-outline' },
-  { key: 'decorative', icon: 'sparkles-outline' },
-  { key: 'flora',      icon: 'leaf-outline' },
-]
+// Shared with the catalog sidebar so the dropdown stays in sync with the
+// display groups (incl. merged groups like Thread & String / Scissors & Knives).
+const navCategories = catalogGroups
 
 const openCatalog  = () => { clearTimeout(catalogTimer); showCatalogMenu.value = true }
 const closeCatalog = () => { catalogTimer = setTimeout(() => { showCatalogMenu.value = false }, 130) }
@@ -302,7 +297,7 @@ onUnmounted(() => {
         <!-- Catalog dropdown -->
         <div class="nav-item-wrap" @mouseenter="openCatalog" @mouseleave="closeCatalog" @click.stop>
           <router-link
-            :to="{ name: 'catalog', params: { lang: currentLang, category: 'needles' } }"
+            :to="{ name: 'catalog', params: { lang: currentLang, category: 'yarn' } }"
             class="nav-link nav-link-dd"
             active-class="active"
             @click="scrollToTop; closeAllMenus()"

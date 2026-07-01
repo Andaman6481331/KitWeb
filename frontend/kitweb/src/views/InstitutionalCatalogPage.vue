@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { api, API_URL} from '../services/api';
+import { groupByDisplayGroup } from '@/utils/catalogCategories';
 
 const { t, locale } = useI18n();
 const route = useRoute();
@@ -31,6 +32,14 @@ const rfqForm = ref({
   notes: ''
 });
 
+// Locale-aware product field accessors (mirrors tProduct in CategoryView.vue).
+// Show Thai name/description when the Thai locale is active, fall back to English.
+const tName = (p) =>
+  (locale.value === 'th' && p.name_th) ? p.name_th : p.title;
+
+const tDesc = (p) =>
+  (locale.value === 'th' && p.description_th) ? p.description_th : p.description;
+
 const getImageUrl = (key, variant = 'large') => {
   if (!key) return 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg';
   const keyStr = String(key);
@@ -39,23 +48,12 @@ const getImageUrl = (key, variant = 'large') => {
   return `${API_URL}/images/${keyStr}-${variant}.webp`;
 };
 
-// Category mapping helper (maps standard database categories to institutional B2B categories)
-const mapCategoryToInstitutional = (catId) => {
-  if (!catId) return 'General Sourcing & Craft Materials';
-  
-  const lower = catId.toLowerCase().trim();
-  if (lower === 'yarn' || lower === 'thread' || lower === 'knitting-yarn' || lower === 'crochet-thread' || lower === 'threads') {
-    return 'Fiber Arts & Yarn Crafts';
-  } else if (lower === 'beads' || lower === 'beads-sequins') {
-    return 'Fine Motor Skills & Beadwork';
-  } else if (lower === 'tools' || lower === 'needles') {
-    return 'Advanced Crafting & Tools';
-  } else if (lower === 'decorative' || lower === 'flora') {
-    return 'Institutional Events & DIY Activities';
-  }
-  
-  // Format nicely if custom category
-  return catId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+// Resolves a display-group key (e.g. 'threadString') to its translated heading,
+// mirroring the headings used on the retail catalog. Falls back to the raw key
+// (title-cased) for any slug not part of a defined group.
+const groupLabel = (key) => {
+  if (!key) return '';
+  return t(`categories.${key}`, key.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
 };
 
 // Fetch data
@@ -66,17 +64,9 @@ const fetchCatalog = async () => {
     const response = await api.getInstitutionalCatalog();
     if (response && response.success) {
       products.value = response.products || [];
-      
-      // Regroup products locally using B2B mapping
-      const grouped = {};
-      products.value.forEach(p => {
-        const instCat = mapCategoryToInstitutional(p.category_id);
-        if (!grouped[instCat]) {
-          grouped[instCat] = [];
-        }
-        grouped[instCat].push(p);
-      });
-      categoriesGrouped.value = grouped;
+
+      // Regroup products into the same display groups used on the retail catalog
+      categoriesGrouped.value = groupByDisplayGroup(products.value, p => p.category_id);
       
       // Initialize default quantities
       products.value.forEach(p => {
@@ -303,19 +293,12 @@ const handlePdfDownload = () => {
   `;
   
   // Group products locally for print view
-  const printGroups = {};
-  products.value.forEach(p => {
-    const instCat = mapCategoryToInstitutional(p.category_id);
-    if (!printGroups[instCat]) {
-      printGroups[instCat] = [];
-    }
-    printGroups[instCat].push(p);
-  });
-  
+  const printGroups = groupByDisplayGroup(products.value, p => p.category_id);
+
   Object.keys(printGroups).forEach(category => {
     html += `
       <div class="category-section">
-        <div class="category-title">${category}</div>
+        <div class="category-title">${groupLabel(category)}</div>
         <table>
           <thead>
             <tr>
@@ -334,8 +317,8 @@ const handlePdfDownload = () => {
         <tr>
           <td style="text-align: center;"><div class="check-box"></div></td>
           <td class="sku-col">${p.sku || 'N/A'}</td>
-          <td><strong>${p.title}</strong></td>
-          <td style="color: #5d4037;">${p.description || 'Suitable for institutional art projects and workshops.'}</td>
+          <td><strong>${tName(p)}</strong></td>
+          <td style="color: #5d4037;">${tDesc(p) || 'Suitable for institutional art projects and workshops.'}</td>
           <td>___________</td>
         </tr>
       `;
@@ -436,14 +419,14 @@ const handleDocxDownload = async () => {
   // ── header row for each category table ───────────────────────────────────
   // Columns:  Image | SKU | Product Title | Description | Qty
   // Widths (DXA, total = 9360 for 1-inch margins on Letter):
-  const COL = { img: 1100, sku: 1200, title: 2500, desc: 3560, qty: 1000 };
+  const COL = { img: 1800, sku: 900, title: 2500, desc: 3560, qty: 1000 };
   // sum = 9360 ✓
 
   const headerRow = () =>
     new TableRow({
       tableHeader: true,
       children: [
-        makeCell([para(txt('Image',         { bold: true, size: 18, color: '604539' }))], { width: COL.img,   shading: LIGHT }),
+        makeCell([para(txt('Image',         { bold: true, size: 28, color: '604539' }))], { width: COL.img,   shading: LIGHT }),
         makeCell([para(txt('SKU / ID',      { bold: true, size: 18, color: '604539' }))], { width: COL.sku,   shading: LIGHT }),
         makeCell([para(txt('Product Title', { bold: true, size: 18, color: '604539' }))], { width: COL.title, shading: LIGHT }),
         makeCell([para(txt('Description',   { bold: true, size: 18, color: '604539' }))], { width: COL.desc,  shading: LIGHT }),
@@ -452,11 +435,7 @@ const handleDocxDownload = async () => {
     });
 
   // ── group products same as PDF ────────────────────────────────────────────
-  const printGroups = {};
-  products.value.forEach(p => {
-    const cat = mapCategoryToInstitutional(p.category_id);
-    (printGroups[cat] = printGroups[cat] || []).push(p);
-  });
+  const printGroups = groupByDisplayGroup(products.value, p => p.category_id);
 
   // ── pre-fetch ALL images in parallel ─────────────────────────────────────
   const allProducts = products.value;
@@ -517,7 +496,7 @@ const handleDocxDownload = async () => {
       new Paragraph({
         spacing: { before: 280, after: 100 },
         border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: BORDER_COLOR, space: 2 } },
-        children: [txt(category, { bold: true, size: 26, color: '604539' })],
+        children: [txt(groupLabel(category), { bold: true, size: 26, color: '604539' })],
       })
     );
 
@@ -531,7 +510,7 @@ const handleDocxDownload = async () => {
         ? [para(new ImageRun({
             data: imgBuf.data,
             type: imgBuf.type,
-            transformation: { width: 60, height: 60 },
+            transformation: { width: 120, height: 120 },
           }))]
         : [para(txt('—', { color: 'AAAAAA' }))];
 
@@ -540,8 +519,8 @@ const handleDocxDownload = async () => {
           children: [
             makeCell(imgCellChildren, { width: COL.img }),
             makeCell([para(txt(p.sku || 'N/A', { size: 18, color: '604539', italics: true }))], { width: COL.sku }),
-            makeCell([para(txt(p.title, { bold: true, size: 20 }))], { width: COL.title }),
-            makeCell([para(txt(p.description || 'Suitable for institutional art projects and workshops.', { size: 18, color: '5d4037' }))], { width: COL.desc }),
+            makeCell([para(txt(tName(p), { bold: true, size: 20 }))], { width: COL.title }),
+            makeCell([para(txt(tDesc(p) || 'Suitable for institutional art projects and workshops.', { size: 18, color: '5d4037' }))], { width: COL.desc }),
             // Empty qty box — user fills in manually
             makeCell([para(txt('', { size: 20 }), { align: AlignmentType.CENTER })], { width: COL.qty }),
           ],
@@ -602,8 +581,8 @@ const handleDocxDownload = async () => {
     <!-- Informational Top Banner -->
     <div class="info-banner">
       <div class="banner-content">
-        <span class="banner-badge">B2B Portal</span>
-        <span class="banner-text">Net-30 Purchase Orders Accepted &nbsp;|&nbsp; Tax-Exempt Accounts Supported</span>
+        <span class="banner-badge">{{ t('institutional.bannerBadge') }}</span>
+        <span class="banner-text">{{ t('institutional.bannerText') }}</span>
       </div>
     </div>
 
@@ -611,21 +590,20 @@ const handleDocxDownload = async () => {
     <div class="b2b-hero">
       <div class="b2b-hero-overlay"></div>
       <div class="b2b-hero-content">
-        <h1 class="hero-title">Institutional Master Catalog</h1>
+        <h1 class="hero-title">{{ t('institutional.heroTitle') }}</h1>
         <p class="hero-subtitle">
-          Designed specifically for schools, teachers, community centers, and non-profits. 
-          Browse project offerings and build a Request for Quote (RFQ) without MOQ constraints or consumer pricing tags.
+          {{ t('institutional.heroSubtitle') }}
         </p>
         <div class="hero-actions">
           <button @click="handlePdfDownload" class="btn-primary" :disabled="loading || products.length === 0">
             <ion-icon name="document-text-outline" class="btn-icon"></ion-icon>
-            Download Full Sourcing Checklist (PDF)
+            {{ t('institutional.downloadPdf') }}
           </button>
         </div>
         <div class="hero-actions">
           <button @click="handleDocxDownload" class="btn-primary" :disabled="loading || products.length === 0">
             <ion-icon name="document-text-outline" class="btn-icon"></ion-icon>
-            Download Sourcing Checklist (DOCX)
+            {{ t('institutional.downloadDocx') }}
           </button>
         </div>
       </div>
@@ -635,21 +613,21 @@ const handleDocxDownload = async () => {
       <!-- Loading State -->
       <div v-if="loading" class="state-container">
         <div class="spinner"></div>
-        <p class="state-text">Loading master catalog materials dynamically...</p>
+        <p class="state-text">{{ t('institutional.loading') }}</p>
       </div>
 
       <!-- Error State -->
       <div v-else-if="error" class="state-container error-card">
         <ion-icon name="alert-circle-outline" class="error-icon"></ion-icon>
         <p class="state-text">{{ error }}</p>
-        <button @click="fetchCatalog" class="btn-retry">Retry Fetching</button>
+        <button @click="fetchCatalog" class="btn-retry">{{ t('institutional.retry') }}</button>
       </div>
 
       <!-- Catalog Main Content -->
       <div v-else class="catalog-grid-wrapper">
         <div v-for="(groupProducts, groupName) in categoriesGrouped" :key="groupName" class="category-block">
           <div class="category-block-header">
-            <h2 class="category-block-title">{{ groupName }}</h2>
+            <h2 class="category-block-title">{{ groupLabel(groupName) }}</h2>
             <div class="title-line"></div>
           </div>
 
@@ -661,9 +639,9 @@ const handleDocxDownload = async () => {
               :class="{ 'card-selected': selectedItems.has(product.id) }"
             >
               <div class="card-img-wrap">
-                <img 
-                  :src="resolveProductImage(product.image_url)" 
-                  :alt="product.title"
+                <img
+                  :src="resolveProductImage(product.image_url)"
+                  :alt="tName(product)"
                   class="card-img"
                   loading="lazy"
                 />
@@ -674,16 +652,16 @@ const handleDocxDownload = async () => {
 
               <div class="card-info">
                 <span class="card-sku">SKU: {{ product.sku || 'N/A' }}</span>
-                <h3 class="card-title">{{ product.title }}</h3>
+                <h3 class="card-title">{{ tName(product) }}</h3>
                 <p class="card-desc">
-                  {{ product.description || 'Excellent for motor skill development, creative art activities, and school craft workshops.' }}
+                  {{ tDesc(product) || t('institutional.descFallback') }}
                 </p>
               </div>
 
               <div class="card-footer">
                 <!-- RFQ Quantity selector inside card when checked -->
                 <div v-if="selectedItems.has(product.id)" class="qty-control">
-                  <span class="qty-label">Qty:</span>
+                  <span class="qty-label">{{ t('institutional.qty') }}</span>
                   <input 
                     type="number" 
                     v-model.number="rfqQuantities[product.id]" 
@@ -699,7 +677,7 @@ const handleDocxDownload = async () => {
                   :class="{ 'btn-rfq-added': selectedItems.has(product.id) }"
                 >
                   <span class="rfq-btn-text">
-                    {{ selectedItems.has(product.id) ? 'Added to RFQ' : 'Add to RFQ' }}
+                    {{ selectedItems.has(product.id) ? t('institutional.addedToRfq') : t('institutional.addToRfq') }}
                   </span>
                   <input 
                     type="checkbox" 
@@ -723,17 +701,17 @@ const handleDocxDownload = async () => {
           <div class="drawer-left">
             <ion-icon name="cart-outline" class="drawer-cart-icon"></ion-icon>
             <div class="drawer-info">
-              <span class="drawer-count">{{ selectedItems.size }} items selected for quotation</span>
-              <span class="drawer-help">Quantities can be adjusted in the checklist overview.</span>
+              <span class="drawer-count">{{ t('institutional.drawerCount', { count: selectedItems.size }) }}</span>
+              <span class="drawer-help">{{ t('institutional.drawerHelp') }}</span>
             </div>
           </div>
           <div class="drawer-right">
             <button @click="clearRfqList" class="btn-secondary">
               <ion-icon name="trash-outline"></ion-icon>
-              Clear List
+              {{ t('institutional.clearList') }}
             </button>
             <button @click="showRfqModal = true" class="btn-accent">
-              Request Quote
+              {{ t('institutional.requestQuote') }}
               <ion-icon name="arrow-forward-outline"></ion-icon>
             </button>
           </div>
@@ -746,7 +724,7 @@ const handleDocxDownload = async () => {
       <div v-if="showRfqModal" class="modal-overlay" @click.self="showRfqModal = false">
         <div class="modal-card">
           <div class="modal-header">
-            <h3>Request For Quote Submission</h3>
+            <h3>{{ t('institutional.modalTitle') }}</h3>
             <button @click="showRfqModal = false" class="btn-close-modal">
               <ion-icon name="close-outline"></ion-icon>
             </button>
@@ -755,15 +733,15 @@ const handleDocxDownload = async () => {
           <!-- Successful Submission State -->
           <div v-if="rfqSuccess" class="modal-body success-state">
             <ion-icon name="checkmark-circle-outline" class="success-icon"></ion-icon>
-            <h4>Quote Request Submitted Successfully!</h4>
-            <p class="success-subtitle">We will review your inquiry and get back to you within 24-48 business hours.</p>
+            <h4>{{ t('institutional.successTitle') }}</h4>
+            <p class="success-subtitle">{{ t('institutional.successSubtitle') }}</p>
             <div class="order-ref-box">
-              <span class="ref-label">Quotation ID Reference:</span>
+              <span class="ref-label">{{ t('institutional.quotationIdRef') }}</span>
               <span class="ref-id">{{ submittedOrderId }}</span>
             </div>
-            <p class="success-footer">A copy of your submission has been forwarded to our wholesale sourcing desk.</p>
+            <p class="success-footer">{{ t('institutional.successFooter') }}</p>
             <button @click="showRfqModal = false; rfqSuccess = false;" class="btn-modal-close-action">
-              Done
+              {{ t('institutional.done') }}
             </button>
           </div>
 
@@ -775,92 +753,92 @@ const handleDocxDownload = async () => {
             </div>
 
             <p class="modal-intro-text">
-              Enter your organization details below. Our sourcing specialist will draft a formal quotation sheet and contact you via email.
+              {{ t('institutional.formIntro') }}
             </p>
 
             <div class="form-row">
               <div class="form-group">
-                <label for="orgName">School / Organization Name *</label>
-                <input 
-                  type="text" 
-                  id="orgName" 
-                  v-model="rfqForm.organization" 
-                  placeholder="e.g. Bangkok International School" 
-                  required 
+                <label for="orgName">{{ t('institutional.orgNameLabel') }}</label>
+                <input
+                  type="text"
+                  id="orgName"
+                  v-model="rfqForm.organization"
+                  :placeholder="t('institutional.orgNamePlaceholder')"
+                  required
                 />
               </div>
               <div class="form-group">
-                <label for="custName">Contact Person Name *</label>
-                <input 
-                  type="text" 
-                  id="custName" 
-                  v-model="rfqForm.customerName" 
-                  placeholder="e.g. Ms. Sarah Jane" 
-                  required 
+                <label for="custName">{{ t('institutional.contactNameLabel') }}</label>
+                <input
+                  type="text"
+                  id="custName"
+                  v-model="rfqForm.customerName"
+                  :placeholder="t('institutional.contactNamePlaceholder')"
+                  required
                 />
               </div>
             </div>
 
             <div class="form-row">
               <div class="form-group">
-                <label for="custEmail">Email Address *</label>
-                <input 
-                  type="email" 
-                  id="custEmail" 
-                  v-model="rfqForm.email" 
-                  placeholder="e.g. sarah@school.org" 
-                  required 
+                <label for="custEmail">{{ t('institutional.emailLabel') }}</label>
+                <input
+                  type="email"
+                  id="custEmail"
+                  v-model="rfqForm.email"
+                  :placeholder="t('institutional.emailPlaceholder')"
+                  required
                 />
               </div>
               <div class="form-group">
-                <label for="custPhone">Phone Number</label>
-                <input 
-                  type="tel" 
-                  id="custPhone" 
-                  v-model="rfqForm.phoneNumber" 
-                  placeholder="e.g. 081-234-5678" 
+                <label for="custPhone">{{ t('institutional.phoneLabel') }}</label>
+                <input
+                  type="tel"
+                  id="custPhone"
+                  v-model="rfqForm.phoneNumber"
+                  :placeholder="t('institutional.phonePlaceholder')"
                 />
               </div>
             </div>
 
             <div class="form-group">
-              <label for="shippingAddr">Shipping / Delivery Address</label>
-              <textarea 
-                id="shippingAddr" 
-                v-model="rfqForm.shippingAddress" 
-                placeholder="Where should the materials be dispatched if the quote is approved?"
+              <label for="shippingAddr">{{ t('institutional.shippingLabel') }}</label>
+              <textarea
+                id="shippingAddr"
+                v-model="rfqForm.shippingAddress"
+                :placeholder="t('institutional.shippingPlaceholder')"
                 rows="2"
               ></textarea>
             </div>
 
             <div class="form-group">
-              <label for="rfqNotes">Special Sourcing Notes / Target Delivery Date</label>
-              <textarea 
-                id="rfqNotes" 
-                v-model="rfqForm.notes" 
-                placeholder="Do you have custom tax needs, Net-30 purchase order formats, or specific color splits?"
+              <label for="rfqNotes">{{ t('institutional.notesLabel') }}</label>
+              <textarea
+                id="rfqNotes"
+                v-model="rfqForm.notes"
+                :placeholder="t('institutional.notesPlaceholder')"
                 rows="2"
               ></textarea>
             </div>
 
             <!-- Preview items in quote -->
             <div class="quote-preview-section">
-              <span class="preview-section-title">Selected Items in Request ({{ selectedProductsList.length }})</span>
+              <span class="preview-section-title">{{ t('institutional.selectedItems', { count: selectedProductsList.length }) }}</span>
               <div class="preview-items-list">
                 <div v-for="item in selectedProductsList" :key="item.id" class="preview-item-row">
                   <span class="item-title-col"><strong>{{ item.title }}</strong> &nbsp;<span class="item-sku">({{ item.sku }})</span></span>
-                  <span class="item-qty-col">Qty: {{ rfqQuantities[item.id] || 10 }}</span>
+                  <span class="item-qty-col">{{ t('institutional.qty') }} {{ rfqQuantities[item.id] || 10 }}</span>
                 </div>
               </div>
             </div>
 
             <div class="modal-footer-actions">
               <button type="button" @click="showRfqModal = false" class="btn-cancel" :disabled="submittingRfq">
-                Cancel
+                {{ t('institutional.cancel') }}
               </button>
               <button type="submit" class="btn-submit-rfq" :disabled="submittingRfq">
                 <span v-if="submittingRfq" class="mini-spinner"></span>
-                <span v-else>Submit Quote Request</span>
+                <span v-else>{{ t('institutional.submitQuote') }}</span>
               </button>
             </div>
           </form>

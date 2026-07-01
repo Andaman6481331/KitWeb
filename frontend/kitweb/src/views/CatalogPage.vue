@@ -6,6 +6,7 @@ import { getUtilsUrl } from '@/services/api';
 import { useRoute, useRouter } from 'vue-router';
 import { computed, ref } from 'vue';
 import { codeToPath, defaultLang } from '@/utils/localeRoutes';
+import { catalogGroups } from '@/utils/catalogCategories';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
@@ -13,25 +14,10 @@ const route = useRoute();
 const router = useRouter();
 
 const currentLang = computed(() => route.params.lang || defaultLang);
-const currentCategory = computed(() => route.params.category || "needles");
+const currentCategory = computed(() => route.params.category || "yarn");
 
 const sortBy = ref('popular');
 const sidebarOpen = ref(false);
-
-const categories = [
-  'yarn', 'needles', 'thread', 'tools',
-  'beads', 'decorative', 'flora'
-];
-
-const categoryIcons = {
-  yarn: 'color-wand-outline',
-  needles: 'cut-outline',
-  thread: 'git-network-outline',
-  tools: 'construct-outline',
-  beads: 'radio-button-on-outline',
-  decorative: 'sparkles-outline',
-  flora: 'leaf-outline',
-};
 
 const sortOptions = computed(() => [
   { value: 'popular', label: t('catalog.sortPopular') },
@@ -88,14 +74,14 @@ const selectCategory = (cat) => {
             <div class="sidebar-section">
                 <h3 class="sidebar-heading">{{ $t('catalog.allCategories') || 'Categories' }}</h3>
                 <ul class="sidebar-category-list">
-                    <li v-for="cat in categories" :key="cat">
+                    <li v-for="group in catalogGroups" :key="group.key">
                         <button
                             class="sidebar-cat-item"
-                            :class="{ active: currentCategory === cat }"
-                            @click="selectCategory(cat); sidebarOpen = false"
+                            :class="{ active: currentCategory === group.key }"
+                            @click="selectCategory(group.key); sidebarOpen = false"
                         >
-                            <ion-icon :name="categoryIcons[cat] || 'grid-outline'" class="cat-icon"></ion-icon>
-                            <span>{{ $t(`categories.${cat}`) }}</span>
+                            <ion-icon :name="group.icon || 'grid-outline'" class="cat-icon"></ion-icon>
+                            <span>{{ $t(`categories.${group.key}`) }}</span>
                             <ion-icon name="chevron-forward-outline" class="arrow-icon"></ion-icon>
                         </button>
                     </li>

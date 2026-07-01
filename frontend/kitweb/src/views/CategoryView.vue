@@ -7,6 +7,7 @@ import { useHead } from '@unhead/vue';
 import translationStore from '../stores/translationStore';
 import { cartStore } from '../stores/cartStore';
 import { codeToPath, defaultLang, localizedRoute } from '@/utils/localeRoutes';
+import { resolveCategoryGroup } from '@/utils/catalogCategories';
 
 const props = defineProps({
   category: {
@@ -68,44 +69,18 @@ const tProduct = (item, field) => {
     return item[field] || '';
 };
 
+// Resolves a group key (e.g. 'threadString') or a raw product slug (e.g. 'scissors')
+// to its translated label, falling back to the original string if no key exists.
 const tCategory = (catName) => {
     if (!catName) return '';
-    const mapping = {
-        'yarn': 'yarn',
-        'needles': 'needles',
-        'threads': 'threads',
-        'tools': 'tools',
-        'beads': 'beads',
-        'ribbons': 'ribbons',
-        'decorative': 'decorative',
-        'flora': 'flora',
-    };
     const lower = catName.toLowerCase().trim();
-    const key = mapping[lower];
-    if (key) {
-        return t(`categories.${key}`);
-    }
-    return t(`categories.${catName}`, catName);
+    return t(`categories.${lower}`, catName);
 };
 
 const tCategoryDesc = (catName) => {
     if (!catName) return '';
-    const mapping = {
-        'yarn': 'yarnDesc',
-        'needles': 'needlesDesc',
-        'thread': 'threadDesc',
-        'tools': 'toolsDesc',
-        'beads': 'beadsDesc',
-        'ribbons': 'ribbonsDesc',
-        'decorative': 'decorativeDesc',
-        'flora': 'floraDesc',
-    };
     const lower = catName.toLowerCase().trim();
-    const key = mapping[lower];
-    if (key) {
-        return t(`categories.${key}`);
-    }
-    return t(`categories.${catName}Desc`, t('catalog.categoryDescriptions.Default'));
+    return t(`categories.${lower}Desc`, t('catalog.categoryDescriptions.Default'));
 };
 
 const products = ref([]);
@@ -124,9 +99,14 @@ const notificationMessage = ref('');
 
 const currentCategory = computed(() => props.category || route.params.category);
 
+// A display group bundles one or more backend category slugs (e.g. the
+// 'threadString' group merges 'thread' + 'strings'). Raw slugs resolve to a
+// single-slug group via the fallback in resolveCategoryGroup.
+const group = computed(() => resolveCategoryGroup(currentCategory.value));
+
 const heroImage = computed(() => {
-    if (currentCategory.value) {
-        return getCategoryImageUrl(currentCategory.value);
+    if (group.value) {
+        return getCategoryImageUrl(group.value.slugs[0]);
     }
 
     // Fallback to first product image if no category is set
@@ -139,9 +119,12 @@ const heroImage = computed(() => {
 async function loadData() {
     loading.value = true;
     try {
-        if (currentCategory.value) {
-            const data = await api.getProducts(currentCategory.value);
-            products.value = data.map(p => ({
+        if (group.value) {
+            // Fetch every slug in the group, then merge and de-duplicate by id.
+            const lists = await Promise.all(group.value.slugs.map(s => api.getProducts(s)));
+            const seen = new Set();
+            const merged = lists.flat().filter(p => !seen.has(p.id) && seen.add(p.id));
+            products.value = merged.map(p => ({
                 ...p,
                 slug: p.slug || generateSlug(p.name, p.id)
             }));
@@ -391,7 +374,8 @@ const sortedProducts = computed(() => {
         <div class="category-bar">
             <div class="category-bar-left">
                 <div class="category-bar-image" v-if="heroImage">
-                    <img :src="heroImage" :alt="tCategory(currentCategory)">
+                    <img :src="heroImage" :alt="tCategory(currentCategory)"
+                        @error="$event.target.style.display = 'none'">
                 </div>
                 <div>
                     <h2 class="category-bar-title">{{ tCategory(currentCategory) }}</h2>
