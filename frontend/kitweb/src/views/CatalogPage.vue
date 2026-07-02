@@ -14,7 +14,7 @@ const route = useRoute();
 const router = useRouter();
 
 const currentLang = computed(() => route.params.lang || defaultLang);
-const currentCategory = computed(() => route.params.category || "yarn");
+const currentCategory = computed(() => route.params.category || "all");
 
 const sortBy = ref('popular');
 const sidebarOpen = ref(false);

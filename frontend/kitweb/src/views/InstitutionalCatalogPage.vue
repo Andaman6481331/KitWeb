@@ -1007,7 +1007,7 @@ const handleDocxDownload = async () => {
 /* Dense structured card grid */
 .dense-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 25px;
 }
 
@@ -1090,9 +1090,10 @@ const handleDocxDownload = async () => {
 
 .card-title {
   color: var(--b2b-primary);
-  font-size: 1.1rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 600;
   line-height: 1.3;
+  margin-top: 0;
   margin-bottom: 8px;
   min-height: 2.6rem; /* Lock title height for alignment */
   display: -webkit-box;

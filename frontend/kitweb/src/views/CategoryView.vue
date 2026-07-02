@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onServerPrefetch, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { api, API_URL, getCategoryImageUrl } from '../services/api';
+import { api, API_URL } from '../services/api';
 import { useI18n } from 'vue-i18n';
 import { useHead } from '@unhead/vue';
 import translationStore from '../stores/translationStore';
@@ -52,10 +52,11 @@ const tProduct = (item, field) => {
         if (field === 'name' && item.name_th) return item.name_th;
         if (field === 'description' && item.description_th) return item.description_th;
         if (field === 'usage' && item.usage_th) return item.usage_th;
+        if (field === 'attribute' && item.attribute_th) return item.attribute_th;
     }
 
     // 2. Auto-translation for metadata fields
-    // const autoFields = ['description', 'usage', 'use_for', 'varieties', 'sizes', 'colors'];
+    // const autoFields = ['description', 'usage', 'attribute', 'varieties', 'sizes', 'colors'];
     // if (autoFields.includes(field) && lang !== 'en') {
     //     const text = item[field];
     //     if (text) {
@@ -103,17 +104,6 @@ const currentCategory = computed(() => props.category || route.params.category);
 // 'threadString' group merges 'thread' + 'strings'). Raw slugs resolve to a
 // single-slug group via the fallback in resolveCategoryGroup.
 const group = computed(() => resolveCategoryGroup(currentCategory.value));
-
-const heroImage = computed(() => {
-    if (group.value && group.value.key !== 'all' && group.value.slugs.length) {
-        return getCategoryImageUrl(group.value.slugs[0]);
-    }
-    // "all" group or no slugs — use the first loaded product's image
-    if (products.value.length > 0 && products.value[0].image_key) {
-        return getImageUrl(products.value[0].image_key);
-    }
-    return '';
-});
 
 async function loadData() {
     loading.value = true;
@@ -265,6 +255,24 @@ const galleryImageKeys = computed(() => {
     return keys.filter(Boolean);
 });
 
+// Usage is stored as JSON ([{type, example}]); older products may still have
+// the legacy comma-separated list, which we fall back to (no example text).
+const usageEntries = computed(() => {
+    const raw = tProduct(selectedProduct.value, 'usage');
+    if (!raw) return [];
+    try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+            return parsed
+                .filter(e => e && e.type)
+                .map(e => ({ type: e.type, example: e.example || '' }));
+        }
+    } catch {
+        // Legacy comma-separated list
+    }
+    return raw.split(',').map(s => s.trim()).filter(Boolean).map(type => ({ type, example: '' }));
+});
+
 const navigateImage = (step) => {
     const keys = galleryImageKeys.value;
     if (keys.length <= 1) return;
@@ -409,9 +417,9 @@ const displayedProducts = computed(() => {
         <!-- Compact category header -->
         <div class="category-bar">
             <div class="category-bar-left">
-                <div class="category-bar-image" v-if="heroImage">
-                    <img :src="heroImage" :alt="tCategory(currentCategory)"
-                        @error="$event.target.style.display = 'none'">
+                <div class="category-bar-image">
+                    <ion-icon v-if="group?.svgSrc" :src="group.svgSrc"></ion-icon>
+                    <ion-icon v-else-if="group?.icon" :name="group.icon"></ion-icon>
                 </div>
                 <div>
                     <h2 class="category-bar-title">{{ tCategory(currentCategory) }}</h2>
@@ -442,34 +450,41 @@ const displayedProducts = computed(() => {
 
         <!-- Product Grid -->
         <div class="product-grid">
-            <router-link
-                v-for="item in displayedProducts"
-                :key="item.id" 
-                :to="{ name: 'catalog', params: { lang: currentLang, category: currentCategory, productSlug: item.slug } }"
-                class="product-card"
-            >
-                <div class="card-image">
-                    <div class="badge" v-if="item.price_1">{{ $t('catalog.artisanChoice') }}</div>
-                    <img :src="getImageUrl(item.image_key)" :alt="tProduct(item, 'name')">
-                </div>
-                <div class="card-content">
-                    <h3 class="card-title">{{ tProduct(item, 'name') }}</h3>
-                    <div class="card-bottom">
-                        <div class="card-desc">
-                            <div class="card-price" v-if="getCheapestPrice(item)">
-                                <span class="cheapest-label">{{ $t('catalog.cheapestAt') }}</span>
-                                <span class="price-value">฿{{ getCheapestPrice(item) }}</span>
-                            </div>
-                            <div class="card-moq" v-if="item.moq">
-                                {{ $t('catalog.moq') }}: {{ item.moq }}
-                            </div>
-                        </div>
-                        <button class="add-btn" @click.prevent.stop="handleAddToCartClick(item)">
-                            <ion-icon name="cart"></ion-icon> {{ $t('catalog.addToOrderShort') }}
-                        </button>
+            <div v-if="loading" class="loading-state"
+                style="grid-column: 1/-1; text-align: center; padding: 60px 0;">
+                <div class="loader"></div>
+                <p style="color: #6b5d54; font-weight: 600; margin-top: 15px;">Loading products...</p>
+            </div>
+            <template v-else>
+                <router-link
+                    v-for="item in displayedProducts"
+                    :key="item.id"
+                    :to="{ name: 'catalog', params: { lang: currentLang, category: currentCategory, productSlug: item.slug } }"
+                    class="product-card"
+                >
+                    <div class="card-image">
+                        <div class="badge" v-if="item.price_1">{{ $t('catalog.artisanChoice') }}</div>
+                        <img :src="getImageUrl(item.image_key)" :alt="tProduct(item, 'name')">
                     </div>
-                </div>
-            </router-link>
+                    <div class="card-content">
+                        <h3 class="card-title">{{ tProduct(item, 'name') }}</h3>
+                        <div class="card-bottom">
+                            <div class="card-desc">
+                                <div class="card-price" v-if="getCheapestPrice(item)">
+                                    <span class="cheapest-label">{{ $t('catalog.cheapestAt') }}</span>
+                                    <span class="price-value">฿{{ getCheapestPrice(item) }}</span>
+                                </div>
+                                <div class="card-moq" v-if="item.moq">
+                                    {{ $t('catalog.moq') }}: {{ item.moq }}
+                                </div>
+                            </div>
+                            <button class="add-btn" @click.prevent.stop="handleAddToCartClick(item)">
+                                <ion-icon name="cart"></ion-icon> {{ $t('catalog.addToOrderShort') }}
+                            </button>
+                        </div>
+                    </div>
+                </router-link>
+            </template>
         </div>
 
         <!-- Product Details Popup -->
@@ -521,26 +536,24 @@ const displayedProducts = computed(() => {
                         </div>
                         <p class="popup-description" v-if="tProduct(selectedProduct, 'description')">{{ tProduct(selectedProduct, 'description') }}</p>
 
-                        <div class="detail-section" v-if="tProduct(selectedProduct, 'usage')">
-                            <h3 class="detail-heading">
+                        <div class="detail-section" v-if="tProduct(selectedProduct, 'attribute')" style="margin:0; display:flex; border-bottom: 1px solid #eee; justify-content:end;">
+                            <!-- <h3 class="detail-heading">
+                                <ion-icon name="information-circle-outline"></ion-icon>
+                            </h3> -->
+                            <p class="detail-text">{{ $t('catalog.attribute') }} : {{ tProduct(selectedProduct, 'attribute') }}</p>
+                        </div>
+
+                        <div class="detail-section" v-if="usageEntries.length > 0" style="margin-bottom:10px">
+                            <h3 class="detail-heading" style="margin-top: 10px;">
                                 <ion-icon name="hammer-outline"></ion-icon>
                                 {{ $t('catalog.howItsUsed') }}
                             </h3>
-                            <div class="tags-container">
-                                <span v-for="use in tProduct(selectedProduct, 'usage').split(',').filter(u => u.trim())"
-                                    :key="use" class="tag usage-tag">
-                                    {{ use.trim() }}
-                                </span>
-                            </div>
+                            <ul class="usage-list">
+                                <li v-for="entry in usageEntries" :key="entry.type">
+                                    {{ entry.type }}<span v-if="entry.example"> : {{ entry.example }}</span>
+                                </li>
+                            </ul>
                         </div>
-
-                        <!-- <div class="detail-section" v-if="tProduct(selectedProduct, 'use_for')">
-                            <h3 class="detail-heading">
-                                <ion-icon name="checkmark-circle-outline"></ion-icon>
-                                {{ $t('catalog.whatItsFor') }}
-                            </h3>
-                            <p class="detail-text">{{ tProduct(selectedProduct, 'use_for') }}</p>
-                        </div> -->
 
                         <div class="detail-section" v-if="tProduct(selectedProduct, 'varieties')">
                             <h3 class="detail-heading">
@@ -606,7 +619,7 @@ const displayedProducts = computed(() => {
                                 <ion-icon name="cart"></ion-icon> {{ $t('catalog.addToOrder') }}
                             </button>
                         </div>
-                        <div v-if="!tProduct(selectedProduct, 'description') && !tProduct(selectedProduct, 'usage') && !tProduct(selectedProduct, 'use_for') && !tProduct(selectedProduct, 'varieties') && !tProduct(selectedProduct, 'sizes') && !tProduct(selectedProduct, 'colors')" class="no-details-message">
+                        <div v-if="!tProduct(selectedProduct, 'description') && !tProduct(selectedProduct, 'attribute') && usageEntries.length === 0 && !tProduct(selectedProduct, 'varieties') && !tProduct(selectedProduct, 'sizes') && !tProduct(selectedProduct, 'colors')" class="no-details-message">
                             <p>{{ $t('catalog.noAdditionalDetails') || 'No additional details available for this product.' }}</p>
                         </div>
                     </div>
@@ -689,15 +702,18 @@ const displayedProducts = computed(() => {
 .category-bar-image {
     width: 60px;
     height: 60px;
-    border-radius: 10px;
+    border-radius: 1rem;
     overflow: hidden;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid black;
 }
 
-.category-bar-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+.category-bar-image ion-icon {
+    font-size: 30px;
+    color: #8b6f47;
 }
 
 .category-bar-title {
@@ -787,6 +803,27 @@ const displayedProducts = computed(() => {
     margin: 0 auto;
     padding: 0 1rem;
     gap: 2px;
+}
+
+/* Spinner Loader styling */
+.loader {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #8b6f47;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 .product-card {
@@ -1171,8 +1208,8 @@ const displayedProducts = computed(() => {
     font-size: 16px;
     color: #666;
     line-height: 1.6;
-    margin-bottom: 30px;
     text-align: justify;
+    margin-bottom: 0;
 }
 
 .detail-section {
@@ -1228,10 +1265,25 @@ const displayedProducts = computed(() => {
     color: #f57c00;
 }
 
-.usage-tag {
-    background: #f0ece4;
+.usage-list {
+    margin: 0;
+    padding-left: 30px;
+}
+
+.usage-list li {
+    font-size: 15px;
+    color: #555;
+    line-height: 1.7;
+}
+
+.usage-list li strong {
+    color: #2d2d2d;
+    text-transform: capitalize;
+    font-weight: 600;
+}
+
+.usage-list li::marker {
     color: #8b6f47;
-    border-radius: 20px;
 }
 
 /* PRICE TIERS */
@@ -1450,6 +1502,10 @@ const displayedProducts = computed(() => {
     .category-bar-image {
         width: 44px;
         height: 44px;
+    }
+
+    .category-bar-image ion-icon {
+        font-size: 22px;
     }
 
     .category-bar-title {

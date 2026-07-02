@@ -297,7 +297,7 @@ onUnmounted(() => {
         <!-- Catalog dropdown -->
         <div class="nav-item-wrap" @mouseenter="openCatalog" @mouseleave="closeCatalog" @click.stop>
           <router-link
-            :to="{ name: 'catalog', params: { lang: currentLang, category: 'yarn' } }"
+            :to="{ name: 'catalog', params: { lang: currentLang, category: 'all' } }"
             class="nav-link nav-link-dd"
             active-class="active"
             @click="scrollToTop; closeAllMenus()"

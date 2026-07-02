@@ -1133,7 +1133,7 @@ export default {
 
 			if (url.pathname === "/products" && request.method === "POST") {
 				const body = await request.json() as any;
-				const { name, name_th, description, price, category, categories, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images, stock, variants } = body;
+				const { name, name_th, description, price, category, categories, image_key, usage, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images, stock, variants } = body;
 				const categoryList = normalizeCategoryList(categories, category);
 				const primaryCategory = categoryList[0] || category || null;
 				const activePrice = price || price_3 || 0;
@@ -1148,10 +1148,10 @@ export default {
 					const sku = await allocateProductSku(env, primaryCategory, body.sku);
 
 					const { meta } = await env.DB.prepare(
-						"INSERT INTO products (name, name_th, description, description_th, price, category, image_key, usage, usage_th, use_for, use_for_th, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, stock, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+						"INSERT INTO products (name, name_th, description, description_th, price, category, image_key, usage, usage_th, attribute, attribute_th, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, stock, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 					).bind(
 						dbValue(name), dbValue(name_th), dbValue(description), dbValue(body.description_th || null), activePrice, primaryCategory,
-						dbValue(image_key), dbValue(usage), dbValue(body.usage_th || null), dbValue(use_for), dbValue(body.use_for_th || null), dbValue(varieties), dbValue(sizes), dbValue(colors),
+						dbValue(image_key), dbValue(usage), dbValue(body.usage_th || null), dbValue(body.attribute || null), dbValue(body.attribute_th || null), dbValue(varieties), dbValue(sizes), dbValue(colors),
 						price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, dbValue(moq), is_visible === false ? 0 : 1, initialStock, sku
 					).run();
 
@@ -1202,7 +1202,7 @@ export default {
 			if (url.pathname.startsWith("/products/") && request.method === "PUT") {
 				const id = url.pathname.split("/products/")[1];
 				const body = await request.json() as any;
-				const { name, name_th, description, price, category, categories, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images, stock, variants } = body;
+				const { name, name_th, description, price, category, categories, image_key, usage, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images, stock, variants } = body;
 				const categoryList = normalizeCategoryList(categories, category);
 				const primaryCategory = categoryList[0] || category || null;
 				const activePrice = price_3 || price || 0;
@@ -1214,10 +1214,10 @@ export default {
 				const currentProduct = await env.DB.prepare("SELECT stock FROM products WHERE id = ?").bind(id).first() as any;
 
 				await env.DB.prepare(
-					"UPDATE products SET name=?, name_th=?, description=?, description_th=?, price=?, category=?, image_key=?, usage=?, usage_th=?, use_for=?, use_for_th=?, varieties=?, sizes=?, colors=?, price_1=?, price_2=?, price_3=?, price_4=?, price_5=?, moq=?, is_visible=?, stock=? WHERE id=?"
+					"UPDATE products SET name=?, name_th=?, description=?, description_th=?, price=?, category=?, image_key=?, usage=?, usage_th=?, attribute=?, attribute_th=?, varieties=?, sizes=?, colors=?, price_1=?, price_2=?, price_3=?, price_4=?, price_5=?, moq=?, is_visible=?, stock=? WHERE id=?"
 				).bind(
 					dbValue(name), dbValue(name_th), dbValue(description), dbValue(body.description_th || null), activePrice, primaryCategory,
-					dbValue(image_key), dbValue(usage), dbValue(body.usage_th || null), dbValue(use_for), dbValue(body.use_for_th || null), dbValue(varieties), dbValue(sizes), dbValue(colors),
+					dbValue(image_key), dbValue(usage), dbValue(body.usage_th || null), dbValue(body.attribute || null), dbValue(body.attribute_th || null), dbValue(varieties), dbValue(sizes), dbValue(colors),
 					price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, dbValue(moq), is_visible === false ? 0 : 1, stock ?? 0, id
 				).run();
 

@@ -44,8 +44,8 @@ const newProduct = ref({
   image_key: '',
   usage: '',
   usage_th: '',
-  use_for: '',
-  use_for_th: '',
+  attribute: '',
+  attribute_th: '',
   varieties: '',
   varieties_th: '',
   sizes: '',
@@ -74,8 +74,8 @@ const galleryFileInput = ref(null);
 const sizeVariants = ref([]); // list of { name, price_1, price_2, price_3, price_4, price_5, stock, image_key }
 const initialVariantNames = ref([]); // track loaded variants
 
-const showDescTh = ref(true);
-const showUseForTh = ref(true);
+// Single shared EN/TH toggle for description, attribute, and usage examples
+const showThaiFields = ref(true);
 const usageOptions = [
   { en: 'sewing',           th: 'งานเย็บ' },
   { en: 'crafting',         th: 'งานประดิษฐ์' },
@@ -91,20 +91,62 @@ const usageOptions = [
   { en: 'punching',         th: 'งานตอก' }
 ];
 
-const selectedUsages = ref([]);
+// Each entry: { en, th, example, example_th } — one per selected usage type,
+// with a small example text the admin writes describing that usage for this product.
+const usageEntries = ref([]);
 
-// Sync FROM newProduct.usage -> selectedUsages (e.g. on editProduct load)
+const isUsageSelected = (en) => usageEntries.value.some(e => e.en === en);
+
+const toggleUsageOption = (u) => {
+  const idx = usageEntries.value.findIndex(e => e.en === u.en);
+  if (idx >= 0) {
+    usageEntries.value.splice(idx, 1);
+  } else {
+    usageEntries.value.push({ en: u.en, th: u.th, example: '', example_th: '' });
+  }
+};
+
+// Accepts either the new JSON format ([{type, example}]) or the legacy
+// comma-separated string format, and normalizes both into usageEntries.
+const parseUsageRaw = (raw, rawTh) => {
+  const parseSide = (str) => {
+    if (!str) return [];
+    try {
+      const parsed = JSON.parse(str);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // Legacy comma-separated list
+    }
+    return str.split(',').map(s => s.trim()).filter(Boolean).map(type => ({ type, example: '' }));
+  };
+  const enList = parseSide(raw);
+  const thList = parseSide(rawTh);
+  return enList.map((entry, i) => {
+    const opt = usageOptions.find(o => o.en === entry.type);
+    return {
+      en: entry.type || '',
+      th: thList[i]?.type || opt?.th || entry.type || '',
+      example: entry.example || '',
+      example_th: thList[i]?.example || ''
+    };
+  });
+};
+
+// Sync FROM newProduct.usage -> usageEntries (e.g. on editProduct load)
 watch(() => newProduct.value.usage, (val) => {
-  selectedUsages.value = val ? val.split(', ').map(s => s.trim()).filter(Boolean) : [];
+  usageEntries.value = parseUsageRaw(val, newProduct.value.usage_th);
 }, { immediate: true });
 
-// Sync TO newProduct when checkboxes change
-watch(selectedUsages, (val) => {
-  newProduct.value.usage = val.join(', ');
-  newProduct.value.usage_th = val
-    .map(en => usageOptions.find(u => u.en === en)?.th || en)
-    .join(', ');
-}, { flush: 'sync' });
+// Sync TO newProduct when entries/examples change
+watch(usageEntries, (val) => {
+  if (val.length === 0) {
+    newProduct.value.usage = '';
+    newProduct.value.usage_th = '';
+  } else {
+    newProduct.value.usage = JSON.stringify(val.map(e => ({ type: e.en, example: e.example || '' })));
+    newProduct.value.usage_th = JSON.stringify(val.map(e => ({ type: e.th || e.en, example: e.example_th || '' })));
+  }
+}, { deep: true, flush: 'sync' });
 
 const detectedSizes = computed(() => {
   const sizes = new Set();
@@ -210,6 +252,17 @@ const validateStockAdjustment = () => {
 
 const showFormulaPopup = ref(false);
 const formulaInput = ref("200, 180, 160, 130");
+
+const previewImageSrc = ref(null);
+const openImagePreview = (img) => {
+  // Newly picked local files have no server-side variants yet — their preview
+  // (an object URL) is already full resolution. Saved images only have a thumb
+  // rendered in the grid, so fetch the large variant for the lightbox.
+  previewImageSrc.value = img.is_new ? img.preview : getImageUrl(img.image_key, 'large');
+};
+const closeImagePreview = () => {
+  previewImageSrc.value = null;
+};
 
 const fileInput = ref(null);
 const triggerFileUpload = () => {
@@ -360,7 +413,7 @@ const triggerGalleryUpload = () => {
 const resetForm = () => {
   newProduct.value = {
     name: '', name_th: '', description: '', description_th: '', price: 0, category: '', categories: [], image_key: '',
-    usage: '', usage_th: '', use_for: '', use_for_th: '', varieties: '', varieties_th: '', sizes: '', sizes_th: '', colors: '', colors_th: '',
+    usage: '', usage_th: '', attribute: '', attribute_th: '', varieties: '', varieties_th: '', sizes: '', sizes_th: '', colors: '', colors_th: '',
     price_1: 0, price_2: 0, price_3: 0, price_4: 0, price_5: 0, moq: '', is_visible: true, stock: 0
   };
   selectedFile.value = null;
@@ -371,7 +424,7 @@ const resetForm = () => {
   isEditing.value = false;
   editingId.value = null;
   stockAdjustment.value = 0;
-  showDescTh.value = false;
+  showThaiFields.value = true;
   formPanelOpen.value = false;
 };
 
@@ -382,7 +435,7 @@ const editProduct = (product) => {
   newProduct.value = { ...product };
   // Normalize DB integer (1/0/null) to a boolean for the toggle
   newProduct.value.is_visible = product.is_visible !== 0;
-  showDescTh.value = false;
+  showThaiFields.value = true;
   imagePreview.value = null; // Clear local preview to show saved image
 
   if (!newProduct.value.categories || newProduct.value.categories.length === 0) {
@@ -598,8 +651,8 @@ const handleSubmit = async () => {
       image_key: newProduct.value.image_key || null,
       usage: newProduct.value.usage || null,
       usage_th: newProduct.value.usage_th || null,
-      use_for: newProduct.value.use_for || null,
-      use_for_th: newProduct.value.use_for_th || null,
+      attribute: newProduct.value.attribute || null,
+      attribute_th: newProduct.value.attribute_th || null,
       varieties: newProduct.value.varieties || null,
       sizes: newProduct.value.sizes || null,
       colors: newProduct.value.colors || null,
@@ -706,12 +759,6 @@ const onCategoriesChange = () => {
   newProduct.value.category = firstPath;
   if (!isEditing.value) {
     newProduct.value.sku = '';
-  }
-  const selectedCat = categories.value.find(c => c.path === firstPath);
-  if (selectedCat) {
-    if (selectedCat.default_use_for) {
-      newProduct.value.use_for = selectedCat.default_use_for;
-    }
   }
 };
 
@@ -946,9 +993,15 @@ const deleteDiyProduct = async (id) => {
               <div class="header-title-group">
                 <h2 style="padding: 0; margin: 0;">{{ isEditing ? $t('admin.editProduct') : $t('admin.addProduct') }}</h2>
               </div>
-              <button @click="resetForm" class="cancel-btn">
-                <ion-icon name="close-circle-outline"></ion-icon> {{ isEditing ? $t('admin.cancelEdit') : $t('admin.cancel') }}
-              </button>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <button type="button" @click="showThaiFields = !showThaiFields"
+                  style="font-size:11px; padding:2px 8px; border-radius:12px; border:1px solid #b2bec3; background: #f1f2f6; cursor:pointer; color:#636e72;">
+                  {{ showThaiFields ? 'TH' : 'EN' }}
+                </button>
+                <button @click="resetForm" class="cancel-btn">
+                  <ion-icon name="close-circle-outline"></ion-icon> {{ isEditing ? $t('admin.cancelEdit') : $t('admin.cancel') }}
+                </button>
+              </div>
             </div>
 
             <form id="product-form" @submit.prevent="handleSubmit">
@@ -976,15 +1029,11 @@ const deleteDiyProduct = async (id) => {
                   <input type="file" ref="fileInput" class="hidden-input" @change="handleFileUpload" accept="image/*" />
                 </div>
                 <div class="form-group" style="margin-top:10px;">
-                  <label>
-                    {{ $t('admin.useFor') }}
-                    <button type="button" @click="showUseForTh = !showUseForTh"
-                      style="font-size:11px; padding:2px 8px; border-radius:12px; border:1px solid #b2bec3; background: #f1f2f6; cursor:pointer; color:#636e72;">
-                      {{ showUseForTh ? 'TH' : 'EN' }}
-                    </button>
-                  </label>
-                  <input v-if="!showUseForTh" v-model="newProduct.use_for" :placeholder="$t('admin.placeholderUseFor')" />
-                  <input v-if="showUseForTh" v-model="newProduct.use_for_th" :placeholder="`ใช้สำหรับทำอะไรบ้าง...`" />
+                  <label>{{ $t('admin.attribute') }}</label>
+                  <textarea v-if="!showThaiFields" v-model="newProduct.attribute" rows="2"
+                    :placeholder="$t('admin.placeholderAttribute')"></textarea>
+                  <textarea v-if="showThaiFields" v-model="newProduct.attribute_th" rows="2"
+                    placeholder="คุณสมบัติของสินค้า..."></textarea>
                 </div>
               </div>
               <div>
@@ -1031,16 +1080,10 @@ const deleteDiyProduct = async (id) => {
                   <small class="auto-hint">{{ $t('admin.categoriesHint') }}</small>
                 </div>
                 <div class="form-group">
-                  <label style="display:flex; align-items:center; gap:8px;">
-                    {{ $t('admin.description') }}
-                    <button type="button" @click="showDescTh = !showDescTh"
-                      style="font-size:11px; padding:2px 8px; border-radius:12px; border:1px solid #b2bec3; background: #f1f2f6; cursor:pointer; color:#636e72;">
-                      {{ showDescTh ? 'TH' : 'EN' }}
-                    </button>
-                  </label>
-                  <textarea v-if="!showDescTh" required v-model="newProduct.description" rows="10"
+                  <label>{{ $t('admin.description') }}</label>
+                  <textarea v-if="!showThaiFields" required v-model="newProduct.description" rows="10"
                     placeholder="English description..."></textarea>
-                  <textarea v-if="showDescTh" v-model="newProduct.description_th" rows="10"
+                  <textarea v-if="showThaiFields" v-model="newProduct.description_th" rows="10"
                     placeholder="คำอธิบายภาษาไทย..."
                     ></textarea>
                   <small class="auto-hint">{{ $t('admin.autoTranslateHint') }}</small>
@@ -1056,8 +1099,8 @@ const deleteDiyProduct = async (id) => {
                   class="dropdown-toggle"
                   @click="usageDropdownOpen = !usageDropdownOpen"
                 >
-                  <span v-if="selectedUsages?.length > 0" class="dropdown-value">
-                    {{ selectedUsages.length }} selected
+                  <span v-if="usageEntries.length > 0" class="dropdown-value">
+                    {{ usageEntries.length }} selected
                   </span>
                   <span v-else class="dropdown-placeholder">Select usages...</span>
                   <ion-icon :name="usageDropdownOpen ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
@@ -1076,8 +1119,8 @@ const deleteDiyProduct = async (id) => {
                       <label v-for="u in filteredUsages" :key="u.en" class="dropdown-option">
                         <input
                           type="checkbox"
-                          :value="u.en"
-                          v-model="selectedUsages"
+                          :checked="isUsageSelected(u.en)"
+                          @change="toggleUsageOption(u)"
                           style="width: 16px;"
                         />
                         <span>{{ u.en }} <span class="cat-th-label">({{ u.th }})</span></span>
@@ -1086,7 +1129,19 @@ const deleteDiyProduct = async (id) => {
                   </div>
                 </transition>
               </div>
-              <small class="auto-hint" v-if="newProduct.usage">{{ newProduct.usage }}</small>
+
+              <!-- One small example text area per selected usage type -->
+              <div v-if="usageEntries.length > 0" class="usage-examples" style="margin-top:12px; display:flex; flex-direction:column; gap:10px;">
+                <div v-for="entry in usageEntries" :key="entry.en" class="usage-example-item">
+                  <label style="font-weight:600; font-size:13px;">
+                    {{ showThaiFields ? entry.th : entry.en }}
+                  </label>
+                  <textarea v-if="!showThaiFields" v-model="entry.example" rows="1"
+                    :placeholder="$t('admin.usageExamplePlaceholder')"></textarea>
+                  <textarea v-if="showThaiFields" v-model="entry.example_th" rows="1"
+                    placeholder="อธิบายตัวอย่างของการใช้งานนี้..."></textarea>
+                </div>
+              </div>
             </div>
 
           </form>
@@ -1202,6 +1257,14 @@ const deleteDiyProduct = async (id) => {
               </div>
             </div>
           </transition>
+
+          <!-- Image Preview Lightbox -->
+          <transition name="fade">
+            <div v-if="previewImageSrc" class="image-preview-overlay" @click.self="closeImagePreview">
+              <button type="button" class="image-preview-close" @click="closeImagePreview">&times;</button>
+              <img :src="previewImageSrc" class="image-preview-img" alt="Preview" />
+            </div>
+          </transition>
                     <!-- Gallery & Variant Manager (For Standard section) -->
           <div v-if="activeAdminSection === 'standard'" class="gallery-variant-manager">
           <div class="workspace-header">
@@ -1216,7 +1279,7 @@ const deleteDiyProduct = async (id) => {
           <div class="gallery-workspace-grid" v-if="galleryImages.length > 0">
             <div v-for="(img, index) in galleryImages" :key="index" class="gallery-card">
               <div class="card-thumb">
-                <img :src="img.preview" />
+                <img :src="img.preview" @click="openImagePreview(img)" />
                 <button type="button" class="remove-card-btn" @click="removeGalleryImage(index)">&times;</button>
               </div>
               <div class="card-controls">
@@ -2527,6 +2590,54 @@ select {
   font-size: 0.9rem;
 }
 
+/* Image Preview Lightbox */
+.image-preview-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  padding: 40px;
+}
+
+.image-preview-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+  animation: modalPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.image-preview-close {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  font-size: 32px;
+  line-height: 1;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.image-preview-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 .formula-info {
   margin-bottom: 20px;
 }
@@ -2736,6 +2847,7 @@ select {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  cursor: zoom-in;
 }
 
 .remove-card-btn {
