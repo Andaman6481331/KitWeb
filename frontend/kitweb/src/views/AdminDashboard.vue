@@ -67,12 +67,8 @@ const imagePreview = ref(null);
 const uploading = ref(false);
 const stockAdjustment = ref(0);
 
-const galleryImages = ref([]); // Array of { key, file, preview, attribute_type, attribute_value, is_new: boolean }
+const galleryImages = ref([]); // Array of { key, file, preview, attribute_type, attribute_value, price_1..5, is_new: boolean }
 const galleryFileInput = ref(null);
-
-// Variant states derived from gallery image link roles
-const sizeVariants = ref([]); // list of { name, price_1, price_2, price_3, price_4, price_5, stock, image_key }
-const initialVariantNames = ref([]); // track loaded variants
 
 // Single shared EN/TH toggle for description, attribute, and usage examples
 const showThaiFields = ref(true);
@@ -147,96 +143,6 @@ watch(usageEntries, (val) => {
     newProduct.value.usage_th = JSON.stringify(val.map(e => ({ type: e.th || e.en, example: e.example_th || '' })));
   }
 }, { deep: true, flush: 'sync' });
-
-const detectedSizes = computed(() => {
-  const sizes = new Set();
-  galleryImages.value.forEach(img => {
-    if (img.attribute_type === 'size' && img.attribute_value) {
-      sizes.add(img.attribute_value.trim());
-    }
-  });
-  return Array.from(sizes);
-});
-
-const detectedColors = computed(() => {
-  const colors = new Set();
-  galleryImages.value.forEach(img => {
-    if (img.attribute_type === 'color' && img.attribute_value) {
-      colors.add(img.attribute_value.trim());
-    }
-  });
-  return Array.from(colors);
-});
-
-watch(
-  [
-    () => galleryImages.value.map(img => `${img.attribute_type}:${img.attribute_value}`),
-    () => [...initialVariantNames.value]
-  ],
-  () => {
-    const detected = new Set();
-    galleryImages.value.forEach(img => {
-      if (img.attribute_type === 'size' && img.attribute_value) {
-        const trimmed = img.attribute_value.trim();
-        if (trimmed) {
-          detected.add(trimmed);
-        }
-      }
-    });
-
-    const allSizeNames = Array.from(new Set([...initialVariantNames.value, ...detected]));
-
-    const updated = allSizeNames.map(size => {
-      const existing = sizeVariants.value.find(sv => sv.name === size);
-      if (existing) return existing;
-      
-      // Check if the loaded product had this variant (for edit mode)
-      if (isEditing.value && newProduct.value.variants) {
-        const match = newProduct.value.variants.find(v => v.variant_name === size);
-        if (match) {
-          return {
-            name: size,
-            price_1: match.price_1 || 0,
-            price_2: match.price_2 || 0,
-            price_3: match.price_3 || 0,
-            price_4: match.price_4 || 0,
-            price_5: match.price_5 || 0,
-            stock: match.stock || 0,
-            image_key: match.image_key || ''
-          };
-        }
-      }
-
-      return {
-        name: size,
-        price_1: newProduct.value.price_1 || 0,
-        price_2: newProduct.value.price_2 || 0,
-        price_3: newProduct.value.price_3 || 0,
-        price_4: newProduct.value.price_4 || 0,
-        price_5: newProduct.value.price_5 || 0,
-        stock: 0,
-        image_key: ''
-      };
-    });
-    sizeVariants.value = updated;
-  },
-  { deep: true, immediate: true }
-);
-
-const removeSizeVariant = (sizeName) => {
-  initialVariantNames.value = initialVariantNames.value.filter(n => n !== sizeName);
-
-  // Untag any gallery images that have this size name
-  galleryImages.value.forEach(img => {
-    if (img.attribute_type === 'size' && img.attribute_value?.trim() === sizeName) {
-      img.attribute_type = 'gallery';
-      img.attribute_value = '';
-    }
-  });
-
-  // Filter it from sizeVariants
-  sizeVariants.value = sizeVariants.value.filter(sv => sv.name !== sizeName);
-};
 
 const updateStockAdjustment = (amount) => {
   stockAdjustment.value += amount;
@@ -395,6 +301,11 @@ const handleGalleryUpload = (event) => {
       preview: URL.createObjectURL(file),
       attribute_type: 'gallery',
       attribute_value: '',
+      price_1: null,
+      price_2: null,
+      price_3: null,
+      price_4: null,
+      price_5: null,
       is_new: true
     });
   });
@@ -419,8 +330,6 @@ const resetForm = () => {
   selectedFile.value = null;
   imagePreview.value = null;
   galleryImages.value = [];
-  sizeVariants.value = [];
-  initialVariantNames.value = [];
   isEditing.value = false;
   editingId.value = null;
   stockAdjustment.value = 0;
@@ -458,26 +367,6 @@ const editProduct = (product) => {
     }));
   } else {
     galleryImages.value = [];
-  }
-
-  // Load variants directly to sizeVariants and initialVariantNames
-  if (product.variants && product.variants.length > 0) {
-    initialVariantNames.value = product.variants
-      .map(v => v.variant_name)
-      .filter(name => name !== 'Default');
-    sizeVariants.value = product.variants.map(v => ({
-      name: v.variant_name,
-      price_1: v.price_1 || 0,
-      price_2: v.price_2 || 0,
-      price_3: v.price_3 || 0,
-      price_4: v.price_4 || 0,
-      price_5: v.price_5 || 0,
-      stock: v.stock || 0,
-      image_key: v.image_key || ''
-    })).filter(v => v.name !== 'Default');
-  } else {
-    initialVariantNames.value = [];
-    sizeVariants.value = [];
   }
 
   // window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -551,7 +440,20 @@ const handleSubmit = async () => {
     // 2. Upload Gallery Images if new, saving keys directly to the gallery array
     const finalImages = [];
     let galleryIndex = 1;
+    const priceOrNull = (v) => {
+      const n = parseFloat(v);
+      return Number.isNaN(n) ? null : n;
+    };
+
     for (const img of galleryImages.value) {
+      const isLinked = img.attribute_type === 'variant_link';
+      const priceFields = {
+        price_1: isLinked ? priceOrNull(img.price_1) : null,
+        price_2: isLinked ? priceOrNull(img.price_2) : null,
+        price_3: isLinked ? priceOrNull(img.price_3) : null,
+        price_4: isLinked ? priceOrNull(img.price_4) : null,
+        price_5: isLinked ? priceOrNull(img.price_5) : null
+      };
       if (img.is_new) {
         const baseKey = await prepareAndUpload(img.file, `-g${galleryIndex++}`);
         img.image_key = baseKey; // save back to helper ref
@@ -560,85 +462,22 @@ const handleSubmit = async () => {
           image_key: baseKey,
           attribute_type: img.attribute_type,
           attribute_value: img.attribute_value,
-          is_main: false
+          is_main: false,
+          ...priceFields
         });
       } else {
         finalImages.push({
           image_key: img.image_key,
           attribute_type: img.attribute_type,
           attribute_value: img.attribute_value,
-          is_main: img.is_main
+          is_main: img.is_main,
+          ...priceFields
         });
       }
     }
 
     // Add images to payload
     newProduct.value.images = finalImages.filter(img => img.image_key);
-
-    // 3. Build variants payload
-    const variantsPayload = [];
-    const colorsList = detectedColors.value;
-
-    if (sizeVariants.value.length > 0) {
-      for (const sv of sizeVariants.value) {
-        // Find size variant image key
-        const sizeImageObj = galleryImages.value.find(img => img.attribute_type === 'size' && img.attribute_value?.trim() === sv.name);
-        const sizeImageKey = sizeImageObj ? sizeImageObj.image_key : null;
-
-        // Generate variant specific SKU slug
-        const sizeSlug = sv.name.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().substring(0, 5);
-        const variantSku = `${sku}-${sizeSlug}`;
-
-        const variantColors = colorsList.map(colorName => {
-          const colorImageObj = galleryImages.value.find(img => img.attribute_type === 'color' && img.attribute_value?.trim() === colorName);
-          const colorImageKey = colorImageObj ? colorImageObj.image_key : null;
-          return {
-            color_name: colorName,
-            image_key: colorImageKey,
-            stock: sv.stock || 0
-          };
-        });
-
-        variantsPayload.push({
-          variant_name: sv.name,
-          sku: variantSku,
-          price_1: parseFloat(sv.price_1) || 0,
-          price_2: parseFloat(sv.price_2) || 0,
-          price_3: parseFloat(sv.price_3) || 0,
-          price_4: parseFloat(sv.price_4) || 0,
-          price_5: parseFloat(sv.price_5) || 0,
-          stock: parseInt(sv.stock) || 0,
-          image_key: sizeImageKey,
-          colors: variantColors
-        });
-      }
-    } else if (colorsList.length > 0) {
-      // Colors only, no sizes -> create a single default variant
-      const variantColors = colorsList.map(colorName => {
-        const colorImageObj = galleryImages.value.find(img => img.attribute_type === 'color' && img.attribute_value?.trim() === colorName);
-        const colorImageKey = colorImageObj ? colorImageObj.image_key : null;
-        return {
-          color_name: colorName,
-          image_key: colorImageKey,
-          stock: parseInt(newProduct.value.stock) || 0
-        };
-      });
-
-      variantsPayload.push({
-        variant_name: 'Default',
-        sku: `${sku}-DFT`,
-        price_1: parseFloat(newProduct.value.price_1) || 0,
-        price_2: parseFloat(newProduct.value.price_2) || 0,
-        price_3: parseFloat(newProduct.value.price_3) || 0,
-        price_4: parseFloat(newProduct.value.price_4) || 0,
-        price_5: parseFloat(newProduct.value.price_5) || 0,
-        stock: parseInt(newProduct.value.stock) || 0,
-        image_key: null,
-        colors: variantColors
-      });
-    }
-
-    newProduct.value.variants = variantsPayload;
 
     const productPayload = {
       name: newProduct.value.name,
@@ -665,8 +504,7 @@ const handleSubmit = async () => {
       is_visible: newProduct.value.is_visible !== false,
       stock: newProduct.value.stock,
       sku: newProduct.value.sku || undefined,
-      images: finalImages.filter(img => img.image_key),
-      variants: variantsPayload
+      images: finalImages.filter(img => img.image_key)
     };
 
     if (isEditing.value) {
@@ -716,33 +554,15 @@ const applyPriceFormula = () => {
     return;
   }
 
-  if (sizeVariants.value.length > 0) {
-    let appliedCount = 0;
-    sizeVariants.value.forEach(sv => {
-      const p5 = parseFloat(sv.price_5);
-      if (!isNaN(p5) && p5 > 0) {
-        sv.price_1 = Number((p5 * percentages[0] / 100).toFixed(2));
-        sv.price_2 = Number((p5 * percentages[1] / 100).toFixed(2));
-        sv.price_3 = Number((p5 * percentages[2] / 100).toFixed(2));
-        sv.price_4 = Number((p5 * percentages[3] / 100).toFixed(2));
-        appliedCount++;
-      }
-    });
-    if (appliedCount === 0) {
-      alert("Please set a valid Level 5 price on at least one variant first.");
-      return;
-    }
-  } else {
-    const p5 = parseFloat(newProduct.value.price_5);
-    if (isNaN(p5) || p5 <= 0) {
-      alert("Please set a valid Level 5 price first.");
-      return;
-    }
-    newProduct.value.price_1 = Number((p5 * percentages[0] / 100).toFixed(2));
-    newProduct.value.price_2 = Number((p5 * percentages[1] / 100).toFixed(2));
-    newProduct.value.price_3 = Number((p5 * percentages[2] / 100).toFixed(2));
-    newProduct.value.price_4 = Number((p5 * percentages[3] / 100).toFixed(2));
+  const p5 = parseFloat(newProduct.value.price_5);
+  if (isNaN(p5) || p5 <= 0) {
+    alert("Please set a valid Level 5 price first.");
+    return;
   }
+  newProduct.value.price_1 = Number((p5 * percentages[0] / 100).toFixed(2));
+  newProduct.value.price_2 = Number((p5 * percentages[1] / 100).toFixed(2));
+  newProduct.value.price_3 = Number((p5 * percentages[2] / 100).toFixed(2));
+  newProduct.value.price_4 = Number((p5 * percentages[3] / 100).toFixed(2));
 
   showFormulaPopup.value = false;
 };
@@ -1240,8 +1060,7 @@ const deleteDiyProduct = async (id) => {
                 <div class="modal-body">
                   <p>{{ $t('admin.formulaDesc') }}</p>
                   <div class="formula-info">
-                    <span class="info-tag" v-if="sizeVariants.length === 0">{{ $t('admin.currentL5', { price: newProduct.price_5 || '0.00' }) }}</span>
-                    <span class="info-tag" v-else>Applying to all variants with a set Level 5 price</span>
+                    <span class="info-tag">{{ $t('admin.currentL5', { price: newProduct.price_5 || '0.00' }) }}</span>
                   </div>
                   <div class="input-group">
                     <label>{{ $t('admin.percentages') }}</label>
@@ -1286,12 +1105,17 @@ const deleteDiyProduct = async (id) => {
                 <label>Link Role</label>
                 <select v-model="img.attribute_type">
                   <option value="gallery">{{$t('admin.galleryOnly')}}</option>
-                  <option value="color">{{$t('admin.colorLink')}}</option>
-                  <option value="size">{{$t('admin.sizeLink')}}</option>
-                  <option value="variant">{{$t('admin.variantLink')}}</option>
+                  <option value="variant_link">{{$t('admin.variantLink')}}</option>
                 </select>
-                <input v-if="img.attribute_type !== 'gallery'" v-model="img.attribute_value" 
-                  :placeholder="img.attribute_type === 'color' ? 'e.g. Red' : 'e.g. 4 inches'" class="card-input" />
+                <input v-if="img.attribute_type === 'variant_link'" v-model="img.attribute_value"
+                  placeholder="e.g. Red / Large" class="card-input" />
+                <div v-if="img.attribute_type === 'variant_link'" class="card-price-tiers">
+                  <input type="number" step="1" v-model="img.price_1" class="card-input" :placeholder="$t('admin.level1')" />
+                  <input type="number" step="1" v-model="img.price_2" class="card-input" :placeholder="$t('admin.level2')" />
+                  <input type="number" step="1" v-model="img.price_3" class="card-input" :placeholder="$t('admin.level3')" />
+                  <input type="number" step="1" v-model="img.price_4" class="card-input" :placeholder="$t('admin.level4')" />
+                  <input type="number" step="1" v-model="img.price_5" class="card-input" :placeholder="$t('admin.level5')" />
+                </div>
               </div>
             </div>
           </div>
@@ -1305,7 +1129,6 @@ const deleteDiyProduct = async (id) => {
             </div>
             <p class="matrix-info-text">
               {{$t('admin.matrixInfoText')}}
-              <span v-if="sizeVariants.length > 0">{{$t('admin.matrixInfoTextColors')}}</span>
             </p>
             <div class="matrix-scrollable">
               <table class="matrix-table">
@@ -1322,52 +1145,30 @@ const deleteDiyProduct = async (id) => {
                   </tr>
                 </thead>
                 <tbody>
-                  <!-- Case 1: Has Size Variants -->
-                  <template v-if="sizeVariants.length > 0">
-                    <tr v-for="(sv, idx) in sizeVariants" :key="idx">
-                      <td class="variant-name-cell">
-                        <strong>{{ sv.name }}</strong>
-                      </td>
-                      <td><input type="number" step="1" v-model="sv.price_1" class="matrix-input" /></td>
-                      <td><input type="number" step="1" v-model="sv.price_2" class="matrix-input" /></td>
-                      <td><input type="number" step="1" v-model="sv.price_3" class="matrix-input" /></td>
-                      <td><input type="number" step="1" v-model="sv.price_4" class="matrix-input" /></td>
-                      <td><input type="number" step="1" v-model="sv.price_5" class="matrix-input" /></td>
-                      <td><input type="number" v-model.number="sv.stock" class="matrix-input stock-input" /></td>
-                      <td style="text-align: center;">
-                        <button type="button" class="action-btn del" @click="removeSizeVariant(sv.name)" title="Remove Variant">
-                          <ion-icon name="trash-outline"></ion-icon>
-                        </button>
-                      </td>
-                    </tr>
-                  </template>
-                  <!-- Case 2: No Size Variants (Base Product) -->
-                  <template v-else>
-                    <tr>
-                      <td class="variant-name-cell">
-                        <strong>{{$t('admin.baseProduct')}}</strong>
-                      </td>
-                      <td><input type="number" step="1" v-model="newProduct.price_1" class="matrix-input" /></td>
-                      <td><input type="number" step="1" v-model="newProduct.price_2" class="matrix-input" /></td>
-                      <td><input type="number" step="1" v-model="newProduct.price_3" class="matrix-input" /></td>
-                      <td><input type="number" step="1" v-model="newProduct.price_4" class="matrix-input" /></td>
-                      <td><input type="number" step="1" v-model="newProduct.price_5" class="matrix-input" /></td>
-                      <td>
-                        <div v-if="!isEditing">
-                          <input type="number" v-model.number="newProduct.stock" class="matrix-input stock-input" min="0" />
+                  <tr>
+                    <td class="variant-name-cell">
+                      <strong>{{$t('admin.baseProduct')}}</strong>
+                    </td>
+                    <td><input type="number" step="1" v-model="newProduct.price_1" class="matrix-input" /></td>
+                    <td><input type="number" step="1" v-model="newProduct.price_2" class="matrix-input" /></td>
+                    <td><input type="number" step="1" v-model="newProduct.price_3" class="matrix-input" /></td>
+                    <td><input type="number" step="1" v-model="newProduct.price_4" class="matrix-input" /></td>
+                    <td><input type="number" step="1" v-model="newProduct.price_5" class="matrix-input" /></td>
+                    <td>
+                      <div v-if="!isEditing">
+                        <input type="number" v-model.number="newProduct.stock" class="matrix-input stock-input" min="0" />
+                      </div>
+                      <div v-else style="display: flex; align-items: center; gap: 6px;">
+                        <input type="number" readonly :value="Math.max(0, (newProduct.stock || 0) + stockAdjustment)" class="matrix-input stock-input" style="background:#f1f2f6; width: 60px;" />
+                        <div class="stock-control edit-stock-control" style="margin: 0; gap: 3px;">
+                          <button type="button" @click="updateStockAdjustment(-1)" class="stock-btn minus" style="width:16px; height:16px; font-size:9px;">-1</button>
+                          <input type="number" v-model.number="stockAdjustment" @input="validateStockAdjustment" class="stock-adjust-input" style="width:36px; padding:0; font-size:11px;" />
+                          <button type="button" @click="updateStockAdjustment(1)" class="stock-btn plus" style="width:16px; height:16px; font-size:9px;">+1</button>
                         </div>
-                        <div v-else style="display: flex; align-items: center; gap: 6px;">
-                          <input type="number" readonly :value="Math.max(0, (newProduct.stock || 0) + stockAdjustment)" class="matrix-input stock-input" style="background:#f1f2f6; width: 60px;" />
-                          <div class="stock-control edit-stock-control" style="margin: 0; gap: 3px;">
-                            <button type="button" @click="updateStockAdjustment(-1)" class="stock-btn minus" style="width:16px; height:16px; font-size:9px;">-1</button>
-                            <input type="number" v-model.number="stockAdjustment" @input="validateStockAdjustment" class="stock-adjust-input" style="width:36px; padding:0; font-size:11px;" />
-                            <button type="button" @click="updateStockAdjustment(1)" class="stock-btn plus" style="width:16px; height:16px; font-size:9px;">+1</button>
-                          </div>
-                        </div>
-                      </td>
-                      <td></td>
-                    </tr>
-                  </template>
+                      </div>
+                    </td>
+                    <td></td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -2896,6 +2697,17 @@ select {
 
 .card-input::placeholder {
   color: #b2bec3;
+}
+
+.card-price-tiers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.card-price-tiers .card-input {
+  padding: 6px;
+  font-size: 12px;
 }
 
 .gallery-workspace-empty {

@@ -29,9 +29,14 @@ CREATE TABLE IF NOT EXISTS product_images (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     product_id INTEGER NOT NULL,
     image_key TEXT NOT NULL,
-    attribute_type TEXT, -- 'variety', 'color', 'size', or 'gallery'
-    attribute_value TEXT, -- e.g., 'Blue', 'XL'
+    attribute_type TEXT, -- 'gallery' or 'variant_link'
+    attribute_value TEXT, -- free-text label for variant_link images, e.g. 'Red / L'
     is_main BOOLEAN DEFAULT 0,
+    price_1 REAL, -- per-image price override, NULL = use product's base price
+    price_2 REAL,
+    price_3 REAL,
+    price_4 REAL,
+    price_5 REAL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );

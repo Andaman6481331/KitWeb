@@ -353,31 +353,16 @@ export default {
 						p.*,
 						(SELECT json_group_array(pc.category_path) FROM product_categories pc WHERE pc.product_id = p.id) as categories,
 						(SELECT json_group_array(json_object(
-							'id', v.id,
-							'variant_name', v.variant_name,
-							'sku', v.sku,
-							'price_1', v.price_1,
-							'price_2', v.price_2,
-							'price_3', v.price_3,
-							'price_4', v.price_4,
-							'price_5', v.price_5,
-							'stock', v.stock,
-							'image_key', v.image_key,
-							'colors', (
-								SELECT json_group_array(json_object(
-									'id', c.id,
-									'color_name', c.color_name,
-									'image_key', c.image_key,
-									'stock', c.stock
-								)) FROM variant_colors c WHERE c.variant_id = v.id
-							)
-						)) FROM product_variants v WHERE v.product_id = p.id) as variants,
-						(SELECT json_group_array(json_object(
 							'id', i.id,
 							'image_key', i.image_key,
 							'attribute_type', i.attribute_type,
 							'attribute_value', i.attribute_value,
-							'is_main', i.is_main
+							'is_main', i.is_main,
+							'price_1', i.price_1,
+							'price_2', i.price_2,
+							'price_3', i.price_3,
+							'price_4', i.price_4,
+							'price_5', i.price_5
 						)) FROM product_images i WHERE i.product_id = p.id) as images
 					FROM products p
 				`;
@@ -405,23 +390,10 @@ export default {
 
 				// Map and parse nested JSON
 				const parsedProducts = products.map((p: any) => {
-					let parsedVariants = [];
-					if (typeof p.variants === 'string') {
-						try {
-							parsedVariants = JSON.parse(p.variants);
-							parsedVariants = parsedVariants.map((v: any) => ({
-								...v,
-								colors: typeof v.colors === 'string' ? JSON.parse(v.colors) : (v.colors || [])
-							}));
-						} catch (err) {
-							console.error("Failed to parse variants JSON:", err);
-						}
-					}
 					return {
 						...p,
 						categories: parseProductCategories(p.categories, p.category),
-						images: typeof p.images === 'string' ? JSON.parse(p.images) : (p.images || []),
-						variants: parsedVariants
+						images: typeof p.images === 'string' ? JSON.parse(p.images) : (p.images || [])
 					};
 				});
 
@@ -1133,7 +1105,7 @@ export default {
 
 			if (url.pathname === "/products" && request.method === "POST") {
 				const body = await request.json() as any;
-				const { name, name_th, description, price, category, categories, image_key, usage, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images, stock, variants } = body;
+				const { name, name_th, description, price, category, categories, image_key, usage, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images, stock } = body;
 				const categoryList = normalizeCategoryList(categories, category);
 				const primaryCategory = categoryList[0] || category || null;
 				const activePrice = price || price_3 || 0;
@@ -1165,28 +1137,11 @@ export default {
 						for (const img of images) {
 							if (!isValidImageKey(img?.image_key)) continue;
 							await env.DB.prepare(
-								"INSERT INTO product_images (product_id, image_key, attribute_type, attribute_value, is_main) VALUES (?, ?, ?, ?, ?)"
-							).bind(productId, img.image_key, dbValue(img.attribute_type), dbValue(img.attribute_value), img.is_main ? 1 : 0).run();
-						}
-					}
-
-					if (variants && Array.isArray(variants) && productId) {
-						for (const v of variants) {
-							if (!v?.variant_name || !v?.sku) continue;
-							const vResult = await env.DB.prepare(
-								"INSERT INTO product_variants (product_id, variant_name, sku, price_1, price_2, price_3, price_4, price_5, stock, image_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-							).bind(productId, v.variant_name, v.sku, v.price_1 || 0, v.price_2 || 0, v.price_3 || 0, v.price_4 || 0, v.price_5 || 0, v.stock || 0, v.image_key || null).run();
-
-							const variantId = vResult.meta.last_row_id;
-
-							if (v.colors && Array.isArray(v.colors) && variantId) {
-								for (const c of v.colors) {
-									if (!c?.color_name) continue;
-									await env.DB.prepare(
-										"INSERT INTO variant_colors (variant_id, color_name, image_key, stock) VALUES (?, ?, ?, ?)"
-									).bind(variantId, c.color_name, c.image_key || null, c.stock || 0).run();
-								}
-							}
+								"INSERT INTO product_images (product_id, image_key, attribute_type, attribute_value, is_main, price_1, price_2, price_3, price_4, price_5) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+							).bind(
+								productId, img.image_key, dbValue(img.attribute_type), dbValue(img.attribute_value), img.is_main ? 1 : 0,
+								dbValue(img.price_1), dbValue(img.price_2), dbValue(img.price_3), dbValue(img.price_4), dbValue(img.price_5)
+							).run();
 						}
 					}
 
@@ -1202,7 +1157,7 @@ export default {
 			if (url.pathname.startsWith("/products/") && request.method === "PUT") {
 				const id = url.pathname.split("/products/")[1];
 				const body = await request.json() as any;
-				const { name, name_th, description, price, category, categories, image_key, usage, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images, stock, variants } = body;
+				const { name, name_th, description, price, category, categories, image_key, usage, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images, stock } = body;
 				const categoryList = normalizeCategoryList(categories, category);
 				const primaryCategory = categoryList[0] || category || null;
 				const activePrice = price_3 || price || 0;
@@ -1236,32 +1191,11 @@ export default {
 					for (const img of images) {
 						if (!isValidImageKey(img?.image_key)) continue;
 						await env.DB.prepare(
-							"INSERT INTO product_images (product_id, image_key, attribute_type, attribute_value, is_main) VALUES (?, ?, ?, ?, ?)"
-						).bind(id, img.image_key, dbValue(img.attribute_type), dbValue(img.attribute_value), img.is_main ? 1 : 0).run();
-					}
-				}
-
-				// Update variants & variant colors: delete and re-insert
-				if (variants && Array.isArray(variants)) {
-					// Delete existing variants (will cascade delete variant_colors)
-					await env.DB.prepare("DELETE FROM product_variants WHERE product_id = ?").bind(id).run();
-
-					for (const v of variants) {
-						if (!v?.variant_name || !v?.sku) continue;
-						const vResult = await env.DB.prepare(
-							"INSERT INTO product_variants (product_id, variant_name, sku, price_1, price_2, price_3, price_4, price_5, stock, image_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-						).bind(id, v.variant_name, v.sku, v.price_1 || 0, v.price_2 || 0, v.price_3 || 0, v.price_4 || 0, v.price_5 || 0, v.stock || 0, v.image_key || null).run();
-
-						const variantId = vResult.meta.last_row_id;
-
-						if (v.colors && Array.isArray(v.colors) && variantId) {
-							for (const c of v.colors) {
-								if (!c?.color_name) continue;
-								await env.DB.prepare(
-									"INSERT INTO variant_colors (variant_id, color_name, image_key, stock) VALUES (?, ?, ?, ?)"
-								).bind(variantId, c.color_name, c.image_key || null, c.stock || 0).run();
-							}
-						}
+							"INSERT INTO product_images (product_id, image_key, attribute_type, attribute_value, is_main, price_1, price_2, price_3, price_4, price_5) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+						).bind(
+							id, img.image_key, dbValue(img.attribute_type), dbValue(img.attribute_value), img.is_main ? 1 : 0,
+							dbValue(img.price_1), dbValue(img.price_2), dbValue(img.price_3), dbValue(img.price_4), dbValue(img.price_5)
+						).run();
 					}
 				}
 

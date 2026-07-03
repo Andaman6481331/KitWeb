@@ -243,6 +243,23 @@ const setMainImage = (key) => {
     currentImageKey.value = key;
 };
 
+// Price tiers to display: a VariantLink image's own price_1..5 override the
+// base product price_1..5 when that image is the one currently shown.
+const displayPrice = computed(() => {
+    const product = selectedProduct.value;
+    if (!product) return {};
+    const images = product.images || [];
+    const match = currentImageKey.value
+        ? images.find(img => img.image_key === currentImageKey.value && img.attribute_type === 'variant_link')
+        : null;
+    const hasOverride = match && [match.price_1, match.price_2, match.price_3, match.price_4, match.price_5]
+        .some(p => p !== null && p !== undefined);
+    if (hasOverride) {
+        return { price_1: match.price_1, price_2: match.price_2, price_3: match.price_3, variantLabel: match.attribute_value || null };
+    }
+    return { price_1: product.price_1, price_2: product.price_2, price_3: product.price_3, variantLabel: null };
+});
+
 // Ordered list of all image keys for the popup gallery (main first, then extras)
 const galleryImageKeys = computed(() => {
     if (!selectedProduct.value) return [];
@@ -594,22 +611,23 @@ const displayedProducts = computed(() => {
                             </div>
                         </div>
                         <div class="detail-section price-section"
-                            v-if="selectedProduct.price_1 || selectedProduct.price_2 || selectedProduct.price_3">
+                            v-if="displayPrice.price_1 || displayPrice.price_2 || displayPrice.price_3">
                             <h3 class="detail-heading">
                                 <ion-icon name="pricetags-outline"></ion-icon>
-                                {{ $t('catalog.pricing') }}
+                                {{ $t('catalog.pricing') }}<span v-if="displayPrice.variantLabel">
+                                    ({{ displayPrice.variantLabel }})</span>
                             </h3>
                             <div class="price-tiers">
-                                <div class="price-tier" v-if="selectedProduct.price_1">
-                                    <span class="price-tier-value">฿{{ selectedProduct.price_1 }}</span>
+                                <div class="price-tier" v-if="displayPrice.price_1">
+                                    <span class="price-tier-value">฿{{ displayPrice.price_1 }}</span>
                                     <span class="price-tier-note">{{ $t('catalog.priceTier1') }}</span>
                                 </div>
-                                <div class="price-tier" v-if="selectedProduct.price_2">
-                                    <span class="price-tier-value">฿{{ selectedProduct.price_2 }}</span>
+                                <div class="price-tier" v-if="displayPrice.price_2">
+                                    <span class="price-tier-value">฿{{ displayPrice.price_2 }}</span>
                                     <span class="price-tier-note">{{ $t('catalog.priceTier2') }}</span>
                                 </div>
-                                <div class="price-tier" v-if="selectedProduct.price_3">
-                                    <span class="price-tier-value">฿{{ selectedProduct.price_3 }}</span>
+                                <div class="price-tier" v-if="displayPrice.price_3">
+                                    <span class="price-tier-value">฿{{ displayPrice.price_3 }}</span>
                                     <span class="price-tier-note">{{ $t('catalog.priceTier3') }}</span>
                                 </div>
                             </div>
