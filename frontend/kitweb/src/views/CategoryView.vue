@@ -20,13 +20,34 @@ const props = defineProps({
   }
 });
 
-// Lowest available wholesale price across the three tiers
-const getCheapestPrice = (item) => {
+// MOQ doubles as the "box size"; stored as free text (e.g. "20 pcs"), so
+// pull out the leading integer and fall back to 1 (no box grouping).
+const parseMoq = (raw) => {
+    if (!raw) return 1;
+    const match = String(raw).match(/\d+/);
+    const n = match ? parseInt(match[0], 10) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : 1;
+};
+
+const roundHalfUp = (value, decimals = 2) => {
+    const factor = 10 ** decimals;
+    return Math.floor(value * factor + 0.5 + Number.EPSILON * factor) / factor;
+};
+
+// Box price -> per-piece display price (never show raw box prices to customers).
+const toPerPiece = (boxPrice, moq) => {
+    const p = Number(boxPrice) || 0;
+    return p ? roundHalfUp(p / (moq || 1), 2) : 0;
+};
+
+// Lowest available per-piece price across the three customer-facing tiers
+// (L1-L3; L4/L5 are staff-only and never shown here).
+const getCheapestPricePerPiece = (item) => {
     if (!item) return 0;
-    const prices = [item.price_1, item.price_2, item.price_3]
+    const boxPrices = [item.price_1, item.price_2, item.price_3]
         .map(Number)
         .filter(p => p > 0);
-    return prices.length ? Math.min(...prices) : 0;
+    return boxPrices.length ? toPerPiece(Math.min(...boxPrices), parseMoq(item.moq)) : 0;
 };
 
 const generateSlug = (name, id) => {
@@ -97,6 +118,84 @@ const showConfirmModal = ref(false);
 const selectedProductForCart = ref(null);
 const showNotification = ref(false);
 const notificationMessage = ref('');
+
+// Per-variant quantity selection inside the confirm modal
+const variantQuantities = ref({});
+const variantQtyWarnings = ref({});
+const showImageLightbox = ref(false);
+const lightboxImageKey = ref(null);
+
+// Variant rows for the confirm modal: real variant_link images, or a single
+// implicit "base" row (using the product's own image/pricing) if none exist.
+const variantsForCart = computed(() => {
+    const product = selectedProductForCart.value;
+    if (!product) return [];
+    const variantImages = (product.images || []).filter(img => img.attribute_type === 'variant_link');
+    if (variantImages.length === 0) {
+        return [{
+            rowKey: 'base',
+            imageKey: product.image_key,
+            label: null,
+            price_1: product.price_1,
+            price_2: product.price_2,
+            price_3: product.price_3
+        }];
+    }
+    return variantImages.map(img => {
+        const hasOverride = [img.price_1, img.price_2, img.price_3].some(p => p !== null && p !== undefined);
+        return {
+            rowKey: img.id,
+            imageKey: img.image_key,
+            label: img.attribute_value || null,
+            price_1: hasOverride ? img.price_1 : product.price_1,
+            price_2: hasOverride ? img.price_2 : product.price_2,
+            price_3: hasOverride ? img.price_3 : product.price_3
+        };
+    });
+});
+
+const moqNumber = computed(() => parseMoq(selectedProductForCart.value?.moq));
+
+const totalVolumeForCart = computed(() =>
+    Object.values(variantQuantities.value).reduce((sum, q) => sum + (Number(q) || 0), 0)
+);
+
+// Only L1-L3 are customer-facing (L4/L5 are staff-only and ignored here).
+const activeTierForCart = computed(() => {
+    const total = totalVolumeForCart.value;
+    return total >= 50 ? 3 : total >= 20 ? 2 : 1;
+});
+
+// Resolves the active tier's box price for a row, falling back to the next
+// LOWER tier only if the target tier's own price is missing/0 (never up).
+const tierBoxPriceForRow = (row) => {
+    const p1 = Number(row.price_1) || 0;
+    const p2 = Number(row.price_2) || 0;
+    const p3 = Number(row.price_3) || 0;
+    const tier = activeTierForCart.value;
+    if (tier === 3) return p3 > 0 ? p3 : (p2 > 0 ? p2 : p1);
+    if (tier === 2) return p2 > 0 ? p2 : p1;
+    return p1;
+};
+
+const cartRowsView = computed(() =>
+    variantsForCart.value.map(row => {
+        const qty = variantQuantities.value[row.rowKey] ?? 0;
+        const boxPrice = tierBoxPriceForRow(row);
+        const perPiecePrice = toPerPiece(boxPrice, moqNumber.value);
+        return {
+            ...row,
+            qty,
+            boxPrice,
+            perPiecePrice,
+            rowTotal: roundHalfUp(perPiecePrice * qty, 2),
+            warning: variantQtyWarnings.value[row.rowKey] || null
+        };
+    })
+);
+
+const cartGrandTotal = computed(() => cartRowsView.value.reduce((sum, r) => sum + r.rowTotal, 0));
+const isConfirmDisabled = computed(() => cartRowsView.value.every(row => (row.qty ?? 0) === 0));
 
 const currentCategory = computed(() => props.category || route.params.category);
 
@@ -260,6 +359,16 @@ const displayPrice = computed(() => {
     return { price_1: product.price_1, price_2: product.price_2, price_3: product.price_3, variantLabel: null };
 });
 
+// Per-piece prices for the popup's price-tier cards (never show raw box prices).
+const displayPricePerPiece = computed(() => {
+    const moq = parseMoq(selectedProduct.value?.moq);
+    return {
+        price_1: toPerPiece(displayPrice.value.price_1, moq),
+        price_2: toPerPiece(displayPrice.value.price_2, moq),
+        price_3: toPerPiece(displayPrice.value.price_3, moq)
+    };
+});
+
 // Ordered list of all image keys for the popup gallery (main first, then extras)
 const galleryImageKeys = computed(() => {
     if (!selectedProduct.value) return [];
@@ -325,28 +434,70 @@ const disableZoom = () => {
 const handleAddToCartClick = (item) => {
     selectedProductForCart.value = item;
     showConfirmModal.value = true;
+
+    const seeded = {};
+    variantsForCart.value.forEach(row => { seeded[row.rowKey] = moqNumber.value; });
+    variantQuantities.value = seeded;
+    variantQtyWarnings.value = {};
 };
 
 const closeConfirmModal = () => {
     showConfirmModal.value = false;
     selectedProductForCart.value = null;
+    variantQuantities.value = {};
+    variantQtyWarnings.value = {};
+};
+
+const incrementRowQty = (rowKey) => {
+    variantQuantities.value[rowKey] = (variantQuantities.value[rowKey] ?? 0) + moqNumber.value;
+    variantQtyWarnings.value[rowKey] = null;
+};
+
+const decrementRowQty = (rowKey) => {
+    variantQuantities.value[rowKey] = Math.max(0, (variantQuantities.value[rowKey] ?? 0) - moqNumber.value);
+    variantQtyWarnings.value[rowKey] = null;
+};
+
+const handleRowQtyBlur = (rowKey) => {
+    const moq = moqNumber.value;
+    const clamped = Math.max(0, Math.floor(Number(variantQuantities.value[rowKey]) || 0));
+    if (clamped === 0) {
+        variantQuantities.value[rowKey] = 0;
+        variantQtyWarnings.value[rowKey] = null;
+    } else if (clamped % moq !== 0) {
+        const rounded = Math.ceil(clamped / moq) * moq;
+        variantQuantities.value[rowKey] = rounded;
+        variantQtyWarnings.value[rowKey] = t('catalog.qtyRoundedToBox', { moq });
+    } else {
+        variantQuantities.value[rowKey] = clamped;
+        variantQtyWarnings.value[rowKey] = null;
+    }
+};
+
+const openImageLightbox = (row) => {
+    lightboxImageKey.value = row.imageKey;
+    showImageLightbox.value = true;
+};
+
+const closeImageLightbox = () => {
+    showImageLightbox.value = false;
+    lightboxImageKey.value = null;
 };
 
 const confirmAddToCart = () => {
-    if (!selectedProductForCart.value) return;
-
     const product = selectedProductForCart.value;
+    if (!product) return;
 
-    // Default variations (like in OrderPage)
-    const sizes = product.sizes ? (typeof product.sizes === 'string' ? product.sizes.split(',').map(s => s.trim()) : product.sizes) : ['Standard'];
-    const colors = product.colors ? (typeof product.colors === 'string' ? product.colors.split(',').map(c => c.trim()) : product.colors) : ['Default'];
+    const rowsToAdd = cartRowsView.value.filter(row => row.qty > 0);
+    if (rowsToAdd.length === 0) return;
 
-    const selection = {
-        size: sizes[0],
-        color: colors[0]
-    };
-
-    cartStore.addToCart(product, selection);
+    rowsToAdd.forEach(row => {
+        cartStore.addToCart(
+            product,
+            { size: row.label || 'Standard', color: 'Default', price: row.perPiecePrice },
+            row.qty
+        );
+    });
 
     showNotificationMsg(`${tProduct(product, 'name')} added to cart! 🛒`);
     closeConfirmModal();
@@ -392,9 +543,9 @@ const sortedProducts = computed(() => {
     const effectiveSort = (isAll && activeSortBy.value === 'popular') ? 'name' : activeSortBy.value;
 
     if (effectiveSort === 'price_asc') {
-        sorted.sort((a, b) => (a.price_1 || a.price || 0) - (b.price_1 || b.price || 0));
+        sorted.sort((a, b) => (getCheapestPricePerPiece(a) || a.price || 0) - (getCheapestPricePerPiece(b) || b.price || 0));
     } else if (effectiveSort === 'price_desc') {
-        sorted.sort((a, b) => (b.price_1 || b.price || 0) - (a.price_1 || a.price || 0));
+        sorted.sort((a, b) => (getCheapestPricePerPiece(b) || b.price || 0) - (getCheapestPricePerPiece(a) || a.price || 0));
     } else if (effectiveSort === 'name') {
         const bcp47 = locale.value === 'th' ? 'th-TH' : 'en';
         sorted.sort((a, b) => {
@@ -487,17 +638,19 @@ const displayedProducts = computed(() => {
                         <h3 class="card-title">{{ tProduct(item, 'name') }}</h3>
                         <div class="card-bottom">
                             <div class="card-desc">
-                                <div class="card-price" v-if="getCheapestPrice(item)">
+                                <div class="card-price" v-if="getCheapestPricePerPiece(item)">
                                     <span class="cheapest-label">{{ $t('catalog.cheapestAt') }}</span>
-                                    <span class="price-value">฿{{ getCheapestPrice(item) }}</span>
+                                    <span class="price-value">฿{{ getCheapestPricePerPiece(item).toFixed(2) }}<span class="price-unit"> / {{ $t('catalog.piece') }}</span></span>
                                 </div>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
                                 <div class="card-moq" v-if="item.moq">
                                     {{ $t('catalog.moq') }}: {{ item.moq }}
                                 </div>
+                                <button class="add-btn" @click.prevent.stop="handleAddToCartClick(item)">
+                                    <ion-icon name="cart"></ion-icon> {{ $t('catalog.addToOrderShort') }}
+                                </button>
                             </div>
-                            <button class="add-btn" @click.prevent.stop="handleAddToCartClick(item)">
-                                <ion-icon name="cart"></ion-icon> {{ $t('catalog.addToOrderShort') }}
-                            </button>
                         </div>
                     </div>
                 </router-link>
@@ -550,6 +703,31 @@ const displayedProducts = computed(() => {
                         <div class="popup-info-header">
                             <span class="popup-category">{{ tCategory(selectedProduct.category) }}</span>
                             <h2 class="popup-title">{{ tProduct(selectedProduct, 'name') }}</h2>
+                        </div>
+                        <div class="detail-section price-section"
+                            v-if="displayPrice.price_1 || displayPrice.price_2 || displayPrice.price_3">
+                            <h3 class="detail-heading">
+                                <ion-icon name="pricetags-outline"></ion-icon>
+                                {{ $t('catalog.pricing') }}<span v-if="displayPrice.variantLabel">
+                                    ({{ displayPrice.variantLabel }})</span>
+                            </h3>
+                            <div class="price-tiers">
+                                <div class="price-tier" v-if="displayPrice.price_1">
+                                    <span class="price-tier-value">฿{{ displayPricePerPiece.price_1.toFixed(2) }}</span>
+                                    <span class="price-tier-box">(฿{{ displayPrice.price_1 }} / box)</span>
+                                    <span class="price-tier-note">{{ $t('catalog.priceTier1') }}</span>
+                                </div>
+                                <div class="price-tier" v-if="displayPrice.price_2">
+                                    <span class="price-tier-value">฿{{ displayPricePerPiece.price_2.toFixed(2) }}</span>
+                                    <span class="price-tier-box">(฿{{ displayPrice.price_2 }} / box)</span>
+                                    <span class="price-tier-note">{{ $t('catalog.priceTier2') }}</span>
+                                </div>
+                                <div class="price-tier" v-if="displayPrice.price_3">
+                                    <span class="price-tier-value">฿{{ displayPricePerPiece.price_3.toFixed(2) }}</span>
+                                    <span class="price-tier-box">(฿{{ displayPrice.price_3 }} / box)</span>
+                                    <span class="price-tier-note">{{ $t('catalog.priceTier3') }}</span>
+                                </div>
+                            </div>
                         </div>
                         <p class="popup-description" v-if="tProduct(selectedProduct, 'description')">{{ tProduct(selectedProduct, 'description') }}</p>
 
@@ -610,28 +788,6 @@ const displayedProducts = computed(() => {
                                 </span>
                             </div>
                         </div>
-                        <div class="detail-section price-section"
-                            v-if="displayPrice.price_1 || displayPrice.price_2 || displayPrice.price_3">
-                            <h3 class="detail-heading">
-                                <ion-icon name="pricetags-outline"></ion-icon>
-                                {{ $t('catalog.pricing') }}<span v-if="displayPrice.variantLabel">
-                                    ({{ displayPrice.variantLabel }})</span>
-                            </h3>
-                            <div class="price-tiers">
-                                <div class="price-tier" v-if="displayPrice.price_1">
-                                    <span class="price-tier-value">฿{{ displayPrice.price_1 }}</span>
-                                    <span class="price-tier-note">{{ $t('catalog.priceTier1') }}</span>
-                                </div>
-                                <div class="price-tier" v-if="displayPrice.price_2">
-                                    <span class="price-tier-value">฿{{ displayPrice.price_2 }}</span>
-                                    <span class="price-tier-note">{{ $t('catalog.priceTier2') }}</span>
-                                </div>
-                                <div class="price-tier" v-if="displayPrice.price_3">
-                                    <span class="price-tier-value">฿{{ displayPrice.price_3 }}</span>
-                                    <span class="price-tier-note">{{ $t('catalog.priceTier3') }}</span>
-                                </div>
-                            </div>
-                        </div>
                         <div class="card-footer" style="justify-content: center; margin-top: 20px;">
                             <button class="add-btn" @click.prevent.stop="handleAddToCartClick(selectedProduct)">
                                 <ion-icon name="cart"></ion-icon> {{ $t('catalog.addToOrder') }}
@@ -647,32 +803,58 @@ const displayedProducts = computed(() => {
 
         <!-- Confirmation Modal -->
         <div v-if="showConfirmModal" class="popup-overlay" @click="closeConfirmModal">
-            <div class="confirm-modal" @click.stop v-if="selectedProductForCart">
+            <div class="confirm-modal confirm-modal-wide" @click.stop v-if="selectedProductForCart">
                 <div class="confirm-header">
                     <div class="confirm-icon">🛒</div>
-                    <h2>{{ $t('catalog.confirmAddToCart') || 'Add to Order?' }}</h2>
+                    <h2>{{ tProduct(selectedProductForCart, 'name') }}</h2>
                 </div>
                 <div class="confirm-body">
-                    <div class="confirm-product-info">
-                        <img :src="getImageUrl(selectedProductForCart.image_key)"
-                            :alt="tProduct(selectedProductForCart, 'name')">
-                        <div class="confirm-text">
-                            <h3>{{ tProduct(selectedProductForCart, 'name') }}</h3>
-                            <p class="category-tag">{{ tCategory(selectedProductForCart.category) }}</p>
+                    <p class="confirm-message">{{ $t('catalog.confirmQtyMessage') }}</p>
+                    <div class="variant-tier-banner" v-if="totalVolumeForCart > 0">
+                        {{ $t('catalog.currentTierNote', { tier: activeTierForCart, total: totalVolumeForCart }) }}
+                    </div>
+                    <div class="variant-rows">
+                        <div class="variant-row" v-for="row in cartRowsView" :key="row.rowKey">
+                            <button class="variant-thumb thumb" type="button" @click="openImageLightbox(row)">
+                                <img :src="getImageUrl(row.imageKey, 'thumb')"
+                                    :alt="row.label || tProduct(selectedProductForCart, 'name')">
+                            </button>
+                            <div class="variant-row-info">
+                                <span class="variant-label">{{ row.label || $t('catalog.standardVariant') }}</span>
+                                <span class="variant-unit-price">
+                                    ฿{{ row.perPiecePrice.toFixed(2) }} / {{ $t('catalog.piece') }}
+                                    <span class="variant-box-price">(฿{{ row.boxPrice.toFixed(2) }} / box)</span>
+                                </span>
+                                <p class="variant-qty-warning" v-if="row.warning">{{ row.warning }}</p>
+                            </div>
+                            <div class="variant-qty-stepper qty-entry">
+                                <button class="qty-btn" type="button" @click="decrementRowQty(row.rowKey)">−</button>
+                                <input class="qty-num" type="number" min="0" :step="moqNumber"
+                                    v-model.number="variantQuantities[row.rowKey]"
+                                    @input="variantQtyWarnings[row.rowKey] = null"
+                                    @blur="handleRowQtyBlur(row.rowKey)">
+                                <button class="qty-btn" type="button" @click="incrementRowQty(row.rowKey)">+</button>
+                            </div>
+                            <div class="variant-row-total">฿{{ row.rowTotal.toFixed(2) }}</div>
                         </div>
                     </div>
-                    <p class="confirm-message">
-                        {{ $t('catalog.confirmMessage') || 'Would you like to add this item to your order list ? ' }}
-                    </p>
+                    <div class="confirm-grand-total">{{ $t('catalog.grandTotal') }}: ฿{{ cartGrandTotal.toFixed(2) }}</div>
                 </div>
                 <div class="confirm-footer">
-                    <button class="btn-cancel" @click="closeConfirmModal">{{ $t('catalog.cancel') || 'Cancel'
-                    }}</button>
-                    <button class="btn-confirm" @click="confirmAddToCart">
-                        {{ $t('catalog.confirm') || 'Yes, Add to Order' }}
+                    <button class="btn-cancel" @click="closeConfirmModal">{{ $t('catalog.cancel') }}</button>
+                    <button class="btn-confirm" :disabled="isConfirmDisabled" @click="confirmAddToCart">
+                        {{ $t('catalog.confirm') }}
                     </button>
                 </div>
             </div>
+        </div>
+
+        <!-- Variant Image Lightbox -->
+        <div v-if="showImageLightbox" class="lightbox-overlay" @click="closeImageLightbox">
+            <button class="lightbox-close" @click="closeImageLightbox">
+                <ion-icon name="close-outline"></ion-icon>
+            </button>
+            <img class="lightbox-image" :src="getImageUrl(lightboxImageKey)" alt="" @click.stop>
         </div>
 
         <!-- Notification Toast -->
@@ -917,7 +1099,7 @@ const displayedProducts = computed(() => {
 .card-title {
     font-size: 0.85rem;
     color: #2d3436;
-    margin: 0 0 12px;
+    margin: 0 0 10px;
     font-weight: 500;
     line-height: 1.35;
     display: -webkit-box;
@@ -930,8 +1112,9 @@ const displayedProducts = computed(() => {
 
 .card-bottom {
     display: flex;
+    flex-direction: column;
     justify-content: space-between;
-    align-items: flex-end;
+    /* align-items: flex-end; */
     gap: 10px;
     margin-top: auto;
 }
@@ -959,6 +1142,12 @@ const displayedProducts = computed(() => {
     font-size: 1.35rem;
     font-weight: 700;
     color: #ee4d2d;
+}
+
+.price-unit {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: #9e8272;
 }
 
 .card-moq {
@@ -1231,7 +1420,9 @@ const displayedProducts = computed(() => {
 }
 
 .detail-section {
-    margin-bottom: 28px;
+    padding-bottom: 14px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid #eee;
 }
 
 .detail-heading {
@@ -1304,13 +1495,6 @@ const displayedProducts = computed(() => {
     color: #8b6f47;
 }
 
-/* PRICE TIERS */
-.price-section {
-    border-top: 1px solid #eee;
-    border-bottom: 1px solid #eee;
-    padding: 24px 0;
-}
-
 .price-tiers {
     display: flex;
     flex-wrap: wrap;
@@ -1324,8 +1508,9 @@ const displayedProducts = computed(() => {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 4px;
-    padding: 12px 10px;
+    padding: 12px 8px;
     background: #f8f8f8;
     border: 1px solid #eee;
     border-radius: 12px;
@@ -1341,9 +1526,15 @@ const displayedProducts = computed(() => {
 }
 
 .price-tier-value {
-    font-size: 18px;
+    font-size: 22px;
     font-weight: 800;
     color: #008080;
+}
+
+.price-tier-box {
+    font-size: 11px;
+    font-weight: 500;
+    color: #9e8272;
 }
 
 /* RESPONSIVE */
@@ -1359,13 +1550,19 @@ const displayedProducts = computed(() => {
     text-align: center;
 }
 
+.confirm-modal-wide {
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
 .confirm-header {
     margin-bottom: 25px;
 }
 
 .confirm-icon {
     font-size: 40px;
-    margin-bottom: 15px;
+    margin-bottom: 0;
 }
 
 .confirm-header h2 {
@@ -1410,13 +1607,135 @@ const displayedProducts = computed(() => {
     font-size: 15px;
     color: #636e72;
     line-height: 1.6;
-    margin-bottom: 30px;
+    margin-bottom: 16px;
+}
+
+.variant-tier-banner {
+    background: #FDF3E6;
+    color: #8b6f47;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    padding: 8px 12px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+}
+
+.variant-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    text-align: left;
+    overflow-y: auto;
+    max-height: 45vh;
+    padding-right: 4px;
+    margin-bottom: 16px;
+}
+
+.variant-row {
+    display: grid;
+    grid-template-columns: 90px 1fr auto auto;
+    align-items: center;
+    gap: 14px;
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 14px;
+}
+
+.variant-thumb {
+    width: 90px;
+    height: 90px;
+    padding: 0;
+    border: 2px solid transparent;
+}
+
+.variant-row-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.variant-label {
+    font-size: 22px;
+    font-weight: 700;
+    color: #2d3436;
+}
+
+.variant-unit-price {
+    font-size: 16px;
+    color: #008080;
+    font-weight: 600;
+}
+
+.variant-box-price {
+    color: #8b6f47;
+    font-weight: 500;
+}
+
+.variant-qty-warning {
+    font-size: 12px;
+    color: #d35400;
+    margin: 2px 0 0 0;
+}
+
+.variant-qty-stepper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.qty-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid #e1e8ed;
+    background: #fafafa;
+    color: #2d3436;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.qty-btn:hover {
+    background: #FDF3E6;
+    border-color: #b89968;
+}
+
+.qty-num {
+    width: 56px;
+    text-align: center;
+    padding: 6px 4px;
+    border: 1px solid #e1e8ed;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #2d3436;
+}
+
+.variant-row-total {
+    font-size: 18px;
+    font-weight: 800;
+    color: #2d3436;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.confirm-grand-total {
+    text-align: right;
+    font-size: 16px;
+    font-weight: 800;
+    color: #008080;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
 }
 
 .confirm-footer {
     display: grid;
     grid-template-columns: 1fr 1.5fr;
     gap: 15px;
+    margin-top: 20px;
 }
 
 .btn-cancel {
@@ -1446,8 +1765,55 @@ const displayedProducts = computed(() => {
     transform: translateY(-2px);
 }
 
+.btn-confirm:disabled {
+    background: #b0b0b0;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .btn-cancel:hover {
     background: #dfe4ea;
+}
+
+/* VARIANT IMAGE LIGHTBOX */
+.lightbox-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1100;
+    padding: 40px;
+    animation: fadeIn 0.2s ease;
+}
+
+.lightbox-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.lightbox-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.9);
+    color: #2d3436;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
 }
 
 /* NOTIFICATION TOAST */

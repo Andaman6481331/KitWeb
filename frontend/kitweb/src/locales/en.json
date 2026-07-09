@@ -232,6 +232,12 @@
     "priceTier1": "1 piece",
     "priceTier2": "20+ pcs",
     "priceTier3": "50+ pcs",
+    "confirmQtyMessage": "Choose a quantity for each variant you want to order.",
+    "standardVariant": "Standard",
+    "piece": "piece",
+    "qtyRoundedToBox": "Adjusted to nearest box of {moq}",
+    "currentTierNote": "Tier {tier} pricing applied ({total} pcs total)",
+    "grandTotal": "Grand Total",
     "categoryDescriptions": {
       "Yarns": "Hand-dyed cotton and northern Thai silk, perfect for weaving stories into every stitch.",
       "Ribbons": "Bespoke satin and velvet trims, gathered from the finest looms across Southeast Asia.",

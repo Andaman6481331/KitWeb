@@ -347,6 +347,12 @@
         "priceTier1": "1 件",
         "priceTier2": "20+ 件",
         "priceTier3": "50+ 件",
+        "confirmQtyMessage": "为您想订购的每个款式选择数量。",
+        "standardVariant": "标准款",
+        "piece": "件",
+        "qtyRoundedToBox": "已调整为最接近的整箱数量（每箱 {moq} 件）",
+        "currentTierNote": "已应用第 {tier} 档价格（共 {total} 件）",
+        "grandTotal": "总计",
         "categoryDescriptions": {
             "Default": "我们为您的创意项目精心挑选的优质材料。"
         }

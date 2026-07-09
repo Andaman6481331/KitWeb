@@ -356,6 +356,12 @@
         "priceTier1": "1個",
         "priceTier2": "20個以上",
         "priceTier3": "50個以上",
+        "confirmQtyMessage": "注文したい各バリエーションの数量を選択してください。",
+        "standardVariant": "標準",
+        "piece": "個",
+        "qtyRoundedToBox": "最も近い箱単位（1箱 {moq} 個）に調整しました",
+        "currentTierNote": "階層 {tier} の価格を適用（合計 {total} 個）",
+        "grandTotal": "合計金額",
         "categoryDescriptions": {
             "Default": "あなたの創造的なプロジェクトのために厳選された高品質の素材です。"
         }
