@@ -42,6 +42,25 @@ export const routes = [
   },
 ]
 
+// Set by the catalog sidebar right before it navigates to a new category, so the
+// next navigation scrolls to the category bar instead of the top of the page.
+// Navbar and all other navigation keep the default scroll-to-top.
+export const scrollIntent = { toCategoryBar: false }
+
+// Reset scroll on navigation. Without this, Vue Router leaves the scroll
+// position where it was on the previous page, so a new page appears already
+// scrolled down. Back/forward restores the saved position; in-page hash links
+// scroll to their target (offset for the sticky navbar).
+export function scrollBehavior(to, from, savedPosition) {
+  if (scrollIntent.toCategoryBar) {
+    scrollIntent.toCategoryBar = false
+    return { el: '#category-bar', top: 90, behavior: 'smooth' }
+  }
+  if (savedPosition) return savedPosition
+  if (to.hash) return { el: to.hash, top: 90, behavior: 'smooth' }
+  return { top: 0 }
+}
+
 export function installRouterGuards(router, i18n) {
   router.beforeEach((to, from, next) => {
     const lang = to.params.lang

@@ -3,6 +3,8 @@
     "home": "Home",
     "products": "Products",
     "startOrder": "Start Order",
+    "shoppingCart": "Shopping Cart",
+    "goToCart": "Go to Cart",
     "contactUs": "Contact Us",
     "login": "Login",
     "events": "Events",
@@ -13,7 +15,8 @@
     "partnersDesc": "Our wholesale clients & partners",
     "faq": "FAQ",
     "faqDesc": "Common questions answered",
-    "b2bCatalog": "B2B Catalog"
+    "b2bCatalog": "B2B Catalog",
+    "contactUsDesc": "Get in touch with our team"
   },
   "footer": {
     "companyName": "Kitcharoen",
@@ -28,6 +31,8 @@
     "copyright": "© 2026 Kitcharoen. All rights reserved."
   },
   "home": {
+    "bannerBadge": "Since 1984",
+    "bannerText": "Family-run craft & sewing supplies from Bangkok's Sampeng Market — trusted by makers for 40+ years",
     "heroTitle": "Kitcharoen Craft Supplies",
     "heroSubtitle": "Trusted materials, honest prices, and friendly service from Sampeng Market, Bangkok. Since 1984",
     "eyebrow": "Arts, Crafts, and Sewing Supplies",
@@ -43,7 +48,15 @@
     "feature3Title": "Fast Delivery",
     "feature3Desc": "Fast delivery both in Thailand and abroad",
     "feature4Title": "For Everyone",
-    "feature4Desc": "Good products that you will love"
+    "feature4Desc": "Good products that you will love",
+    "nav": {
+      "categories": "Categories",
+      "about": "About Us",
+      "video": "Videos",
+      "instagram": "Instagram",
+      "reviews": "Reviews",
+      "promo": "Offers"
+    }
   },
   "categories": {
     "title": "Shop by Category",
@@ -200,6 +213,8 @@
     "videos": "Videos"
   },
   "catalog": {
+    "bannerBadge": "Wholesale Pricing",
+    "bannerText": "Buy by the box for the best rates — prices shown per piece so you can compare with ease",
     "since": "SINCE 1984",
     "title": "Browse Our Collection",
     "subtitle": "Four decades of craftsman quality, curated by category for the modern maker and the traditional tailor.",
@@ -290,6 +305,8 @@
     "exploreDetails": "Explore Kit Details"
   },
   "partner": {
+    "bannerBadge": "180+ Partners",
+    "bannerText": "Trusted by retailers across 42 Thai provinces and 8 countries — let's grow together",
     "heroTitle": "Trusted Partners Across Thailand & Beyond",
     "heroSubtitle": "Building reliable retail partnerships from Bangkok to every corner of Thailand and across international borders",
     "reasonsTitle": "Built for wholesale success",
@@ -342,7 +359,14 @@
       }
     },
     "protipTitle": "Pro-Tip for Local Partners:",
-    "protipText": "Have a preferred transport company or a specific consolidation hub in Rong Mueang or Phutthamonthon? Let us know during order verification, and we will deliver straight to their terminal."
+    "protipText": "Have a preferred transport company or a specific consolidation hub in Rong Mueang or Phutthamonthon? Let us know during order verification, and we will deliver straight to their terminal.",
+    "nav": {
+      "overview": "Overview",
+      "reasons": "Why Partner",
+      "delivery": "Logistics",
+      "community": "Community",
+      "contact": "Get Started"
+    }
   },
   "common": {
     "address": "376 Wanich 1 Chakkrawat Samphantawong Bangkok",
@@ -456,6 +480,9 @@
     "title": "Kitcharoen Collections",
     "subtitle": "Discover the finest materials for your next masterpiece.",
     "explore": "Explore Collection",
+    "eyebrow": "Our Collections",
+    "groupCrafting": "Crafting Tools & Supplies",
+    "groupDecor": "Decorative & Flora",
   "items": {
     "needles": {
       "name": "Needles",
@@ -472,6 +499,18 @@
     "beads": {
       "name": "Beads",
       "description": "Exquisite glass and crystal accents curated to bring brilliance and fine detail to any creative project."
+    },
+    "thread": {
+      "name": "Thread",
+      "description": "Durable sewing and embroidery threads in a full spectrum of colors for every stitch and craft."
+    },
+    "decorative": {
+      "name": "Decorative",
+      "description": "Velvet wire, trims and finishing touches to add character and detail to your handmade creations."
+    },
+    "flora": {
+      "name": "Flora",
+      "description": "Lifelike artificial flowers and foliage, perfect for arrangements, décor and lasting displays."
     }
   }
   },
@@ -574,7 +613,7 @@
     "q10": "What are your opening hours?",
     "a10": "We're open Monday–Saturday, 8:00 AM–5:00 PM. Sunday hours vary by week — feel free to message us in advance to confirm.",
     "q11": "Where can I follow shop updates?",
-    "a11": "Follow our news, promotions, and activities on our website and Instagram: @kit_craft376.",
+    "a11": "Follow our news, promotions, and activities on our website and Instagram: {'@'}kit_craft376.",
     "q12": "Where can I follow your events and new products?",
     "a12": "Stay up to date on workshops, promotions, and new arrivals through our website and social media channels.",
     "q13": "Is there parking near the shop?",
@@ -740,7 +779,7 @@
     "contactNameLabel": "Contact Person Name *",
     "contactNamePlaceholder": "e.g. Ms. Sarah Jane",
     "emailLabel": "Email Address *",
-    "emailPlaceholder": "e.g. sarah@school.org",
+    "emailPlaceholder": "e.g. sarah{'@'}school.org",
     "phoneLabel": "Phone Number",
     "phonePlaceholder": "e.g. 081-234-5678",
     "shippingLabel": "Shipping / Delivery Address",

@@ -13,7 +13,13 @@ const router = useRouter();
 const currentLang = computed(() => route.params.lang || defaultLang);
 const { t, te, locale } = useI18n()
 
-const isMobile = ref(window.innerWidth <= 768)
+const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
+
+// Local inline placeholder (no external network dependency)
+const placeholderImg = (label = '') => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#F9F5F0"/><text x="50" y="54" font-family="Work Sans, Arial, sans-serif" font-size="11" fill="#3D2B1F" text-anchor="middle">${label}</text></svg>`
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
 
 // Helper to translate product fields
 const tProduct = (item, field) => {
@@ -50,7 +56,7 @@ const products = computed(() => {
         varieties: p.varieties ? (typeof p.varieties === 'string' ? p.varieties.split(',').map(v => v.trim()) : p.varieties) : null,
         varieties_th: p.varieties_th ? (typeof p.varieties_th === 'string' ? p.varieties_th.split(',').map(v => v.trim()) : p.varieties_th) : null,
         inStock: p.stock !== undefined ? p.stock > 0 : true,
-        image: p.image_key ? `${API_URL}/images/${p.image_key}-thumb.webp` : 'https://via.placeholder.com/100x100/F9F5F0/3D2B1F?text=Product'
+        image: p.image_key ? `${API_URL}/images/${p.image_key}-thumb.webp` : placeholderImg('Product')
     }))
 
     const diyMapped = rawDiyProducts.value.map(p => ({
@@ -102,7 +108,6 @@ onMounted(() => {
 const cart = computed(() => cartStore.cart)
 const searchQuery = ref('')
 const selectedCategory = ref('All')
-const showCart = ref(false)
 const showNotification = ref(false)
 const notificationMessage = ref('')
 const showCheckoutPopup = ref(false)
@@ -178,7 +183,7 @@ const fetchOrders = async () => {
             price: order.total_amount,
             // Fallback for UI if items list is empty but count is needed
             itemsCount: order.items ? order.items.length : 0,
-            image: order.items && order.items.length > 0 ? getProductImage(order.items[0].product_id) : 'https://via.placeholder.com/100x100/F9F5F0/3D2B1F?text=Order'
+            image: order.items && order.items.length > 0 ? getProductImage(order.items[0].product_id) : placeholderImg('Order')
         }))
     } catch (error) {
         console.error('Error fetching orders:', error)
@@ -196,7 +201,7 @@ const getProductImage = (productId) => {
         if (typeof productId === 'string' && productId.startsWith('diy-')) {
             return 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg';
         }
-        return 'https://via.placeholder.com/100x100/F9F5F0/3D2B1F?text=Product';
+        return placeholderImg('Product');
     }
 
     const keyStr = String(key);
@@ -475,9 +480,9 @@ const showNotificationMsg = (msg) => {
     }, 1500)
 }
 
-// Toggle cart
-const toggleCart = () => {
-    showCart.value = !showCart.value
+// Scroll to the cart (mobile sticky bar)
+const scrollToCart = () => {
+    document.getElementById('cartSidebar')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 const isProductInCart = (productId) => {
@@ -501,64 +506,53 @@ const closeOrderDetails = () => {
 <template>
     <div class="order-page">
         <!-- Page Header -->
-        <div class="page-header">
-            <div class="header-content">
-                <h1 v-reveal>{{ t('order.title') }}</h1>
-                <p v-reveal class="delay2">
-                    {{ authStore.isAuthenticated ? t('order.welcomeBack', {
-                        name: authStore.user?.businessName ||
-                            authStore.user?.ownerName
-                    }) :
-                        t('order.heroSubtitle') }}
-                </p>
+        <div class="headers-wrapper">
+            <div class="page-header">
+                <div class="header-content">
+                    <h1 v-reveal>{{ t('order.title') }}</h1>
+                    <p v-reveal class="delay2">
+                        {{ authStore.isAuthenticated ? t('order.welcomeBack', {
+                            name: authStore.user?.businessName ||
+                                authStore.user?.ownerName
+                        }) :
+                            t('order.heroSubtitle') }}
+                    </p>
+                </div>
+
+                <!-- Secondary Navbar -->
+                <div class="secondary-navbar">
+                    <button class="nav-item" :class="{ active: activeTab === 'new-order' }" @click="activeTab = 'new-order'">
+                        {{ t('order.newOrder') }}
+                    </button>
+                    <button class="nav-item" :class="{ active: activeTab === 'track-orders' }"
+                        @click="activeTab = 'track-orders'">
+                        {{ t('order.trackOrders') }}
+                    </button>
+                </div>
             </div>
-
-            <!-- Action Buttons (Logout & Cart) -->
-            <div class="header-actions">
-
-                <button class="cart-toggle mobile-only" @click="toggleCart">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0" />
+            <!-- Search & Filter Bar (Only for New Order) -->
+            <div v-if="activeTab === 'new-order'" class="filter-bar">
+                <div class="search-box">
+                    <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="2" />
+                        <path d="M14 14L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
                     </svg>
-                    <span v-if="cartItemCount > 0" class="cart-badge">{{ cartItemCount }}</span>
-                </button>
+                    <input v-model="searchQuery" type="text" :placeholder="t('order.searchPlaceholder')"
+                        class="search-input" />
+                </div>
+
+                <div class="category-filters">
+                    <!-- <button class="category-btn" :class="{ active: selectedCategory === 'All' }" :key="'All'"
+                        @click="selectedCategory = 'All'">
+                        All
+                    </button> -->
+                    <button v-for="category in categories" :key="category" class="category-btn"
+                        :class="{ active: selectedCategory === category }" @click="selectedCategory = category">
+                        {{ tCategory(category) }}
+                    </button>
+                </div>
             </div>
         </div>
-
-        <!-- Secondary Navbar -->
-        <div class="secondary-navbar">
-            <button class="nav-item" :class="{ active: activeTab === 'new-order' }" @click="activeTab = 'new-order'">
-                {{ t('order.newOrder') }}
-            </button>
-            <button class="nav-item" :class="{ active: activeTab === 'track-orders' }"
-                @click="activeTab = 'track-orders'">
-                {{ t('order.trackOrders') }}
-            </button>
-        </div>
-
-        <!-- Search & Filter Bar (Only for New Order) -->
-        <div v-if="activeTab === 'new-order'" class="filter-bar">
-            <div class="search-box">
-                <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="2" />
-                    <path d="M14 14L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                </svg>
-                <input v-model="searchQuery" type="text" :placeholder="t('order.searchPlaceholder')"
-                    class="search-input" />
-            </div>
-
-            <div class="category-filters">
-                <!-- <button class="category-btn" :class="{ active: selectedCategory === 'All' }" :key="'All'"
-                    @click="selectedCategory = 'All'">
-                    All
-                </button> -->
-                <button v-for="category in categories" :key="category" class="category-btn"
-                    :class="{ active: selectedCategory === category }" @click="selectedCategory = category">
-                    {{ tCategory(category) }}
-                </button>
-            </div>
-        </div>
-
         <!-- Main Content -->
         <div class="content-wrapper">
             <!-- Products Table Section -->
@@ -581,7 +575,7 @@ const closeOrderDetails = () => {
                                 <p>{{ t('order.loadingProducts') }}</p>
                             </div>
                             <template v-else>
-                                <RecycleScroller v-if="!isMobile" class="scroller" :items="filteredProducts" :item-size="isMobile ? 100 : 160"
+                                <RecycleScroller v-if="!isMobile" class="scroller" :items="filteredProducts" :item-size="104"
                                     key-field="id" v-slot="{ item: product }">
                                     <div v-if="product"
                                         class="product-row" :class="{
@@ -718,7 +712,7 @@ const closeOrderDetails = () => {
                 </div>
 
                 <!-- Shopping Cart Sidebar -->
-                <div class="cart-sidebar" :class="{ 'show': showCart }">
+                <div class="cart-sidebar" id="cartSidebar">
                     <div class="cart-header-modern">
                         <div class="cart-title-group">
                             <div class="cart-icon-bg">
@@ -733,7 +727,6 @@ const closeOrderDetails = () => {
                         </div>
                         <button v-if="cart.length > 0" @click="clearCart" class="clear-all-btn">{{ t('order.clearAll')
                         }}</button>
-                        <!-- <button class="close-cart mobile-only" @click="toggleCart">✕</button> -->
                     </div>
 
                     <!-- Cart Items -->
@@ -741,19 +734,23 @@ const closeOrderDetails = () => {
                         <div v-for="item in cart" :key="item.cartItemKey" class="cart-item-modern">
                             <img :src="item.image" :alt="item.name" class="cart-item-image" />
 
-                            <div class="cart-item-details">
-                                <h4>{{ item.name }}</h4>
-                                <p class="cart-item-specs">{{ item.selectedSize }} • {{ item.selectedColor }}</p>
-                                <p class="cart-item-price">฿{{ item.price }}</p>
+                            <div class="cart-item-body">
+                                <div class="cart-item-top">
+                                    <div class="cart-item-details">
+                                        <h4>{{ item.name }}</h4>
+                                        <p class="cart-item-specs">{{ item.selectedSize }} • {{ item.selectedColor }}</p>
+                                    </div>
+                                    <button @click="removeFromCart(item.cartItemKey)" class="remove-btn-modern">✕</button>
+                                </div>
+                                <div class="cart-item-bottom">
+                                    <span class="cart-item-price">฿{{ item.price }}</span>
+                                    <div class="quantity-controls-modern">
+                                        <button @click="updateQuantity(item.cartItemKey, -1)" class="qty-btn">−</button>
+                                        <span class="quantity">{{ item.quantity }}</span>
+                                        <button @click="updateQuantity(item.cartItemKey, 1)" class="qty-btn">+</button>
+                                    </div>
+                                </div>
                             </div>
-
-                            <div class="quantity-controls-modern">
-                                <button @click="updateQuantity(item.cartItemKey, -1)" class="qty-btn">−</button>
-                                <span class="quantity">{{ item.quantity }}</span>
-                                <button @click="updateQuantity(item.cartItemKey, 1)" class="qty-btn">+</button>
-                            </div>
-
-                            <button @click="removeFromCart(item.cartItemKey)" class="remove-btn-modern">✕</button>
                         </div>
                     </div>
 
@@ -777,19 +774,17 @@ const closeOrderDetails = () => {
                     <!-- Cart Footer Modern -->
                     <div class="cart-footer-modern" v-if="cart.length > 0">
                         <div class="cart-summary-modern">
-                            <div style="display: flex; justify-content: center; gap: 2rem;">
-                                <div class="summary-row">
-                                    <span>{{ t('order.subtotal') }}</span>
-                                    <span> ฿{{ cartTotal }}</span>
-                                </div>
-                                <div class="summary-row">
-                                    <span>{{ t('order.delivery') }}</span>
-                                    <span> ฿30</span>
-                                </div>
+                            <div class="summary-row">
+                                <span>{{ t('order.subtotal') }}</span>
+                                <span>฿{{ cartTotal }}</span>
+                            </div>
+                            <div class="summary-row">
+                                <span>{{ t('order.delivery') }}</span>
+                                <span>฿30</span>
                             </div>
                             <div class="summary-row total">
                                 <span>{{ t('order.total') }}</span>
-                                <span> ฿{{ cartTotal + 30 }}</span>
+                                <span>฿{{ cartTotal + 30 }}</span>
                             </div>
                         </div>
 
@@ -957,8 +952,12 @@ const closeOrderDetails = () => {
         </div>
     </transition>
 
-    <!-- Cart Overlay (Mobile) -->
-    <div v-if="showCart" class="cart-overlay mobile-only" @click="toggleCart"></div>
+    <!-- Mobile sticky "view cart" bar -->
+    <button v-if="activeTab === 'new-order' && cart.length > 0" class="mobile-cart-bar" @click="scrollToCart">
+        <span class="mcb-count">{{ cartItemCount }}</span>
+        <span class="mcb-label">{{ t('order.yourCart') }}</span>
+        <span class="mcb-total">฿{{ cartTotal }}</span>
+    </button>
 
     <!-- Checkout Popup -->
     <div v-if="showCheckoutPopup" class="checkout-overlay" @click="closeCheckoutPopup">
@@ -1122,103 +1121,137 @@ const closeOrderDetails = () => {
 
 /* Page Header */
 .page-header {
-    padding: 20px 5% 20px;
+    padding: 16px 10% 0 5%;
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 4px 24px;
+    border-bottom: 1px solid #EAE1D7;
+    margin-bottom: 12px;
+}
+
+.header-content {
+    padding-bottom: 11px;
 }
 
 .header-content h1 {
     font-family: 'Crimson Pro', serif;
-    font-size: 48px;
+    font-size: 34px;
     font-weight: 700;
     margin: 0;
     color: #3D2B1F;
+    letter-spacing: -0.5px;
 }
 
 .header-content p {
-    font-size: 16px;
-    margin: 0;
+    font-size: 14px;
+    margin: 6px 0 0;
     color: #8C7B6E;
 }
 
 /* Filter Bar Modern */
 .filter-bar {
-    max-width: 1400px;
-    margin: 0 auto 40px;
-    padding: 0 5%;
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 20px;
-}
-
-.category-filters {
-    flex-wrap: wrap;
-    justify-content: center;
+    gap: 16px;
+    padding: 2px 5% 10px;
+    margin: 0 0 6px;
 }
 
 .search-box {
-    display: flex;
     position: relative;
-    width: 300px;
+    width: 320px;
+    flex-shrink: 0;
 }
 
 .search-input {
     width: 100%;
-    padding: 12px 16px 12px 44px;
+    padding: 11px 16px 11px 44px;
     border: 1px solid #E6E0D9;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 14px;
+    color: #3D2B1F;
     background: white;
-    transition: all 0.3s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-input::placeholder {
+    color: #A99C8F;
 }
 
 .search-input:focus {
     outline: none;
     border-color: #3D2B1F;
+    box-shadow: 0 0 0 3px rgba(61, 43, 31, 0.10);
 }
 
 .search-icon {
     position: absolute;
-    left: 14px;
+    left: 15px;
     top: 50%;
     transform: translateY(-50%);
-    color: #8C7B6E;
+    color: #A99C8F;
     pointer-events: none;
 }
 
+/* Category chips — single scrolling row */
 .category-filters {
     display: flex;
+    flex-wrap: nowrap;
     gap: 8px;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    padding: 4px 2px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+}
+
+.category-filters::-webkit-scrollbar {
+    display: none;
 }
 
 .category-btn {
+    flex-shrink: 0;
+    white-space: nowrap;
     padding: 8px 16px;
     border: 1px solid #E6E0D9;
     background: white;
-    border-radius: 20px;
+    border-radius: 999px;
     cursor: pointer;
     font-weight: 500;
-    font-size: 14px;
-    color: #8C7B6E;
-    transition: all 0.3s ease;
+    font-size: 13px;
+    color: #7A6A5C;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.category-btn:hover {
+    border-color: #C9B8A8;
+    color: #3D2B1F;
+    background: #FCF9F5;
 }
 
 .category-btn.active {
     background: #3D2B1F;
     color: white;
     border-color: #3D2B1F;
+    box-shadow: 0 2px 8px rgba(61, 43, 31, 0.18);
+}
+
+.headers-wrapper {
+    padding: 0;
+    display: block;
 }
 
 /* Content Wrapper */
 .content-wrapper {
-    /* max-width: 1400px; */
-    /* margin: 0 auto; */
-    /* padding: 0 5%; */
+    padding: 0 5%;
     display: grid;
-    grid-template-columns: 1fr 380px;
-    gap: 40px;
+    grid-template-columns: 1fr 360px;
+    gap: 28px;
     align-items: start;
 }
 
@@ -1232,8 +1265,10 @@ const closeOrderDetails = () => {
 
 .table-header {
     display: grid;
-    grid-template-columns: 140px 2fr 180px 100px 120px;
-    padding: 20px 30px;
+    grid-template-columns: 84px minmax(0, 2.2fr) 150px 88px 104px;
+    gap: 16px;
+    align-items: center;
+    padding: 14px 24px;
     background: #F9F5F0;
     border-bottom: 1px solid #F4EDE6;
     color: #8C7B6E;
@@ -1248,13 +1283,20 @@ const closeOrderDetails = () => {
 
 .product-row {
     display: grid;
-    grid-template-columns: 140px 2fr 180px 100px 120px;
-    padding: 20px 30px;
+    grid-template-columns: 84px minmax(0, 2.2fr) 150px 88px 104px;
+    gap: 16px;
+    padding: 14px 24px;
     border-bottom: 1px solid #F4EDE6;
     align-items: center;
     transition: background 0.3s ease;
-    /* height: 160px; */
+    height: 104px;
     box-sizing: border-box;
+}
+
+/* Item already in cart — subtle accent so it's obvious */
+.product-row.in-cart {
+    background: #FBF7F2;
+    box-shadow: inset 3px 0 0 #DD876E;
 }
 
 .product-row:last-child {
@@ -1266,12 +1308,12 @@ const closeOrderDetails = () => {
 }
 
 .image-wrapper {
-    width: 100px;
-    height: 100px;
+    width: 72px;
+    height: 72px;
     background: #F9F5F0;
-    border-radius: 12px;
+    border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .product-thumb {
@@ -1283,16 +1325,17 @@ const closeOrderDetails = () => {
 .td-details {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 3px;
+    min-width: 0;
 }
 
 .product-tag {
     display: inline-block;
     width: fit-content;
-    padding: 4px 10px;
+    padding: 3px 8px;
     background: #E0F7F9;
     color: #4DB6C1;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 700;
     text-transform: uppercase;
     border-radius: 4px;
@@ -1306,11 +1349,11 @@ const closeOrderDetails = () => {
 
 .standard-spec-badge {
     display: inline-block;
-    width: 140px;
-    padding: 8px 12px;
+    width: 120px;
+    padding: 6px 10px;
     background: #F9F5F0;
     color: #8C7B6E;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
     border-radius: 8px;
     text-align: center;
@@ -1320,7 +1363,7 @@ const closeOrderDetails = () => {
 
 .product-name {
     font-family: 'Crimson Pro', serif;
-    font-size: 20px;
+    font-size: 16px;
     font-weight: 700;
     color: #3D2B1F;
     margin: 0;
@@ -1332,12 +1375,12 @@ const closeOrderDetails = () => {
 }
 
 .product-desc {
-    font-size: 14px;
+    font-size: 12px;
     color: #8C7B6E;
-    line-height: 1.5;
+    line-height: 1.4;
     margin: 0;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 1;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1346,12 +1389,12 @@ const closeOrderDetails = () => {
 .td-variations {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .variation-select {
-    width: 140px;
-    padding: 8px 12px;
+    width: 120px;
+    padding: 6px 10px;
     border: 1px solid #E6E0D9;
     border-radius: 8px;
     font-size: 13px;
@@ -1372,18 +1415,18 @@ const closeOrderDetails = () => {
 
 .price-currency {
     font-family: 'Crimson Pro', serif;
-    font-size: 18px;
+    font-size: 14px;
     font-weight: 700;
 }
 
 .price-amount {
     font-family: 'Crimson Pro', serif;
-    font-size: 24px;
+    font-size: 19px;
     font-weight: 700;
 }
 
 .add-to-cart-btn {
-    padding: 10px 20px;
+    padding: 9px 16px;
     background: #3D2B1F;
     color: white;
     border: none;
@@ -1475,17 +1518,17 @@ const closeOrderDetails = () => {
 /* Cart Sidebar Modern */
 .cart-sidebar {
     background: #F9F5F0;
-    border-radius: 20px;
-    padding: 30px;
+    border-radius: 16px;
+    padding: 20px;
     position: sticky;
-    top: 40px;
+    top: 24px;
 }
 
 .cart-header-modern {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 30px;
+    margin-bottom: 16px;
 }
 
 .cart-title-group {
@@ -1495,19 +1538,20 @@ const closeOrderDetails = () => {
 }
 
 .cart-icon-bg {
-    width: 40px;
-    height: 40px;
+    width: 34px;
+    height: 34px;
     background: #E6E0D9;
-    border-radius: 10px;
+    border-radius: 9px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #3D2B1F;
+    flex-shrink: 0;
 }
 
 .cart-header-modern h2 {
     font-family: 'Crimson Pro', serif;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
     margin: 0;
 }
@@ -1588,19 +1632,19 @@ const closeOrderDetails = () => {
 
 .checkout-btn-modern {
     width: 100%;
-    padding: 16px;
-    background: #3D2B1F;
+    padding: 14px;
+    background: linear-gradient(135deg, #DD876E, #e6957c);
     color: white;
     border: none;
-    border-radius: 12px;
+    border-radius: 10px;
     font-weight: 700;
-    font-size: 16px;
+    font-size: 15px;
     cursor: pointer;
     transition: all 0.3s ease;
 }
 
 .checkout-btn-modern:hover {
-    background: #543D2F;
+    opacity: 0.92;
     transform: translateY(-2px);
 }
 
@@ -1610,8 +1654,8 @@ const closeOrderDetails = () => {
     justify-content: center;
     align-items: center;
     gap: 12px;
-    margin-top: 30px;
-    padding-top: 20px;
+    margin-top: 18px;
+    padding-top: 16px;
     border-top: 1px solid #E6E0D9;
 }
 
@@ -1629,82 +1673,179 @@ const closeOrderDetails = () => {
     font-size: 10px;
 }
 
-/* Existing Cart Item Styles Updated */
+/* Cart Item Card */
 .cart-item-modern {
-    display: flex;
+    display: grid;
+    grid-template-columns: 48px 1fr;
     gap: 12px;
-    padding: 16px;
+    padding: 12px;
     background: white;
     border-radius: 12px;
-    margin-bottom: 12px;
-    position: relative;
+    margin-bottom: 10px;
 }
 
 .cart-item-image {
-    width: 60px;
-    height: 60px;
+    width: 48px;
+    height: 48px;
     border-radius: 8px;
     object-fit: cover;
+    background: #F9F5F0;
+}
+
+.cart-item-body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cart-item-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.cart-item-details {
+    min-width: 0;
 }
 
 .cart-item-details h4 {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
-    margin: 0 0 4px 0;
+    margin: 0 0 2px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .cart-item-specs {
-    font-size: 12px;
+    font-size: 11px;
     color: #8C7B6E;
-    margin: 0 0 4px 0;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cart-item-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .cart-item-price {
     font-weight: 700;
     font-size: 14px;
+    color: #3D2B1F;
 }
 
 .quantity-controls-modern {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-top: 8px;
+    gap: 8px;
+}
+
+.qty-btn {
+    width: 24px;
+    height: 24px;
+    border: 1px solid #E6E0D9;
+    background: #FBF7F2;
+    color: #3D2B1F;
+    border-radius: 6px;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.qty-btn:hover {
+    background: #DD876E;
+    border-color: #DD876E;
+    color: #fff;
+}
+
+.quantity {
+    min-width: 20px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #3D2B1F;
 }
 
 .remove-btn-modern {
-    position: absolute;
-    top: 10px;
-    right: 10px;
     background: none;
     border: none;
     color: #B2A69B;
     cursor: pointer;
     font-size: 12px;
+    line-height: 1;
+    padding: 2px;
+    flex-shrink: 0;
+    transition: color 0.2s ease;
+}
+
+.remove-btn-modern:hover {
+    color: #D63031;
+}
+
+/* Cart Footer Summary */
+.cart-footer-modern {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #E6E0D9;
+}
+
+.cart-summary-modern {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    color: #8C7B6E;
+}
+
+.summary-row.total {
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px dashed #E6E0D9;
+    font-size: 16px;
+    font-weight: 700;
+    color: #3D2B1F;
 }
 
 /* Secondary Navbar */
 .secondary-navbar {
     display: flex;
-    gap: 40px;
-    padding: 0 5%;
-    background: #FBF7F2;
-    border-bottom: 1px solid #E6E0D9;
-    margin-bottom: 30px;
+    gap: 28px;
+    padding: 0;
+    margin: 0;
+    flex-shrink: 0;
 }
 
 .nav-item {
     background: none;
     border: none;
-    padding: 20px 0;
+    padding: 11px 0;
     font-family: 'Work Sans', sans-serif;
-    font-size: 14px;
-    font-weight: 700;
-    color: #8C7E71;
+    font-size: 20px;
+    font-weight: 600;
+    color: #A0917F;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 1px;
     position: relative;
-    transition: all 0.3s ease;
+    transition: color 0.2s ease;
 }
 
 .nav-item:hover {
@@ -1722,23 +1863,24 @@ const closeOrderDetails = () => {
     left: 0;
     width: 100%;
     height: 2px;
-    background: #8C7E71;
+    background: #3D2B1F;
+    border-radius: 2px 2px 0 0;
 }
 
 /* History Section */
 .history-section {
     flex: 1;
     background: white;
-    border-radius: 20px;
-    padding: 40px;
-    box-shadow: 0 4px 20px rgba(61, 43, 31, 0.05);
+    border-radius: 14px;
+    padding: 28px;
+    box-shadow: 0 2px 10px rgba(61, 43, 31, 0.05);
 }
 
 .history-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 30px;
+    margin-bottom: 20px;
 }
 
 .history-title {
@@ -1775,8 +1917,8 @@ const closeOrderDetails = () => {
 .order-history-card {
     background: #FBF7F2;
     border: 1px solid #E6E0D9;
-    border-radius: 16px;
-    padding: 24px;
+    border-radius: 14px;
+    padding: 18px;
     transition: all 0.3s ease;
 }
 
@@ -1808,13 +1950,13 @@ const closeOrderDetails = () => {
 
 .order-main-info {
     display: flex;
-    gap: 20px;
-    margin-bottom: 20px;
+    gap: 16px;
+    margin-bottom: 14px;
 }
 
 .order-img-container {
-    width: 100px;
-    height: 100px;
+    width: 84px;
+    height: 84px;
     background: white;
     border-radius: 12px;
     overflow: hidden;
@@ -1954,7 +2096,7 @@ const closeOrderDetails = () => {
 
 /* History Sidebar */
 .history-sidebar {
-    width: 380px;
+    width: 100%;
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -1962,9 +2104,9 @@ const closeOrderDetails = () => {
 
 .recommendations-container {
     background: white;
-    border-radius: 20px;
-    padding: 30px;
-    box-shadow: 0 4px 20px rgba(61, 43, 31, 0.05);
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(61, 43, 31, 0.05);
 }
 
 .recommendations-container h3 {
@@ -2039,9 +2181,9 @@ const closeOrderDetails = () => {
 /* Order Details Sidebar */
 .order-details-sidebar {
     background: white;
-    border-radius: 20px;
-    padding: 30px;
-    box-shadow: 0 4px 20px rgba(61, 43, 31, 0.05);
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(61, 43, 31, 0.05);
 }
 
 .details-header {
@@ -2109,6 +2251,25 @@ const closeOrderDetails = () => {
 @media (max-width: 768px) {
     .secondary-navbar {
         gap: 20px;
+    }
+
+    .header-content h1 {
+        font-size: 28px;
+    }
+
+    .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .search-box {
+        width: 100%;
+    }
+
+    .category-filters {
+        -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+        mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
     }
 
     .order-main-info {
@@ -2218,7 +2379,7 @@ const closeOrderDetails = () => {
 
 .checkout-popup {
     background: white;
-    border-radius: 5px;
+    border-radius: 16px;
     max-width: 1000px;
     width: 100%;
     max-height: 90vh;
@@ -2228,25 +2389,25 @@ const closeOrderDetails = () => {
 }
 
 .popup-header {
-    padding: 10px;
+    padding: 20px 24px;
     border-bottom: 1px solid #F4EDE6;
     text-align: center;
 }
 
 .popup-header h2 {
     font-family: 'Crimson Pro', serif;
-    font-size: 32px;
+    font-size: 24px;
     font-weight: 700;
     color: #3D2B1F;
-    margin: 0 0 10px 0;
+    margin: 0 0 6px 0;
 }
 
 .popup-body {
-    padding: 40px;
+    padding: 24px;
 }
 
 .form-group {
-    margin-bottom: 24px;
+    margin-bottom: 16px;
 }
 
 .form-group label {
@@ -2270,9 +2431,9 @@ const closeOrderDetails = () => {
 
 .order-summary-section {
     background: #F9F5F0;
-    padding: 24px;
-    border-radius: 16px;
-    margin-bottom: 24px;
+    padding: 16px;
+    border-radius: 14px;
+    margin-bottom: 16px;
 }
 
 .order-summary-header {
@@ -2284,7 +2445,7 @@ const closeOrderDetails = () => {
 .summary-item {
     display: grid;
     grid-template-columns: 3fr 1fr 2fr 1fr;
-    padding: 12px 0;
+    padding: 10px 0;
     border-bottom: 1px solid #E6E0D9;
     text-align: center;
 }
@@ -2321,7 +2482,7 @@ const closeOrderDetails = () => {
 }
 
 .popup-footer {
-    padding: 0 40px 40px;
+    padding: 0 24px 24px;
     display: flex;
     gap: 16px;
 }
@@ -2668,10 +2829,52 @@ const closeOrderDetails = () => {
     }
 }
 
-.header-actions {
-    display: flex;
-    align-items: center;
-    gap: 15px;
+/* Mobile sticky "view cart" bar */
+.mobile-cart-bar {
+    display: none;
+}
+
+@media (max-width: 1100px) {
+    .mobile-cart-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        position: fixed;
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+        z-index: 9000;
+        padding: 14px 18px;
+        border: none;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #DD876E, #e6957c);
+        color: #fff;
+        font-weight: 700;
+        font-size: 15px;
+        cursor: pointer;
+        box-shadow: 0 8px 24px rgba(221, 135, 110, 0.4);
+    }
+
+    .mcb-count {
+        min-width: 24px;
+        height: 24px;
+        padding: 0 6px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.25);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+    }
+
+    .mcb-label {
+        flex: 1;
+        text-align: left;
+    }
+
+    .mcb-total {
+        font-size: 16px;
+    }
 }
 
 </style>

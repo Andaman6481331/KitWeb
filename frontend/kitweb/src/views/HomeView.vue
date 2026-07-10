@@ -1,20 +1,34 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import VideoCard from '../components/video-card.vue';
 import InstagramSection from '../components/InstagramSection.vue';
 import AboutKitcharoen from '../components/AboutKitcharoen.vue';
 import AutoScrollBanner from '../components/auto-scroll-banner.vue';
 import FeaturedCategories from '../components/featured-categories.vue';
 import customerReview from '../components/customer-review.vue';
+import InfoBanner from '../components/info-banner.vue';
+import SectionNav from '../components/section-nav.vue';
 import { api, getUtilsUrl } from '../services/api';
 import { codeToPath, defaultLang } from '../utils/localeRoutes';
 import ProductStock from '../components/products-stock.vue';
 
+const { t } = useI18n();
 const products = ref([]);
 const route = useRoute();
 const currentLang = computed(() => route.params.lang || defaultLang);
 const loading = ref(true);
+
+// Section navigator (right-side mini-map rail)
+const sections = computed(() => [
+  { id: 'home-categories', label: t('home.nav.categories') },
+  { id: 'home-about',      label: t('home.nav.about') },
+  { id: 'home-video',      label: t('home.nav.video') },
+  { id: 'home-instagram',  label: t('home.nav.instagram') },
+  { id: 'home-reviews',    label: t('home.nav.reviews') },
+  { id: 'home-promo',      label: t('home.nav.promo') },
+]);
 
 // ── Hero Carousel ──────────────────────────────
 // Bump BANNER_VERSION whenever you re-upload a banner to R2 under the same name.
@@ -63,6 +77,9 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
 </script>
 <template>
   <div class="content">
+
+    <!-- Info Banner -->
+    <InfoBanner :badge="$t('home.bannerBadge')" :text="$t('home.bannerText')" />
 
     <!-- Hero Carousel -->
     <section
@@ -219,25 +236,35 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
   </div>
 
     <!-- Featured Categories -->
-    <FeaturedCategories />
+    <div id="home-categories" class="home-anchor">
+      <FeaturedCategories />
+    </div>
 
     <!-- About us / History / Location -->
-    <AboutKitcharoen />
+    <div id="home-about" class="home-anchor">
+      <AboutKitcharoen />
+    </div>
 
     <!-- Video Card Display -->
-    <VideoCard />
+    <div id="home-video" class="home-anchor">
+      <VideoCard />
+    </div>
 
     <!-- Auto Item Scroll Banner -->
     <AutoScrollBanner />
 
     <!-- KitCraft Instagram Ads -->
-    <InstagramSection />
+    <div id="home-instagram" class="home-anchor">
+      <InstagramSection />
+    </div>
 
     <!-- Customer Review -->
-    <customerReview />
+    <div id="home-reviews" class="home-anchor">
+      <customerReview />
+    </div>
 
     <!-- Promotional Banner -->
-    <section class="promo-section">
+    <section class="promo-section" id="home-promo">
       <div class="promo-content">
         <h2>{{ $t('home.specialOffer') }}</h2>
         <p>{{ $t('home.promoText') }}</p>
@@ -246,6 +273,9 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
         </router-link>
       </div>
     </section>
+
+    <!-- Section Navigator: right-side mini-map rail -->
+    <SectionNav :sections="sections" />
   </div>
 </template>
 
@@ -262,6 +292,12 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
   padding: 0;
   margin: 0;
   background-color: #FBF7F2;
+}
+
+/* Keep section headings clear of the sticky navbar when scrolled to via the rail */
+.home-anchor,
+.promo-section {
+  scroll-margin-top: 90px;
 }
 
 /* ===== HERO CAROUSEL ===== */

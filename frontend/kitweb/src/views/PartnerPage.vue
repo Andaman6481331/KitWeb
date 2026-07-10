@@ -1,11 +1,22 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { getUtilsUrl } from '@/services/api';
 import { useI18n } from 'vue-i18n';
+import InfoBanner from '../components/info-banner.vue';
+import SectionNav from '../components/section-nav.vue';
 
 const { t } = useI18n();
 
 // Hero text is now handled via i18n in the template
+
+// Section navigator (right-side mini-map rail)
+const sections = computed(() => [
+  { id: 'partner-stats',     label: t('partner.nav.overview') },
+  { id: 'partner-reasons',   label: t('partner.nav.reasons') },
+  { id: 'partner-delivery',  label: t('partner.nav.delivery') },
+  { id: 'partner-community', label: t('partner.nav.community') },
+  { id: 'partner-cta',       label: t('partner.nav.contact') },
+]);
 
 const stats = ref([
     { number: '180+', label: 'Retail Partners' },
@@ -107,6 +118,9 @@ const handleLearnMoreClick = () => {
 
 <template>
     <div class="partners-reach-page">
+        <!-- Info Banner -->
+        <InfoBanner :badge="$t('partner.bannerBadge')" :text="$t('partner.bannerText')" />
+
         <!-- Hero Section -->
         <section class="hero" :style="{ backgroundImage: `url(${getUtilsUrl('shop03-large.webp')})` }">
             <div class="hero-content">
@@ -116,7 +130,7 @@ const handleLearnMoreClick = () => {
         </section>
 
         <!-- Statistics Section -->
-        <section class="stats-section">
+        <section class="stats-section" id="partner-stats">
             <div class="container">
                 <div class="stats-grid">
                     <div v-for="(stat, index) in stats" :key="index" class="stat">
@@ -128,7 +142,7 @@ const handleLearnMoreClick = () => {
         </section>
         
         <!-- Reasons We Work With Partners -->
-        <section class="reasons-section">
+        <section class="reasons-section" id="partner-reasons">
             <div class="container">
                 <div class="section-header">
                     <p class="section-eyebrow">{{ $t('partner.reasonsEyebrow') }}</p>
@@ -149,7 +163,7 @@ const handleLearnMoreClick = () => {
         <div class="line-divider"></div>
 
         <!-- Delivery Section -->
-        <section class="delivery-section">
+        <section class="delivery-section" id="partner-delivery">
             <div class="container">
                 <div class="section-header" style="text-align: center!important;">
                     <p class="section-eyebrow" style="margin-left: auto; margin-right: auto;">{{ $t('partner.deliveryEyebrow') }}</p>
@@ -211,7 +225,7 @@ const handleLearnMoreClick = () => {
         <div class="line-divider"></div>
 
         <!-- Customer Image Wall -->
-        <section class="image-wall-section">
+        <section class="image-wall-section" id="partner-community">
             <div class="container-fluid">
                 <div class="container">
                     <div class="section-header">
@@ -254,7 +268,7 @@ const handleLearnMoreClick = () => {
 
 
         <!-- Call to Action -->
-        <section class="cta-section">
+        <section class="cta-section" id="partner-cta">
             <div class="container">
                 <div class="cta-content">
                     <h2 class="cta-title">{{ cta.title }}</h2>
@@ -266,6 +280,9 @@ const handleLearnMoreClick = () => {
                 </div>
             </div>
         </section>
+
+        <!-- Section Navigator: right-side mini-map rail -->
+        <SectionNav :sections="sections" />
     </div>
 </template>
 
@@ -288,6 +305,18 @@ const handleLearnMoreClick = () => {
     background: var(--earth-cream);
     line-height: 1.7;
     position: relative;
+
+    /* Retint the shared section-nav rail to this page's warm accent */
+    --sn-accent: var(--accent-warm);
+}
+
+/* Keep section headings clear of the sticky navbar when scrolled to via the rail */
+.stats-section,
+.reasons-section,
+.delivery-section,
+.image-wall-section,
+.cta-section {
+    scroll-margin-top: 90px;
 }
 
 * {

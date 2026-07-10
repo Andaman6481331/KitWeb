@@ -2,11 +2,13 @@
 import ProductStock from '../components/products-stock.vue';
 import DiyProductKit from '../components/diy-product-kit.vue';
 import CategoryView from '../views/CategoryView.vue';
+import InfoBanner from '../components/info-banner.vue';
 import { getUtilsUrl } from '@/services/api';
 import { useRoute, useRouter } from 'vue-router';
 import { computed, ref } from 'vue';
 import { codeToPath, defaultLang } from '@/utils/localeRoutes';
 import { catalogGroups } from '@/utils/catalogCategories';
+import { scrollIntent } from '@/router';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
@@ -28,15 +30,23 @@ const sortOptions = computed(() => [
 ]);
 
 const selectCategory = (cat) => {
+  // Flag the sidebar-initiated navigation so scrollBehavior scrolls to the
+  // category bar (not the top). Only when the category actually changes, so a
+  // no-op re-select doesn't leave a stale flag for the next navigation.
+  if (cat !== currentCategory.value) {
+    scrollIntent.toCategoryBar = true;
+  }
   router.push({
     name: 'catalog',
     params: { lang: currentLang.value, category: cat }
   });
-  window.scrollTo({ top: 400, behavior: 'smooth' });
 };
 </script>
 
 <template>
+    <!-- Info Banner -->
+    <InfoBanner :badge="$t('catalog.bannerBadge')" :text="$t('catalog.bannerText')" />
+
     <!-- Preload hero image -->
     <img :src="getUtilsUrl('shop06-large.webp')" fetchpriority="high" aria-hidden="true"
         style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">

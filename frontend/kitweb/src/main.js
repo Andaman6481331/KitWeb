@@ -1,6 +1,6 @@
 import { ViteSSG } from 'vite-ssg'
 import App from './App.vue'
-import { routes, installRouterGuards } from './router'
+import { routes, scrollBehavior, installRouterGuards } from './router'
 import { createLanguageEngine, registerI18n, localeFromPath } from './i18n'
 import VueVirtualScroller from 'vue-virtual-scroller'
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
@@ -63,12 +63,13 @@ export async function includedRoutes(paths = []) {
 
 export const createApp = ViteSSG(
   App,
-  { routes },
+  { routes, scrollBehavior },
   async ({ app, router, isClient, initialState, routePath }) => {
     const initialLocale = localeFromPath(routePath || router.currentRoute.value.fullPath || '/')
     const i18n = createLanguageEngine(initialLocale)
 
-    app.use(router)
+    // Note: vite-ssg installs the router itself (after this setup fn runs),
+    // so we must NOT call app.use(router) here or the plugin is applied twice.
     app.use(i18n)
 
     if (isClient) {

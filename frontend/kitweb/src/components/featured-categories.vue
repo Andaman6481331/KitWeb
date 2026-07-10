@@ -4,6 +4,9 @@ import { defaultLang } from '../utils/localeRoutes';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { getUtilsUrl } from '@/services/api';
+// card-img05-large.webp is not present on the backend /utils (404),
+// so use the bundled local asset for this card instead.
+import cardImg05 from '@/assets/card-img05.webp';
 
 const route = useRoute();
 const currentLang = computed(() => route.params.lang || defaultLang);
@@ -21,7 +24,7 @@ const bottomLeft = [
 ];
 
 const bottomRight = [
-    { id: 6, key: 'decorative', image: getUtilsUrl('card-img05-large.webp') },
+    { id: 6, key: 'decorative', image: cardImg05 },
     { id: 7, key: 'flora',      image: getUtilsUrl('card-img07-large.webp') },
 ];
 </script>

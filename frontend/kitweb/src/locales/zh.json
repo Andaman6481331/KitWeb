@@ -3,6 +3,8 @@
         "home": "首页",
         "products": "产品",
         "startOrder": "开始订购",
+        "shoppingCart": "购物车",
+        "goToCart": "去购物车",
         "contactUs": "联系我们",
         "login": "登录",
         "events": "活动",
@@ -13,7 +15,8 @@
         "partnersDesc": "批发客户与合作伙伴",
         "faq": "常见问题",
         "faqDesc": "常见问题解答",
-        "b2bCatalog": "B2B 目录"
+        "b2bCatalog": "B2B 目录",
+        "contactUsDesc": "联系我们的团队"
     },
     "footer": {
         "companyName": "侨成发",
@@ -28,13 +31,23 @@
         "copyright": "© 2026 侨成发。版权所有。"
     },
     "home": {
+        "bannerBadge": "自1984年",
+        "bannerText": "来自曼谷三聘市场的家族经营手工艺与缝纫用品店，深受手作爱好者信赖40余年",
         "heroTitle": "侨成发 手工艺和缝纫用品",
         "heroSubtitle": "来自曼谷三聘市场的可信赖材料、公道价格和友好服务。自1984年",
         "shopNow": "立即购买",
         "viewCatalog": "查看目录",
         "specialOffer": "特别优惠！",
         "promoText": "本周所有纱线产品八折优惠",
-        "shopSale": "购买特价商品"
+        "shopSale": "购买特价商品",
+        "nav": {
+            "categories": "商品分类",
+            "about": "关于我们",
+            "video": "视频",
+            "instagram": "Instagram",
+            "reviews": "顾客评价",
+            "promo": "优惠"
+        }
     },
     "categories": {
     "title": "按类别选购",
@@ -165,8 +178,17 @@
         "address": "曼谷三攀他旺区 乍甲拉瓦 瓦尼奇1路 376号"
     },
     "partner": {
+        "bannerBadge": "180+ 合作伙伴",
+        "bannerText": "深受泰国42府及8个国家零售商信赖 — 携手共同成长",
         "heroTitle": "遍布泰国及海外的诚信合作伙伴",
-        "heroSubtitle": "建立可靠的零售伙伴关系，从曼谷延伸至泰国的每个角落以及跨国边界"
+        "heroSubtitle": "建立可靠的零售伙伴关系，从曼谷延伸至泰国的每个角落以及跨国边界",
+        "nav": {
+            "overview": "概览",
+            "reasons": "合作优势",
+            "delivery": "物流配送",
+            "community": "合作社区",
+            "contact": "立即合作"
+        }
     },
     "admin": {
         "loginTitle": "管理员登录",
@@ -249,6 +271,9 @@
         "title": "匠心系列",
         "subtitle": "为您下一个杰作发现最优质的材料。",
         "explore": "探索系列",
+        "eyebrow": "我们的系列",
+        "groupCrafting": "手工工具与用品",
+        "groupDecor": "装饰与花艺",
         "items": {
             "needles": {
                 "name": "针",
@@ -265,6 +290,18 @@
             "beads": {
                 "name": "珠子",
                 "description": "精美的玻璃和水晶珠，为任何项目增添一抹亮色。"
+            },
+            "thread": {
+                "name": "线",
+                "description": "耐用的缝纫与刺绣线，色彩齐全，适合各种针法与手工项目。"
+            },
+            "decorative": {
+                "name": "装饰品",
+                "description": "绒线、饰边等装饰配件，为您的手工作品增添个性与细节。"
+            },
+            "flora": {
+                "name": "花艺",
+                "description": "逼真的仿真花与绿叶，适合插花、装饰与长久摆设。"
             }
         }
     },
@@ -318,6 +355,8 @@
         "indicatorLabel": "前往视频 {index}"
     },
     "catalog": {
+        "bannerBadge": "批发价格",
+        "bannerText": "整箱购买更优惠 — 按件显示价格，方便您轻松比较",
         "since": "始于 1984 年",
         "title": "浏览我们的收藏",
         "subtitle": "四十年的精湛工艺，为现代制作者和传统裁缝精心策划。",
@@ -434,7 +473,7 @@
         "q10": "店铺的营业时间是什么时候？",
         "a10": "周一至周六 08:00–17:00 营业。周日仅部分周开放，请提前联系确认。",
         "q11": "在哪里可以关注店铺最新动态？",
-        "a11": "欢迎关注我们的官网及 Instagram：@kit_craft376，获取最新资讯与优惠活动。",
+        "a11": "欢迎关注我们的官网及 Instagram：{'@'}kit_craft376，获取最新资讯与优惠活动。",
         "q12": "在哪里可以关注活动和新品信息？",
         "a12": "请通过我们的官网和社交媒体账号，随时了解工作坊、促销及新品动态。",
         "q13": "店附近有停车位吗？",

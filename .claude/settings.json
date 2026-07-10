@@ -12,7 +12,14 @@
       "Bash(npx tsc *)",
       "Bash(echo \"exit: $?\")",
       "Bash(npx vite *)",
-      "Bash(echo \"vite build exit: $?\")"
+      "Bash(echo \"vite build exit: $?\")",
+      "Bash(npm run *)",
+      "Bash(node -e ' *)",
+      "Bash(git -C /d/GitHub/KitWeb status --short)",
+      "Bash(git -C /d/GitHub/KitWeb check-ignore frontend/kitweb/dist)",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('d:/GitHub/KitWeb/frontend/kitweb/src/locales/th.json','utf8'\\)\\); console.log\\('th.json OK'\\)\")",
+      "Bash(node -e \"const j=require\\('d:/GitHub/KitWeb/frontend/kitweb/src/locales/en.json'\\); console.log\\(JSON.stringify\\(j.nav,null,2\\)\\)\")",
+      "Bash(node -e \"const s=require\\('./package.json'\\).scripts; console.log\\(JSON.stringify\\(s,null,2\\)\\)\")"
     ]
   }
 }

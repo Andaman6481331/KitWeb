@@ -59,7 +59,7 @@ const generateSlug = (name, id) => {
     return `${slugified}-${id}`;
 };
 
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const currentLang = computed(() => route.params.lang || defaultLang);
@@ -92,17 +92,25 @@ const tProduct = (item, field) => {
 };
 
 // Resolves a group key (e.g. 'threadString') or a raw product slug (e.g. 'scissors')
-// to its translated label, falling back to the original string if no key exists.
+// to its translated label. Group keys are camelCase and product slugs are lowercase,
+// so try the name as-is first, then fall back to the lowercased form. `te` is checked
+// against 'en' (the most complete locale) so t() still applies per-locale fallback.
 const tCategory = (catName) => {
     if (!catName) return '';
-    const lower = catName.toLowerCase().trim();
-    return t(`categories.${lower}`, catName);
+    const raw = catName.trim();
+    if (te(`categories.${raw}`, 'en')) return t(`categories.${raw}`);
+    const lower = raw.toLowerCase();
+    if (te(`categories.${lower}`, 'en')) return t(`categories.${lower}`);
+    return catName;
 };
 
 const tCategoryDesc = (catName) => {
     if (!catName) return '';
-    const lower = catName.toLowerCase().trim();
-    return t(`categories.${lower}Desc`, t('catalog.categoryDescriptions.Default'));
+    const raw = catName.trim();
+    if (te(`categories.${raw}Desc`, 'en')) return t(`categories.${raw}Desc`);
+    const lower = raw.toLowerCase();
+    if (te(`categories.${lower}Desc`, 'en')) return t(`categories.${lower}Desc`);
+    return t('catalog.categoryDescriptions.Default');
 };
 
 const products = ref([]);
@@ -583,7 +591,7 @@ const displayedProducts = computed(() => {
 <template>
     <div class="category-page">
         <!-- Compact category header -->
-        <div class="category-bar">
+        <div class="category-bar" id="category-bar">
             <div class="category-bar-left">
                 <div class="category-bar-image">
                     <ion-icon v-if="group?.svgSrc" :src="group.svgSrc"></ion-icon>

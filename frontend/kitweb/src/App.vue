@@ -5,6 +5,7 @@ import { useHead } from '@unhead/vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale } from './i18n'
 import { authStore } from './stores/authStore'
+import { cartStore } from './stores/cartStore'
 import { api, getUtilsUrl } from './services/api';
 import { localizedRoute, codeToPath, pathToCode } from './utils/localeRoutes'
 import { catalogGroups } from './utils/catalogCategories'
@@ -251,8 +252,16 @@ const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
 // ── Dropdown menus ────────────────────────────
 const showCatalogMenu = ref(false)
 const showCompanyMenu = ref(false)
+const showCartMenu = ref(false)
 let catalogTimer = null
 let companyTimer = null
+let cartTimer = null
+
+// ── Mini-cart ─────────────────────────────────
+const cartItems = computed(() => cartStore.cart)
+const cartCount = computed(() => cartStore.cartItemCount)
+const cartTotal = computed(() => cartStore.cartTotal)
+const cartItemName = (item) => (locale.value === 'th' && item.name_th) ? item.name_th : item.name
 
 // Shared with the catalog sidebar so the dropdown stays in sync with the
 // display groups (incl. merged groups like Thread & String / Scissors & Knives).
@@ -266,8 +275,11 @@ const openCompany  = () => { clearTimeout(companyTimer); showCompanyMenu.value =
 const closeCompany = () => { companyTimer = setTimeout(() => { showCompanyMenu.value = false }, 130) }
 const toggleCompany = () => { showCompanyMenu.value = !showCompanyMenu.value; showCatalogMenu.value = false }
 
-const closeAllMenus = () => { showCatalogMenu.value = false; showCompanyMenu.value = false }
-const isCompanyActive = computed(() => ['partners', 'faq'].includes(String(route.name)))
+const openCart  = () => { clearTimeout(cartTimer); showCartMenu.value = true }
+const closeCart = () => { cartTimer = setTimeout(() => { showCartMenu.value = false }, 130) }
+
+const closeAllMenus = () => { showCatalogMenu.value = false; showCompanyMenu.value = false; showCartMenu.value = false }
+const isCompanyActive = computed(() => ['partners', 'faq', 'contactus'].includes(String(route.name)))
 
 onMounted(() => {
   document.addEventListener('click', closeAllMenus)
@@ -379,12 +391,21 @@ onUnmounted(() => {
                   <span class="dd-page-desc">{{ $t('nav.faqDesc') || 'Common questions answered' }}</span>
                 </span>
               </router-link>
+              <router-link
+                :to="{ name: 'contactus', params: { lang: currentLang } }"
+                class="dd-page-link"
+                active-class="dd-page-link-active"
+                @click="scrollToTop; closeAllMenus()"
+              >
+                <span class="dd-page-icon"><ion-icon name="mail-outline"></ion-icon></span>
+                <span class="dd-page-text">
+                  <span class="dd-page-title">{{ $t('nav.contactUs') }}</span>
+                  <span class="dd-page-desc">{{ $t('nav.contactUsDesc') || 'Get in touch with our team' }}</span>
+                </span>
+              </router-link>
             </div>
           </Transition>
         </div>
-
-        <!-- Contact Us -->
-        <router-link :to="{ name: 'contactus', params: { lang: currentLang } }" @click="scrollToTop; closeAllMenus()" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.contactUs') }}</router-link>
 
       </div>
 
@@ -408,18 +429,64 @@ onUnmounted(() => {
             </transition>
           </div>
           <!-- <template v-if="isDev"> -->
-            <router-link v-if="authStore.isAuthenticated" :to="{ name: 'orderpage', params: { lang: currentLang } }" @click="scrollToTop" class="order-capsule">
-              {{ $t('nav.startOrder') }}
-            </router-link>
+            <!-- Cart mini-dropdown -->
+            <div class="nav-item-wrap cart-wrap" @mouseenter="openCart" @mouseleave="closeCart">
+              <router-link
+                class="cart-trigger"
+                :to="{ name: 'orderpage', params: { lang: currentLang } }"
+                :aria-label="$t('nav.shoppingCart')"
+                @click="scrollToTop(); closeAllMenus()"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0" />
+                </svg>
+                <span v-if="cartCount > 0" class="cart-count-badge">{{ cartCount }}</span>
+              </router-link>
+              <Transition name="nav-dd">
+                <div v-if="showCartMenu" class="dd-menu cart-dd" @click.stop>
+                  <div class="cart-dd-header">{{ $t('nav.shoppingCart') }}</div>
+
+                  <!-- Empty state -->
+                  <div v-if="cartItems.length === 0" class="cart-dd-empty">
+                    {{ $t('order.cartEmpty') }}
+                  </div>
+
+                  <!-- Items -->
+                  <template v-else>
+                    <div class="cart-dd-items">
+                      <div v-for="item in cartItems" :key="item.cartItemKey" class="cart-dd-item">
+                        <img :src="item.image" :alt="cartItemName(item)" class="cart-dd-thumb" />
+                        <div class="cart-dd-info">
+                          <span class="cart-dd-name">{{ cartItemName(item) }}</span>
+                          <span class="cart-dd-specs">{{ item.selectedSize }} • {{ item.selectedColor }}</span>
+                          <span class="cart-dd-price">฿{{ item.price }}</span>
+                        </div>
+                        <span class="cart-dd-qty">× {{ item.quantity }}</span>
+                      </div>
+                    </div>
+
+                    <div class="cart-dd-footer">
+                      <div class="cart-dd-subtotal">
+                        <span>{{ $t('order.subtotal') }}</span>
+                        <span class="cart-dd-total">฿{{ cartTotal }}</span>
+                      </div>
+                      <router-link
+                        :to="{ name: 'orderpage', params: { lang: currentLang } }"
+                        class="cart-dd-btn"
+                        @click="scrollToTop(); closeAllMenus()"
+                      >
+                        {{ $t('nav.goToCart') }}
+                      </router-link>
+                    </div>
+                  </template>
+                </div>
+              </Transition>
+            </div>
 
             <router-link v-if="!authStore.isAuthenticated" :to="{ name: 'login', params: { lang: currentLang } }" @click="scrollToTop" class="login-capsule">
               {{ $t('nav.login') }}
             </router-link>
             <div v-else class="logged-in-actions">
-              <router-link :to="{ name: 'orderpage', params: { lang: currentLang } }" @click="scrollToTop" class="login-capsule account-link">
-                <ion-icon name="person-circle-outline"></ion-icon>
-                <span>{{ authStore.user?.businessName || authStore.user?.ownerName || $t('nav.account') }}</span>
-              </router-link>
               <button class="logout-btn-nav" @click="handleLogout" :title="$t('order.logout')">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -841,11 +908,22 @@ body {
   cursor: pointer;
   display: flex;
   align-items: center;
+  transition: transform 0.2s ease;
+}
+
+.lang-globe:hover {
+  transform: translateY(-1px);
+}
+
+.lang-globe:hover ion-icon,
+.lang-globe:hover .current-lang-code {
+  color: #DD876E;
 }
 
 .lang-globe ion-icon {
   font-size: 24px;
   color: #5d4037;
+  transition: color 0.2s ease;
 }
 
 .current-lang-code {
@@ -853,6 +931,7 @@ body {
   font-weight: 700;
   color: #5d4037;
   margin-left: 4px;
+  transition: color 0.2s ease;
 }
 
 .lang-popup {
@@ -945,16 +1024,6 @@ body {
   background-color: #f8f8f8;
 }
 
-.account-link {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.account-link ion-icon {
-  font-size: 20px;
-}
-
 .logged-in-actions {
   display: flex;
   align-items: center;
@@ -972,18 +1041,199 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .logout-btn-nav:hover {
   background-color: #fff;
-  border-color: #008080;
-  color: #008080;
+  border-color: #DD876E;
+  color: #DD876E;
   transform: translateY(-1px);
 }
 
 .logout-btn-nav ion-icon {
   font-size: 20px;
+}
+
+/* ── Mini-cart dropdown ──────────────────────── */
+.cart-wrap {
+  margin-right: 4px;
+}
+
+.cart-trigger {
+  position: relative;
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: #5d4037;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.cart-trigger:hover {
+  color: #DD876E;
+  transform: translateY(-1px);
+}
+
+.cart-count-badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: #DD876E;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  border-radius: 9px;
+  box-shadow: 0 1px 4px rgba(221, 135, 110, 0.5);
+}
+
+/* Right-align the panel so it stays within the viewport edge */
+.dd-menu.cart-dd {
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  left: auto;
+  right: 0;
+  transform: none;
+  padding: 0;
+}
+
+/* Neutralise the shared nav-dd centering transform for the right-aligned panel */
+.cart-dd.nav-dd-enter-from,
+.cart-dd.nav-dd-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.cart-dd-header {
+  padding: 15px 18px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #3D2B1F;
+  border-bottom: 1px solid #f2e8de;
+  text-align: left;
+}
+
+.cart-dd-empty {
+  padding: 30px 18px;
+  text-align: center;
+  color: #9e8272;
+  font-size: 14px;
+}
+
+.cart-dd-items {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.cart-dd-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 10px;
+  transition: background 0.14s;
+}
+
+.cart-dd-item:hover {
+  background: #FDF3E6;
+}
+
+.cart-dd-thumb {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #F9F5F0;
+}
+
+.cart-dd-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.cart-dd-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #3D2B1F;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cart-dd-specs {
+  font-size: 11.5px;
+  color: #9e8272;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cart-dd-price {
+  font-size: 13px;
+  font-weight: 700;
+  color: #3D2B1F;
+}
+
+.cart-dd-qty {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8C7B6E;
+  white-space: nowrap;
+}
+
+.cart-dd-footer {
+  padding: 14px 18px;
+  border-top: 1px solid #f2e8de;
+}
+
+.cart-dd-subtotal {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #5d4037;
+}
+
+.cart-dd-total {
+  font-size: 18px;
+  font-weight: 700;
+  color: #3D2B1F;
+}
+
+.cart-dd-btn {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #DD876E, #e6957c);
+  color: #fff;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  transition: transform 0.2s, opacity 0.3s;
+}
+
+.cart-dd-btn:hover {
+  transform: translateY(-1px);
+  opacity: 0.92;
 }
 
 /* ===== FOOTER ===== */

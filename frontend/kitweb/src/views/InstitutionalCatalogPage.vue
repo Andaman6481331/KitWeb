@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { api, API_URL} from '../services/api';
@@ -15,6 +15,11 @@ const loading = ref(true);
 const error = ref(null);
 const selectedItems = ref(new Set()); // set of product IDs
 const rfqQuantities = ref({}); // product ID -> quantity
+
+// Section navigator (right-side mini-map rail)
+const activeSection = ref(null);
+const catalogSections = computed(() => Object.keys(categoriesGrouped.value));
+let sectionObserver = null;
 
 // RFQ Modal State
 const showRfqModal = ref(false);
@@ -82,6 +87,43 @@ const fetchCatalog = async () => {
     loading.value = false;
   }
 };
+
+// ── Section navigator: click-to-scroll + track the section currently in view ──
+const scrollToSection = (groupName) => {
+  const el = document.getElementById(`catalog-section-${groupName}`);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+const setupSectionObserver = () => {
+  if (sectionObserver) sectionObserver.disconnect();
+  // A section becomes "active" once it crosses into the middle band of the viewport.
+  sectionObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) activeSection.value = entry.target.dataset.section;
+      });
+    },
+    { rootMargin: '-40% 0px -55% 0px', threshold: 0 }
+  );
+
+  catalogSections.value.forEach((name) => {
+    const el = document.getElementById(`catalog-section-${name}`);
+    if (el) sectionObserver.observe(el);
+  });
+
+  // Default the highlight to the first section until the user scrolls.
+  if (!activeSection.value) activeSection.value = catalogSections.value[0] || null;
+};
+
+// Rebuild the observers whenever the grouped catalog changes (i.e. after data loads).
+watch(categoriesGrouped, async () => {
+  await nextTick();
+  setupSectionObserver();
+});
+
+onBeforeUnmount(() => {
+  if (sectionObserver) sectionObserver.disconnect();
+});
 
 onMounted(() => {
   fetchCatalog();
@@ -594,17 +636,19 @@ const handleDocxDownload = async () => {
         <p class="hero-subtitle">
           {{ t('institutional.heroSubtitle') }}
         </p>
-        <div class="hero-actions">
-          <button @click="handlePdfDownload" class="btn-primary" :disabled="loading || products.length === 0">
-            <ion-icon name="document-text-outline" class="btn-icon"></ion-icon>
-            {{ t('institutional.downloadPdf') }}
-          </button>
-        </div>
-        <div class="hero-actions">
-          <button @click="handleDocxDownload" class="btn-primary" :disabled="loading || products.length === 0">
-            <ion-icon name="document-text-outline" class="btn-icon"></ion-icon>
-            {{ t('institutional.downloadDocx') }}
-          </button>
+        <div class="hero-actions-wrapper">
+          <div class="hero-actions">
+            <button @click="handlePdfDownload" class="btn-primary" :disabled="loading || products.length === 0">
+              <ion-icon name="document-text-outline" class="btn-icon"></ion-icon>
+              {{ t('institutional.downloadPdf') }}
+            </button>
+          </div>
+          <div class="hero-actions">
+            <button @click="handleDocxDownload" class="btn-primary" :disabled="loading || products.length === 0">
+              <ion-icon name="document-text-outline" class="btn-icon"></ion-icon>
+              {{ t('institutional.downloadDocx') }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -625,7 +669,13 @@ const handleDocxDownload = async () => {
 
       <!-- Catalog Main Content -->
       <div v-else class="catalog-grid-wrapper">
-        <div v-for="(groupProducts, groupName) in categoriesGrouped" :key="groupName" class="category-block">
+        <div
+          v-for="(groupProducts, groupName) in categoriesGrouped"
+          :key="groupName"
+          :id="`catalog-section-${groupName}`"
+          :data-section="groupName"
+          class="category-block"
+        >
           <div class="category-block-header">
             <h2 class="category-block-title">{{ groupLabel(groupName) }}</h2>
             <div class="title-line"></div>
@@ -693,6 +743,26 @@ const handleDocxDownload = async () => {
         </div>
       </div>
     </div>
+
+    <!-- Section Navigator: slim right-side mini-map rail -->
+    <nav
+      v-if="!loading && !error && catalogSections.length > 1"
+      class="section-nav"
+      aria-label="Catalog sections"
+    >
+      <button
+        v-for="groupName in catalogSections"
+        :key="groupName"
+        type="button"
+        class="section-nav-item"
+        :class="{ 'is-active': activeSection === groupName }"
+        :title="groupLabel(groupName)"
+        @click="scrollToSection(groupName)"
+      >
+        <span class="section-nav-label">{{ groupLabel(groupName) }}</span>
+        <span class="section-nav-dot"></span>
+      </button>
+    </nav>
 
     <!-- Floating RFQ List Drawer (Bottom Sheet) -->
     <Transition name="drawer-slide">
@@ -932,6 +1002,13 @@ const handleDocxDownload = async () => {
   margin-bottom: 25px;
 }
 
+.hero-actions-wrapper {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
 .hero-actions {
   display: flex;
   justify-content: center;
@@ -982,6 +1059,78 @@ const handleDocxDownload = async () => {
 /* Category Block */
 .category-block {
   margin-bottom: 50px;
+  scroll-margin-top: 90px; /* Keep heading clear of any fixed header when scrolled to */
+}
+
+/* Section Navigator (right-side mini-map rail) */
+.section-nav {
+  position: fixed;
+  top: 50%;
+  right: 18px;
+  transform: translateY(-50%);
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 10px 8px;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--b2b-border);
+  border-radius: 30px;
+  box-shadow: 0 4px 16px rgba(96, 69, 57, 0.1);
+}
+
+.section-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 5px 4px;
+}
+
+.section-nav-label {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--b2b-primary);
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-width 0.3s ease, opacity 0.3s ease;
+}
+
+/* Reveal all labels while hovering the rail */
+.section-nav:hover .section-nav-label {
+  max-width: 200px;
+  opacity: 1;
+}
+
+.section-nav-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--b2b-border);
+  transition: transform 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+}
+
+.section-nav-item:hover .section-nav-dot {
+  background: var(--b2b-secondary);
+}
+
+.section-nav-item.is-active .section-nav-dot {
+  background: var(--b2b-accent);
+  transform: scale(1.4);
+  box-shadow: 0 0 0 4px rgba(221, 135, 110, 0.18);
+}
+
+.section-nav-item.is-active .section-nav-label {
+  color: var(--b2b-accent);
 }
 
 .category-block-header {
@@ -1669,5 +1818,10 @@ const handleDocxDownload = async () => {
   .drawer-container { flex-direction: column; text-align: center; }
   .drawer-left { flex-direction: column; gap: 5px; }
   .drawer-right { width: 100%; justify-content: center; }
+}
+
+/* The mini-map rail needs horizontal room; hide it on smaller screens */
+@media (max-width: 1024px) {
+  .section-nav { display: none; }
 }
 </style>
