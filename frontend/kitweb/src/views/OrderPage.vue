@@ -102,7 +102,6 @@ const fetchProducts = async () => {
 
 onMounted(() => {
     fetchProducts()
-    fetchOrders()
 })
 
 const cart = computed(() => cartStore.cart)
@@ -110,116 +109,7 @@ const searchQuery = ref('')
 const selectedCategory = ref('All')
 const showNotification = ref(false)
 const notificationMessage = ref('')
-const showCheckoutPopup = ref(false)
 const showClearConfirm = ref(false)
-const customerName = ref(authStore.user?.businessName || authStore.user?.ownerName || '')
-const paymentMethod = ref('Bank Transfer')
-const orderNote = ref('')
-const isSubmittingOrder = ref(false)
-const activeTab = ref('new-order')
-const showOrderDetails = ref(false)
-const selectedOrder = ref(null)
-
-// Checkout form — new fields
-const phoneNumber = ref('')
-const shippingAddress = ref('')
-const slipImage = ref(null)
-const slipPreview = ref(null)
-const lineUserId = ref('')
-const lineDisplayName = ref('')
-const lineLoginEnabled = ref(false)
-
-const handleSlipUpload = (event) => {
-  const file = event.target.files[0]
-  if (file) {
-    slipImage.value = file
-    slipPreview.value = URL.createObjectURL(file)
-  }
-}
-
-const triggerLineLogin = () => {
-  const state = crypto.randomUUID()
-  sessionStorage.setItem('line_oauth_state', state)
-  const callbackBase = window.location.origin
-  const redirectUri = encodeURIComponent(`${callbackBase}/line-callback`)
-  const channelId = import.meta.env.VITE_LINE_LOGIN_CHANNEL_ID
-  const url =
-    `https://access.line.me/oauth2/v2.1/authorize?response_type=code` +
-    `&client_id=${channelId}` +
-    `&redirect_uri=${redirectUri}` +
-    `&state=${state}` +
-    `&scope=profile%20openid` +
-    `&bot_prompt=aggressive`
-  const popup = window.open(url, 'lineLogin', 'width=500,height=700')
-  const handler = (e) => {
-    if (e.origin !== window.location.origin) return
-    if (e.data?.type === 'LINE_AUTH') {
-      lineUserId.value = e.data.lineUserId
-      lineDisplayName.value = e.data.displayName
-      window.removeEventListener('message', handler)
-      popup?.close()
-    }
-  }
-  window.addEventListener('message', handler)
-}
-
-// Order history data
-const orders = ref([])
-const isFetchingOrders = ref(false)
-
-// Fetch orders from database
-const fetchOrders = async () => {
-    isFetchingOrders.value = true
-    try {
-        // Only fetch orders for the logged-in customer if applicable
-        const data = await api.getOrders(authStore.user?.id)
-        orders.value = data.map(order => ({
-            ...order,
-            date: new Date(order.created_at).toLocaleDateString(locale.value === 'th' ? 'th-TH' : 'en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-            }),
-            price: order.total_amount,
-            // Fallback for UI if items list is empty but count is needed
-            itemsCount: order.items ? order.items.length : 0,
-            image: order.items && order.items.length > 0 ? getProductImage(order.items[0].product_id) : placeholderImg('Order')
-        }))
-    } catch (error) {
-        console.error('Error fetching orders:', error)
-    } finally {
-        isFetchingOrders.value = false
-    }
-}
-
-// Helper to get image for a product ID
-const getProductImage = (productId) => {
-    const product = products.value.find(p => p.id === productId);
-    const key = product ? (product.image_key || product.image) : null;
-
-    if (!key) {
-        if (typeof productId === 'string' && productId.startsWith('diy-')) {
-            return 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg';
-        }
-        return placeholderImg('Product');
-    }
-
-    const keyStr = String(key);
-    if (keyStr.startsWith('http')) return keyStr;
-    if (keyStr.includes('.')) {
-        if (typeof productId === 'string' && productId.startsWith('diy-')) {
-            return `${API_URL}/kit-image/${keyStr}`;
-        }
-        return `${API_URL}/images/${keyStr}`;
-    }
-    if (typeof productId === 'string' && productId.startsWith('diy-')) {
-        return `${API_URL}/kit-image/${keyStr}-thumb.webp`;
-    }
-    return `${API_URL}/images/${keyStr}-thumb.webp`;
-};
-
-// Recommendations data
-const recommendations = ref([])
 
 // Track selected size and color for each product
 const productSelections = ref({})
@@ -372,48 +262,82 @@ const confirmClearCart = () => {
     showNotificationMsg(t('order.cartCleared'))
 }
 
-// Checkout
+// Use an existing translation key when present, otherwise a readable fallback.
+const tt = (key, fallback) => (te(key) ? t(key) : fallback)
+
+// Checkout — swap the left column into the checkout form in place.
+// The right-hand cart summary stays put so the flow feels continuous.
+const isCheckoutView = ref(false)
+
 const checkout = () => {
     if (cart.value.length === 0) {
         showNotificationMsg(t('order.cartEmptyError'))
         return
     }
-
-    // Open checkout popup instead of immediate alert
-    showCheckoutPopup.value = true
-}
-
-const closeCheckoutPopup = () => {
-    showCheckoutPopup.value = false
-}
-
-const generateOrderId = () => {
-    const now = new Date()
-    const year = now.getFullYear()
-    const random = Math.floor(Math.random() * 99999).toString().padStart(5, '0')
-    return `WH-${year}-${random}`
-}
-
-const formatOrderMessage = (orderId) => {
-    let message = `🧾 New Order (Website)\n`
-    message += `รหัส Order: ${orderId}\n`
-    message += `ชื่อลูกค้า: ${customerName.value || 'Guest'}\n\n`
-
-    cart.value.forEach((item, index) => {
-        message += `${index + 1}) ${item.name}\n`
-        message += `   ขนาด: ${item.selectedSize} | สี: ${item.selectedColor}\n`
-        message += `   จำนวน: ${item.quantity}\n`
-        message += `   ชิ้น: ${item.price.toFixed(2)}\n`
-        message += `   ราคารวม: ${(item.price * item.quantity).toFixed(2)}\n\n`
-    })
-
-    message += `รวมทั้งหมด: ${cartTotal.value.toFixed(2)}\n`
-    message += `วิธีการชำระเงิน: ${paymentMethod.value}\n`
-    if (orderNote.value) {
-        message += `หมายเหตุ: ${orderNote.value}\n`
+    isCheckoutView.value = true
+    if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
     }
+}
 
-    return message
+const exitCheckout = () => {
+    isCheckoutView.value = false
+}
+
+// If the cart empties while checking out (e.g. user removes the last item),
+// fall back to the product browser.
+watch(() => cart.value.length, (len) => {
+    if (len === 0 && isCheckoutView.value) {
+        isCheckoutView.value = false
+    }
+})
+
+// ---- Checkout form fields (in-place, replaces the product browser) ----
+const customerName = ref(authStore.user?.businessName || authStore.user?.ownerName || '')
+const phoneNumber = ref('')
+const shippingAddress = ref('')
+const orderNote = ref('')
+const slipImage = ref(null)
+const slipPreview = ref(null)
+const isSubmittingOrder = ref(false)
+
+// Optional LINE connect
+const lineUserId = ref('')
+const lineDisplayName = ref('')
+const lineLoginEnabled = ref(false)
+
+const handleSlipUpload = (event) => {
+    const file = event.target.files[0]
+    if (file) {
+        slipImage.value = file
+        slipPreview.value = URL.createObjectURL(file)
+    }
+}
+
+const triggerLineLogin = () => {
+    const state = crypto.randomUUID()
+    sessionStorage.setItem('line_oauth_state', state)
+    const callbackBase = window.location.origin
+    const redirectUri = encodeURIComponent(`${callbackBase}/line-callback`)
+    const channelId = import.meta.env.VITE_LINE_LOGIN_CHANNEL_ID
+    const url =
+        `https://access.line.me/oauth2/v2.1/authorize?response_type=code` +
+        `&client_id=${channelId}` +
+        `&redirect_uri=${redirectUri}` +
+        `&state=${state}` +
+        `&scope=profile%20openid` +
+        `&bot_prompt=aggressive`
+    const popup = window.open(url, 'lineLogin', 'width=500,height=700')
+    const handler = (e) => {
+        if (e.origin !== window.location.origin) return
+        if (e.data?.type === 'LINE_AUTH') {
+            lineUserId.value = e.data.lineUserId
+            lineDisplayName.value = e.data.displayName
+            window.removeEventListener('message', handler)
+            popup?.close()
+        }
+    }
+    window.addEventListener('message', handler)
 }
 
 const submitOrder = async () => {
@@ -431,6 +355,7 @@ const submitOrder = async () => {
     formData.append('customerName', customerName.value)
     formData.append('phoneNumber', phoneNumber.value)
     formData.append('shippingAddress', shippingAddress.value)
+    formData.append('orderNote', orderNote.value)
     formData.append('totalAmount', String(cartTotal.value))
     formData.append('lineUserId', lineUserId.value)
     formData.append('cartItems', JSON.stringify(cart.value.map(item => ({
@@ -448,7 +373,6 @@ const submitOrder = async () => {
         const result = await api.submitOrderWithSlip(formData)
         if (result.success) {
             cartStore.clearCart()
-            showCheckoutPopup.value = false
             router.push({
                 name: 'thank-you',
                 params: { lang: currentLang.value },
@@ -488,19 +412,6 @@ const scrollToCart = () => {
 const isProductInCart = (productId) => {
     return cart.value.some(item => item.id === productId)
 }
-
-const selectOrderDetails = (order) => {
-    selectedOrder.value = order
-    showOrderDetails.value = true
-}
-
-const closeOrderDetails = () => {
-    showOrderDetails.value = false
-    selectedOrder.value = null
-}
-
-
-
 </script>
 
 <template>
@@ -521,17 +432,18 @@ const closeOrderDetails = () => {
 
                 <!-- Secondary Navbar -->
                 <div class="secondary-navbar">
-                    <button class="nav-item" :class="{ active: activeTab === 'new-order' }" @click="activeTab = 'new-order'">
+                    <router-link class="nav-item" exact-active-class="active"
+                        :to="{ name: 'orderpage', params: { lang: currentLang } }">
                         {{ t('order.newOrder') }}
-                    </button>
-                    <button class="nav-item" :class="{ active: activeTab === 'track-orders' }"
-                        @click="activeTab = 'track-orders'">
+                    </router-link>
+                    <router-link class="nav-item" exact-active-class="active"
+                        :to="{ name: 'ordertracking', params: { lang: currentLang } }">
                         {{ t('order.trackOrders') }}
-                    </button>
+                    </router-link>
                 </div>
             </div>
-            <!-- Search & Filter Bar (Only for New Order) -->
-            <div v-if="activeTab === 'new-order'" class="filter-bar">
+            <!-- Search & Filter Bar (hidden while checking out) -->
+            <div class="filter-bar" v-if="!isCheckoutView">
                 <div class="search-box">
                     <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
                         <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="2" />
@@ -555,9 +467,8 @@ const closeOrderDetails = () => {
         </div>
         <!-- Main Content -->
         <div class="content-wrapper">
-            <!-- Products Table Section -->
-            <template v-if="activeTab === 'new-order'">
-                <div class="products-section">
+            <!-- Products Table Section (default left column) -->
+                <div class="products-section" v-if="!isCheckoutView">
                     <div class="products-container">
                         <!-- Table Header -->
                         <div class="table-header">
@@ -711,6 +622,95 @@ const closeOrderDetails = () => {
                     </div>
                 </div>
 
+                <!-- Checkout Form (replaces the product browser once checkout starts) -->
+                <div class="form-col" v-else>
+                    <button class="back-link" @click="exitCheckout">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M19 12H5M12 19l-7-7 7-7" />
+                        </svg>
+                        {{ tt('order.backToShopping', 'Back to shopping') }}
+                    </button>
+
+                    <!-- Shipping information -->
+                    <div class="form-card">
+                        <h2 class="card-title">{{ tt('order.shippingInformation', 'Shipping Information') }}</h2>
+
+                        <div class="form-group">
+                            <label>{{ t('order.fullName') }} <span class="required-star">*</span></label>
+                            <input v-model="customerName" type="text" :placeholder="t('order.fullNamePlaceholder')"
+                                class="form-input" required />
+                        </div>
+
+                        <div class="form-group">
+                            <label>{{ t('order.phoneNumber') }}</label>
+                            <input v-model="phoneNumber" type="tel" :placeholder="t('order.phoneNumberPlaceholder')"
+                                class="form-input" />
+                        </div>
+
+                        <div class="form-group">
+                            <label>{{ t('order.shippingAddress') }}</label>
+                            <textarea v-model="shippingAddress" :placeholder="t('order.shippingAddressPlaceholder')"
+                                class="form-textarea" rows="3"></textarea>
+                        </div>
+
+                        <div class="form-group no-margin">
+                            <label>{{ t('order.orderNote') }}</label>
+                            <textarea v-model="orderNote" :placeholder="t('order.orderNotePlaceholder')"
+                                class="form-textarea" rows="2"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Payment slip -->
+                    <div class="form-card">
+                        <h2 class="card-title">{{ tt('order.paymentTitle', 'Payment') }}</h2>
+                        <div class="form-group no-margin">
+                            <label>{{ t('order.uploadSlip') }} <span class="required-star">*</span></label>
+                            <div class="slip-upload-zone" @click="$refs.slipInput.click()">
+                                <img v-if="slipPreview" :src="slipPreview" class="slip-preview-img"
+                                    alt="Slip preview" />
+                                <div v-else class="slip-placeholder">
+                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8C7B6E"
+                                        stroke-width="1.5">
+                                        <rect x="3" y="3" width="18" height="18" rx="3" />
+                                        <path d="M3 9l4-4 4 4 4-6 4 6" />
+                                    </svg>
+                                    <span>{{ t('order.uploadSlip') }}</span>
+                                </div>
+                                <input type="file" ref="slipInput" class="hidden-input" accept="image/*"
+                                    @change="handleSlipUpload" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Optional LINE connect -->
+                    <div class="form-card line-connect-section">
+                        <label class="line-toggle-label">
+                            <input type="checkbox" v-model="lineLoginEnabled" class="line-toggle-checkbox" />
+                            <span class="line-toggle-text">{{ t('order.lineConnectPrompt') }}</span>
+                        </label>
+                        <div v-if="lineLoginEnabled" class="line-connect-action">
+                            <button v-if="!lineUserId" type="button" class="line-connect-btn"
+                                @click="triggerLineLogin">
+                                <svg width="18" height="18" viewBox="0 0 40 40" fill="none">
+                                    <rect width="40" height="40" rx="8" fill="#06C755" />
+                                    <path
+                                        d="M20 8C13.4 8 8 12.5 8 18c0 3.7 2.4 6.9 6 8.8l-.8 3.9 4.5-2.4c.7.1 1.5.2 2.3.2 6.6 0 12-4.5 12-10S26.6 8 20 8z"
+                                        fill="white" />
+                                </svg>
+                                {{ t('order.connectLine') }}
+                            </button>
+                            <div v-else class="line-connected-badge">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#06C755"
+                                    stroke-width="2.5">
+                                    <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                                {{ t('order.lineConnected') }}: {{ lineDisplayName }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Shopping Cart Sidebar -->
                 <div class="cart-sidebar" id="cartSidebar">
                     <div class="cart-header-modern">
@@ -789,8 +789,13 @@ const closeOrderDetails = () => {
                         </div>
 
                         <div class="cart-actions-modern">
-                            <button @click="checkout" class="checkout-btn-modern">
+                            <button v-if="!isCheckoutView" @click="checkout" class="checkout-btn-modern">
                                 {{ t('order.secureCheckout') }}
+                            </button>
+                            <button v-else @click="submitOrder" class="checkout-btn-modern"
+                                :disabled="isSubmittingOrder">
+                                <span v-if="!isSubmittingOrder">{{ t('order.verifyAndOrder') }}</span>
+                                <span v-else>{{ t('order.sending') }}</span>
                             </button>
                         </div>
                     </div>
@@ -815,125 +820,6 @@ const closeOrderDetails = () => {
                         </div>
                     </div>
                 </div>
-            </template>
-
-            <!-- Track Orders View -->
-            <template v-else>
-                <div class="history-section">
-                    <div class="history-header">
-                        <div class="history-title">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2"></svg>
-                            <h2>{{ t('order.orderHistory') }}</h2>
-                        </div>
-                        <button class="download-statements">{{ t('order.downloadStatements') }}</button>
-                    </div>
-
-                    <div class="orders-history-list">
-                        <div v-if="orders.length === 0" class="empty-orders-state">
-                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="1" style="opacity: 0.3; margin-bottom: 20px;">
-                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-                                <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-                            </svg>
-                            <h3>{{ t('order.noOrdersFound') }}</h3>
-                            <p>{{ t('order.noOrdersSubtitle') }}</p>
-                            <button class="checkout-btn-modern" style="max-width: 200px; margin-top: 20px;"
-                                @click="activeTab = 'new-order'">{{ t('order.shopNow') }}</button>
-                        </div>
-                        <div v-else v-for="order in orders" :key="order.id" class="order-history-card">
-                            <div class="order-main-info">
-                                <div class="order-img-container">
-                                    <img :src="order.image" :alt="order.name">
-                                </div>
-                                <div class="order-text-info">
-                                    <div class="order-id-status">
-                                        <span class="order-id">{{ t('order.orderNumber') }}{{ order.id }}</span>
-                                        <span v-if="order.status === 'SHIPPED'" class="status-tag shipped">{{
-                                            t('order.shipped') }}</span>
-                                        <span v-else class="status-tag pending">{{ order.status }}</span>
-                                    </div>
-                                    <h3 class="order-name">{{ order.items && order.items.length > 0 ?
-                                        order.items[0].product_name : 'New Order' }}</h3>
-                                    <p class="order-meta">{{ t('order.placedOn') }} {{ order.date }} • {{
-                                        order.itemsCount }} {{ t('order.itemsCount') }} •
-                                        ฿{{
-                                            order.price.toLocaleString() }}</p>
-                                </div>
-                            </div>
-
-                            <!-- Tracking Bar (Only for Shipped) -->
-                            <div v-if="order.status === 'SHIPPED'" class="tracking-timeline">
-                                <div class="timeline-header">
-                                    <span class="arrival-time">{{ order.deliveryStatus }}</span>
-                                    <span class="current-location">{{ order.location }}</span>
-                                </div>
-                                <div class="timeline-bar">
-                                    <div class="bar-progress" style="width: 70%"></div>
-                                </div>
-                            </div>
-
-                            <div class="order-card-actions">
-                                <button class="track-btn" v-if="order.status === 'SHIPPED'">{{ t('order.trackShipment')
-                                }}</button>
-                                <button class="order-details-btn" @click="selectOrderDetails(order)">{{
-                                    t('order.orderDetails') }}</button>
-                                <button class="buy-again-btn" v-if="order.status === 'DELIVERED'">{{ t('order.buyAgain')
-                                }}</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Sidebar for Track Orders -->
-                <div class="history-sidebar">
-                    <!-- Recommended For You (Default) -->
-                    <div v-if="!showOrderDetails" class="recommendations-container">
-                        <h3>{{ t('order.recommendedForYou') }}</h3>
-                        <div class="rec-list">
-                            <div v-for="rec in recommendations" :key="rec.id" class="rec-item">
-                                <img :src="rec.image" :alt="rec.name">
-                                <div class="rec-info">
-                                    <h4>{{ rec.name }}</h4>
-                                    <p>฿{{ rec.price }}{{ rec.unit || '' }}</p>
-                                </div>
-                                <button class="add-rec-btn">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2">
-                                        <circle cx="9" cy="21" r="1" />
-                                        <circle cx="20" cy="21" r="1" />
-                                        <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        <button class="view-all-recs">{{ t('order.viewRecommendations') }}</button>
-                    </div>
-
-                    <!-- Order Details (Toggled) -->
-                    <div v-else class="order-details-sidebar">
-                        <div class="details-header">
-                            <h3>{{ t('order.orderDetails') }}</h3>
-                            <button @click="closeOrderDetails" class="close-details">✕</button>
-                        </div>
-                        <div v-if="selectedOrder" class="details-content">
-                            <div class="order-summary-mini">
-                                <p><strong>{{ t('order.orderNumber') }}</strong> {{ selectedOrder.id }}</p>
-                                <p><strong>{{ t('order.status') }}:</strong> {{ selectedOrder.status }}</p>
-                                <p><strong>{{ t('order.total') }}:</strong> ฿{{ selectedOrder.price.toLocaleString() }}
-                                </p>
-                            </div>
-                            <div class="order-items-mini">
-                                <div v-for="item in selectedOrder.items" :key="item.id" class="mini-item">
-                                    <p><strong>{{ item.product_name }}</strong> x {{ item.quantity }}</p>
-                                    <p class="mini-meta">{{ item.size }} | {{ item.color }}</p>
-                                </div>
-                            </div>
-                            <button class="checkout-btn-modern">{{ t('order.goCheckout') }}</button>
-                        </div>
-                    </div>
-                </div>
-            </template>
         </div>
     </div>
 
@@ -953,143 +839,11 @@ const closeOrderDetails = () => {
     </transition>
 
     <!-- Mobile sticky "view cart" bar -->
-    <button v-if="activeTab === 'new-order' && cart.length > 0" class="mobile-cart-bar" @click="scrollToCart">
+    <button v-if="cart.length > 0" class="mobile-cart-bar" @click="scrollToCart">
         <span class="mcb-count">{{ cartItemCount }}</span>
         <span class="mcb-label">{{ t('order.yourCart') }}</span>
         <span class="mcb-total">฿{{ cartTotal }}</span>
     </button>
-
-    <!-- Checkout Popup -->
-    <div v-if="showCheckoutPopup" class="checkout-overlay" @click="closeCheckoutPopup">
-        <div class="checkout-popup" @click.stop>
-            <button class="popup-close-btn" @click="closeCheckoutPopup">✕</button>
-
-            <div class="popup-header">
-                <h2>{{ t('order.completeOrder') }}</h2>
-                <p>{{ t('order.completeOrderSubtitle') }}</p>
-            </div>
-
-            <div class="popup-body">
-
-                <!-- Order Summary -->
-                <div class="order-summary-section">
-                    <div class="order-summary-header">
-                        <h3>{{ t('order.orderSummary') }}</h3>
-                        <h3>{{ t('order.qty') }}</h3>
-                        <h3>{{ t('order.price') }}</h3>
-                        <h3>{{ t('order.total') }}</h3>
-                    </div>
-                    <div class="summary-items">
-                        <div v-for="item in cart" :key="item.cartItemKey" class="summary-item">
-                            <div class="summary-item-info">
-                                <strong>{{ item.name }}</strong>
-                                <span class="summary-specs">{{ item.selectedSize }} • {{ item.selectedColor
-                                }}</span>
-                            </div>
-                            <div class="summary-item-quantity">
-                                <span>x {{ item.quantity }}</span>
-                            </div>
-                            <div class="summary-item-price">
-                                <span>{{ item.price }}</span>
-                            </div>
-                            <div class="summary-item-total">
-                                <strong>{{ item.quantity * item.price }} ฿</strong>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="summary-total">
-                        <div class="total-row">
-                            <span>{{ t('order.subtotal') }}</span>
-                            <span>฿{{ cartTotal }}</span>
-                        </div>
-                        <div class="total-row">
-                            <span>{{ t('order.delivery') }}</span>
-                            <span>฿30</span>
-                        </div>
-                        <div class="total-row grand-total">
-                            <span>{{ t('order.grandTotal') }}</span>
-                            <span>฿{{ cartTotal + 30 }}</span>
-                        </div>
-                    </div>
-                </div>
-                <!-- Customer details -->
-                <div class="form-group">
-                    <label>{{ t('order.fullName') }}</label>
-                    <input v-model="customerName" type="text" :placeholder="t('order.fullNamePlaceholder')"
-                        class="form-input" required />
-                </div>
-
-                <div class="form-row-two">
-                    <div class="form-group">
-                        <label>{{ t('order.phoneNumber') }}</label>
-                        <input v-model="phoneNumber" type="tel" :placeholder="t('order.phoneNumberPlaceholder')"
-                            class="form-input" />
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>{{ t('order.shippingAddress') }}</label>
-                    <textarea v-model="shippingAddress" :placeholder="t('order.shippingAddressPlaceholder')"
-                        class="form-textarea" rows="2"></textarea>
-                </div>
-
-                <!-- PromptPay slip upload -->
-                <div class="form-group">
-                    <label>{{ t('order.uploadSlip') }} <span class="required-star">*</span></label>
-                    <div class="slip-upload-zone" @click="$refs.slipInput.click()">
-                        <img v-if="slipPreview" :src="slipPreview" class="slip-preview-img" alt="Slip preview" />
-                        <div v-else class="slip-placeholder">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8C7B6E" stroke-width="1.5">
-                                <rect x="3" y="3" width="18" height="18" rx="3"/>
-                                <path d="M3 9l4-4 4 4 4-6 4 6"/>
-                            </svg>
-                            <span>{{ t('order.uploadSlip') }}</span>
-                        </div>
-                        <input type="file" ref="slipInput" class="hidden-input" accept="image/*"
-                            @change="handleSlipUpload" />
-                    </div>
-                </div>
-
-                <!-- Optional LINE Login -->
-                <div class="line-connect-section">
-                    <label class="line-toggle-label">
-                        <input type="checkbox" v-model="lineLoginEnabled" class="line-toggle-checkbox" />
-                        <span class="line-toggle-text">{{ t('order.lineConnectPrompt') }}</span>
-                    </label>
-                    <div v-if="lineLoginEnabled" class="line-connect-action">
-                        <button v-if="!lineUserId" type="button" class="line-connect-btn" @click="triggerLineLogin">
-                            <svg width="18" height="18" viewBox="0 0 40 40" fill="none">
-                                <rect width="40" height="40" rx="8" fill="#06C755"/>
-                                <path d="M20 8C13.4 8 8 12.5 8 18c0 3.7 2.4 6.9 6 8.8l-.8 3.9 4.5-2.4c.7.1 1.5.2 2.3.2 6.6 0 12-4.5 12-10S26.6 8 20 8z" fill="white"/>
-                            </svg>
-                            {{ t('order.connectLine') }}
-                        </button>
-                        <div v-else class="line-connected-badge">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#06C755" stroke-width="2.5">
-                                <polyline points="20 6 9 17 4 12"/>
-                            </svg>
-                            {{ t('order.lineConnected') }}: {{ lineDisplayName }}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>{{ t('order.orderNote') }}</label>
-                    <textarea v-model="orderNote" :placeholder="t('order.orderNotePlaceholder')" class="form-textarea"
-                        rows="2"></textarea>
-                </div>
-            </div>
-
-            <div class="popup-footer">
-                <button @click="closeCheckoutPopup" class="cancel-btn">{{ t('order.cancel') }}</button>
-                <button @click="submitOrder" class="submit-order-btn" :disabled="isSubmittingOrder">
-                    <span v-if="!isSubmittingOrder">{{ t('order.verifyAndOrder') }}</span>
-                    <span v-else>{{ t('order.sending') }}</span>
-                </button>
-            </div>
-        </div>
-    </div>
 
     <!-- Clear Cart Confirmation Modal -->
     <div v-if="showClearConfirm" class="checkout-overlay" @click="showClearConfirm = false">
@@ -1824,6 +1578,198 @@ const closeOrderDetails = () => {
     color: #3D2B1F;
 }
 
+.checkout-btn-modern:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ---- In-place checkout form (left column) ---- */
+.form-col {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 6px;
+    background: none;
+    border: none;
+    color: #8C7B6E;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.2s ease;
+}
+
+.back-link:hover {
+    color: #3D2B1F;
+}
+
+.form-card {
+    background: white;
+    border: 1px solid #F4EDE6;
+    border-radius: 16px;
+    padding: 24px;
+}
+
+.card-title {
+    font-family: 'Crimson Pro', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: #3D2B1F;
+    margin: 0 0 18px 0;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group.no-margin {
+    margin-bottom: 0;
+}
+
+.form-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #3D2B1F;
+    margin-bottom: 8px;
+}
+
+.form-input,
+.form-textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #E6E0D9;
+    border-radius: 8px;
+    font-family: 'Work Sans', sans-serif;
+    font-size: 14px;
+    color: #3D2B1F;
+    background: white;
+    box-sizing: border-box;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-textarea {
+    resize: vertical;
+}
+
+.form-input:focus,
+.form-textarea:focus {
+    outline: none;
+    border-color: #3D2B1F;
+    box-shadow: 0 0 0 3px rgba(61, 43, 31, 0.10);
+}
+
+.required-star {
+    color: #d63031;
+    margin-left: 2px;
+}
+
+.hidden-input {
+    display: none;
+}
+
+/* Slip upload */
+.slip-upload-zone {
+    border: 2px dashed #E6E0D9;
+    border-radius: 12px;
+    background: #FDFAF7;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+
+.slip-upload-zone:hover {
+    border-color: #8C7B6E;
+}
+
+.slip-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #8C7B6E;
+    font-size: 13px;
+    padding: 20px;
+}
+
+.slip-preview-img {
+    width: 100%;
+    max-height: 240px;
+    object-fit: contain;
+}
+
+/* LINE connect */
+.line-connect-section {
+    background: #F0FFF6;
+    border: 1px solid #C3EFD4;
+}
+
+.line-toggle-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    color: #2d6a4f;
+    user-select: none;
+}
+
+.line-toggle-checkbox {
+    width: auto;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.line-toggle-text {
+    line-height: 1.4;
+}
+
+.line-connect-action {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #C3EFD4;
+}
+
+.line-connect-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #06C755;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.line-connect-btn:hover {
+    background: #05a847;
+}
+
+.line-connected-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #2d6a4f;
+}
+
 /* Secondary Navbar */
 .secondary-navbar {
     display: flex;
@@ -1867,370 +1813,6 @@ const closeOrderDetails = () => {
     border-radius: 2px 2px 0 0;
 }
 
-/* History Section */
-.history-section {
-    flex: 1;
-    background: white;
-    border-radius: 14px;
-    padding: 28px;
-    box-shadow: 0 2px 10px rgba(61, 43, 31, 0.05);
-}
-
-.history-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-
-.history-title {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    color: #3D2B1F;
-}
-
-.history-title h2 {
-    font-family: 'Crimson Pro', serif;
-    font-size: 28px;
-    font-weight: 700;
-    margin: 0;
-}
-
-.download-statements {
-    background: none;
-    border: none;
-    color: #4DB6C1;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    text-decoration: underline;
-}
-
-/* Order History Cards */
-.orders-history-list {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.order-history-card {
-    background: #FBF7F2;
-    border: 1px solid #E6E0D9;
-    border-radius: 14px;
-    padding: 18px;
-    transition: all 0.3s ease;
-}
-
-.order-history-card:hover {
-    box-shadow: 0 4px 12px rgba(61, 43, 31, 0.08);
-    border-color: #D1C7BD;
-}
-
-@media (max-width: 600px) {
-    .order-main-info {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-    }
-
-    .order-img-container {
-        width: 140px;
-        height: 140px;
-    }
-
-    .order-card-actions {
-        flex-direction: column;
-    }
-
-    .order-card-actions button {
-        width: 100%;
-    }
-}
-
-.order-main-info {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 14px;
-}
-
-.order-img-container {
-    width: 84px;
-    height: 84px;
-    background: white;
-    border-radius: 12px;
-    overflow: hidden;
-    flex-shrink: 0;
-}
-
-.order-img-container img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.order-text-info {
-    flex: 1;
-}
-
-.order-id-status {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-}
-
-.order-id {
-    font-size: 13px;
-    font-weight: 600;
-    color: #8C7E71;
-}
-
-.status-tag {
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-}
-
-.status-tag.shipped {
-    background: #E0F7F9;
-    color: #4DB6C1;
-}
-
-.order-name {
-    font-family: 'Crimson Pro', serif;
-    font-size: 18px;
-    font-weight: 700;
-    color: #3D2B1F;
-    margin: 0 0 4px 0;
-}
-
-.order-meta {
-    font-size: 13px;
-    color: #8C7E71;
-    margin: 0;
-}
-
-/* Tracking Timeline */
-.tracking-timeline {
-    background: white;
-    padding: 20px;
-    border-radius: 12px;
-    margin-bottom: 20px;
-}
-
-.timeline-header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 12px;
-    font-size: 14px;
-    font-weight: 600;
-}
-
-.arrival-time {
-    color: #3D2B1F;
-}
-
-.current-location {
-    color: #4DB6C1;
-}
-
-.timeline-bar {
-    height: 4px;
-    background: #F4EDE6;
-    border-radius: 2px;
-    position: relative;
-}
-
-.bar-progress {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    background: #4DB6C1;
-    border-radius: 2px;
-}
-
-/* Order Card Actions */
-.order-card-actions {
-    display: flex;
-    gap: 12px;
-}
-
-.track-btn {
-    flex: 1;
-    background: #006D77;
-    color: white;
-    border: none;
-    padding: 12px;
-    border-radius: 8px;
-    font-weight: 700;
-    font-size: 13px;
-    cursor: pointer;
-}
-
-.order-details-btn {
-    flex: 1;
-    background: white;
-    border: 1px solid #3D2B1F;
-    color: #3D2B1F;
-    padding: 12px;
-    border-radius: 8px;
-    font-weight: 700;
-    font-size: 13px;
-    cursor: pointer;
-}
-
-.buy-again-btn {
-    background: white;
-    border: 1px solid #E6E0D9;
-    color: #8C7E71;
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-weight: 700;
-    font-size: 13px;
-    cursor: pointer;
-}
-
-/* History Sidebar */
-.history-sidebar {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.recommendations-container {
-    background: white;
-    border-radius: 14px;
-    padding: 20px;
-    box-shadow: 0 2px 10px rgba(61, 43, 31, 0.05);
-}
-
-.recommendations-container h3 {
-    font-size: 14px;
-    font-weight: 700;
-    color: #3D2B1F;
-    letter-spacing: 1px;
-    margin: 0 0 20px 0;
-}
-
-.rec-list {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    margin-bottom: 24px;
-}
-
-.rec-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px;
-    border-radius: 12px;
-    background: #FBF7F2;
-}
-
-.rec-item img {
-    width: 60px;
-    height: 60px;
-    border-radius: 8px;
-    object-fit: cover;
-}
-
-.rec-info {
-    flex: 1;
-}
-
-.rec-info h4 {
-    font-size: 14px;
-    font-weight: 600;
-    color: #3D2B1F;
-    margin: 0 0 4px 0;
-}
-
-.rec-info p {
-    font-size: 13px;
-    color: #4DB6C1;
-    font-weight: 700;
-    margin: 0;
-}
-
-.add-rec-btn {
-    background: none;
-    border: none;
-    color: #8C7E71;
-    cursor: pointer;
-    padding: 8px;
-}
-
-.view-all-recs {
-    width: 100%;
-    padding: 12px;
-    background: white;
-    border: 1px solid #4DB6C1;
-    color: #006D77;
-    border-radius: 8px;
-    font-weight: 700;
-    font-size: 13px;
-    cursor: pointer;
-}
-
-/* Order Details Sidebar */
-.order-details-sidebar {
-    background: white;
-    border-radius: 14px;
-    padding: 20px;
-    box-shadow: 0 2px 10px rgba(61, 43, 31, 0.05);
-}
-
-.details-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-
-.details-header h3 {
-    font-family: 'Crimson Pro', serif;
-    font-size: 20px;
-    font-weight: 700;
-    margin: 0;
-}
-
-.close-details {
-    background: none;
-    border: none;
-    font-size: 18px;
-    color: #8C7E71;
-    cursor: pointer;
-}
-
-.details-content {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.order-summary-mini {
-    background: #FBF7F2;
-    padding: 16px;
-    border-radius: 12px;
-    font-size: 14px;
-}
-
-.order-summary-mini p {
-    margin: 8px 0;
-    color: #3D2B1F;
-}
-
-.order-items-mini {
-    font-size: 13px;
-    color: #8C7E71;
-}
-
 /* Responsive Modern */
 @media (max-width: 1100px) {
     .content-wrapper {
@@ -2239,12 +1821,6 @@ const closeOrderDetails = () => {
 
     .cart-sidebar {
         position: static;
-    }
-}
-
-@media (max-width: 1024px) {
-    .history-sidebar {
-        width: 100%;
     }
 }
 
@@ -2272,18 +1848,6 @@ const closeOrderDetails = () => {
         mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
     }
 
-    .order-main-info {
-        flex-direction: column;
-    }
-
-    .order-img-container {
-        width: 100%;
-        height: 150px;
-    }
-
-    .order-card-actions {
-        flex-direction: column;
-    }
     .table-header {
         display: none;
     }
@@ -2361,7 +1925,7 @@ const closeOrderDetails = () => {
     }
 }
 
-/* Checkout Popup Modern */
+/* Shared modal overlay (used by the clear-cart confirmation) */
 .checkout-overlay {
     position: fixed;
     top: 0;
@@ -2377,221 +1941,6 @@ const closeOrderDetails = () => {
     padding: 20px;
 }
 
-.checkout-popup {
-    background: white;
-    border-radius: 16px;
-    max-width: 1000px;
-    width: 100%;
-    max-height: 90vh;
-    overflow-y: auto;
-    position: relative;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-}
-
-.popup-header {
-    padding: 20px 24px;
-    border-bottom: 1px solid #F4EDE6;
-    text-align: center;
-}
-
-.popup-header h2 {
-    font-family: 'Crimson Pro', serif;
-    font-size: 24px;
-    font-weight: 700;
-    color: #3D2B1F;
-    margin: 0 0 6px 0;
-}
-
-.popup-body {
-    padding: 24px;
-}
-
-.form-group {
-    margin-bottom: 16px;
-}
-
-.form-group label {
-    display: block;
-    font-size: 14px;
-    font-weight: 600;
-    color: #3D2B1F;
-    margin-bottom: 8px;
-}
-
-.form-input,
-.form-textarea,
-.form-select {
-    width: 100%;
-    padding: 12px 16px;
-    border: 1px solid #E6E0D9;
-    border-radius: 8px;
-    font-family: 'Work Sans', sans-serif;
-    font-size: 14px;
-}
-
-.order-summary-section {
-    background: #F9F5F0;
-    padding: 16px;
-    border-radius: 14px;
-    margin-bottom: 16px;
-}
-
-.order-summary-header {
-    display: grid;
-    grid-template-columns: 3fr 1fr 2fr 1fr;
-    text-align: center;
-}
-
-.summary-item {
-    display: grid;
-    grid-template-columns: 3fr 1fr 2fr 1fr;
-    padding: 10px 0;
-    border-bottom: 1px solid #E6E0D9;
-    text-align: center;
-}
-
-.summary-item-info {
-    text-align: left;
-    display: flex;
-    flex-direction: column;
-    padding-left: 20px;
-}
-
-.summary-item:last-child {
-    border-bottom: none;
-}
-
-
-.summary-total {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 2px solid #E6E0D9;
-}
-
-.total-row {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 8px;
-}
-
-.grand-total {
-    font-family: 'Crimson Pro', serif;
-    font-size: 20px;
-    font-weight: 700;
-    color: #3D2B1F;
-}
-
-.popup-footer {
-    padding: 0 24px 24px;
-    display: flex;
-    gap: 16px;
-}
-
-.required-star {
-    color: #d63031;
-    margin-left: 2px;
-}
-
-.slip-upload-zone {
-    border: 2px dashed #E6E0D9;
-    border-radius: 12px;
-    background: #FDFAF7;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100px;
-    overflow: hidden;
-    transition: border-color 0.2s;
-}
-
-.slip-upload-zone:hover {
-    border-color: #8C7B6E;
-}
-
-.slip-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    color: #8C7B6E;
-    font-size: 13px;
-    padding: 20px;
-}
-
-.slip-preview-img {
-    width: 100%;
-    max-height: 200px;
-    object-fit: contain;
-}
-
-.line-connect-section {
-    background: #F0FFF6;
-    border: 1px solid #C3EFD4;
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 20px;
-}
-
-.line-toggle-label {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    cursor: pointer;
-    font-weight: 500;
-    font-size: 14px;
-    color: #2d6a4f;
-    user-select: none;
-}
-
-.line-toggle-checkbox {
-    width: auto;
-    padding: 0;
-    border: none;
-    background: none;
-    margin-top: 2px;
-    flex-shrink: 0;
-}
-
-.line-toggle-text {
-    line-height: 1.4;
-}
-
-.line-connect-action {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid #C3EFD4;
-}
-
-.line-connect-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: #06C755;
-    color: white;
-    border: none;
-    padding: 10px 18px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-    width: auto;
-    transition: background 0.2s;
-}
-
-.line-connect-btn:hover {
-    background: #05a847;
-}
-
-.line-connected-badge {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 14px;
-    font-weight: 600;
-    color: #2d6a4f;
-}
-
 .cancel-btn {
     flex: 1;
     padding: 14px;
@@ -2599,17 +1948,6 @@ const closeOrderDetails = () => {
     border: 1px solid #E6E0D9;
     border-radius: 8px;
     font-weight: 600;
-    cursor: pointer;
-}
-
-.submit-order-btn {
-    flex: 2;
-    padding: 14px;
-    background: #3D2B1F;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-weight: 700;
     cursor: pointer;
 }
 
@@ -2629,57 +1967,6 @@ const closeOrderDetails = () => {
 
 ::-webkit-scrollbar-thumb:hover {
     background: #D1C7BD;
-}
-
-.mini-item {
-    padding: 10px 0;
-    border-bottom: 1px solid #F0ECE7;
-}
-
-.mini-item:last-child {
-    border-bottom: none;
-}
-
-.mini-meta {
-    font-size: 11px;
-    opacity: 0.7;
-    margin-top: 2px;
-}
-
-.empty-orders-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 80px 20px;
-    text-align: center;
-    background: white;
-    border-radius: 12px;
-    border: 1px dashed #E6E0D9;
-}
-
-.empty-orders-state h3 {
-    font-family: 'ZCOOL XiaoWei', serif;
-    font-size: 24px;
-    color: #3D2B1F;
-    margin-bottom: 10px;
-}
-
-.empty-orders-state p {
-    color: #8C7E71;
-    max-width: 400px;
-    line-height: 1.6;
-}
-
-.status-tag.pending {
-    background: #FFF9E6;
-    color: #B28900;
-}
-
-@media (max-width: 768px) {
-    .history-sidebar {
-        display: none;
-    }
 }
 
 /* Notification Popup Modern */
