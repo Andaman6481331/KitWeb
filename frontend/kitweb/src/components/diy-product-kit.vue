@@ -76,11 +76,6 @@ const tProduct = (item, field) => {
 };
 
 const handleAddToCart = (product) => {
-    if (product.stock <= 0) {
-        alert('Out of stock!');
-        return;
-    }
-
     const cartProduct = {
         id: `diy-${product.id}`, // Scope prefixed ID to prevent collision in cart
         name: product.name,
@@ -88,8 +83,7 @@ const handleAddToCart = (product) => {
         price: product.price_1, // Display Level 1 price as requested by user
         image_key: product.images && product.images.length > 0 ? product.images[0] : '',
         category: 'DIY Kit',
-        sku: product.sku,
-        stock: product.stock
+        sku: product.sku
     };
 
     cartStore.addToCart(cartProduct, { size: 'Default', color: 'Default' });
@@ -136,20 +130,14 @@ const handleAddToCart = (product) => {
                             <div class="kit-features"
                                 style="margin-top: auto; border-top: 1px solid #E8E2DD; padding-top: 15px;">
                                 <div class="feature">
-                                    <ion-icon name="cube-outline"></ion-icon>
-                                    <span>Stock: {{ product.stock || 0 }}</span>
-                                </div>
-                                <div class="feature" style="margin-left: auto;">
                                     <ion-icon name="ribbon-outline"></ion-icon>
                                     <span>Premium Quality</span>
                                 </div>
                             </div>
 
-                            <button class="kit-btn" @click.stop="handleAddToCart(product)"
-                                :disabled="product.stock <= 0">
+                            <button class="kit-btn" @click.stop="handleAddToCart(product)">
                                 <ion-icon name="cart-outline"></ion-icon>
-                                {{ product.stock > 0 ?
-                                    ($t('catalog.addToOrder') || 'Add to Order Cart') : 'Out of Stock' }}
+                                {{ $t('catalog.addToOrder') || 'Add to Order Cart' }}
                             </button>
                         </div>
                     </div>
@@ -194,10 +182,6 @@ const handleAddToCart = (product) => {
 
                             <div class="modal-price-row">
                                 <span class="price-val">฿{{ selectedProduct.price_1 }}</span>
-                                <span class="stock-badge" :class="{ 'out-of-stock': selectedProduct.stock <= 0 }">
-                                    {{ selectedProduct.stock > 0 ?
-                                        `Stock: ${selectedProduct.stock} units` : 'Out of Stock' }}
-                                </span>
                             </div>
 
                             <div class="modal-description-box">
@@ -210,11 +194,9 @@ const handleAddToCart = (product) => {
                                 <span>SKU: {{ selectedProduct.sku }}</span>
                             </div>
 
-                            <button class="modal-buy-btn" @click="handleAddToCart(selectedProduct)"
-                                :disabled="selectedProduct.stock <= 0">
+                            <button class="modal-buy-btn" @click="handleAddToCart(selectedProduct)">
                                 <ion-icon name="cart-outline"></ion-icon>
-                                {{ selectedProduct.stock > 0 ? ($t(
-                                    'catalog.addToOrder') || 'Add to Order Cart') : 'Out of Stock' }}
+                                {{ $t('catalog.addToOrder') || 'Add to Order Cart' }}
                             </button>
                         </div>
                     </div>

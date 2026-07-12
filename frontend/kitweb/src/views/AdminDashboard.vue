@@ -502,13 +502,11 @@ const handleSubmit = async () => {
       price_5: newProduct.value.price_5,
       moq: newProduct.value.moq || null,
       is_visible: newProduct.value.is_visible !== false,
-      stock: newProduct.value.stock,
       sku: newProduct.value.sku || undefined,
       images: finalImages.filter(img => img.image_key)
     };
 
     if (isEditing.value) {
-      productPayload.stock = Math.max(0, (newProduct.value.stock || 0) + stockAdjustment.value);
       await api.updateProduct(editingId.value, productPayload);
       alert(t('admin.alertUpdated'));
     } else {
@@ -579,17 +577,6 @@ const onCategoriesChange = () => {
   newProduct.value.category = firstPath;
   if (!isEditing.value) {
     newProduct.value.sku = '';
-  }
-};
-
-const adjustStock = async (product, change) => {
-  try {
-    const result = await api.adjustStock(product.id, change);
-    if (result.success) {
-      product.stock = result.newStock;
-    }
-  } catch (error) {
-    alert('Failed to adjust stock');
   }
 };
 
@@ -1014,10 +1001,6 @@ const deleteDiyProduct = async (id) => {
                 <textarea required v-model="newDiyProduct.description" rows="8" placeholder="Describe the DIY kit contents, difficulty level, or instructions..."></textarea>
               </div>
 
-              <div class="form-group">
-                <label>Stock Count</label>
-                <input v-model.number="newDiyProduct.stock" type="number" min="0" placeholder="0" required />
-              </div>
 
               <!-- DIY Images Gallery -->
               <div class="gallery-section">
@@ -1140,7 +1123,6 @@ const deleteDiyProduct = async (id) => {
                     <th>{{$t('admin.level3')}}</th>
                     <th>{{$t('admin.level4')}}</th>
                     <th>{{$t('admin.level5')}}</th>
-                    <th>{{$t('admin.stock')}}</th>
                     <th style="width: 50px;"></th>
                   </tr>
                 </thead>
@@ -1154,19 +1136,6 @@ const deleteDiyProduct = async (id) => {
                     <td><input type="number" step="1" v-model="newProduct.price_3" class="matrix-input" /></td>
                     <td><input type="number" step="1" v-model="newProduct.price_4" class="matrix-input" /></td>
                     <td><input type="number" step="1" v-model="newProduct.price_5" class="matrix-input" /></td>
-                    <td>
-                      <div v-if="!isEditing">
-                        <input type="number" v-model.number="newProduct.stock" class="matrix-input stock-input" min="0" />
-                      </div>
-                      <div v-else style="display: flex; align-items: center; gap: 6px;">
-                        <input type="number" readonly :value="Math.max(0, (newProduct.stock || 0) + stockAdjustment)" class="matrix-input stock-input" style="background:#f1f2f6; width: 60px;" />
-                        <div class="stock-control edit-stock-control" style="margin: 0; gap: 3px;">
-                          <button type="button" @click="updateStockAdjustment(-1)" class="stock-btn minus" style="width:16px; height:16px; font-size:9px;">-1</button>
-                          <input type="number" v-model.number="stockAdjustment" @input="validateStockAdjustment" class="stock-adjust-input" style="width:36px; padding:0; font-size:11px;" />
-                          <button type="button" @click="updateStockAdjustment(1)" class="stock-btn plus" style="width:16px; height:16px; font-size:9px;">+1</button>
-                        </div>
-                      </div>
-                    </td>
                     <td></td>
                   </tr>
                 </tbody>
@@ -1278,12 +1247,6 @@ const deleteDiyProduct = async (id) => {
                   <span class="p-meta">SKU: {{ product.sku }} | {{ formatProductCategories(product) }} | ${{ product.price_1 || product.price }}</span>
                   </div>
                   <div class="stock-control">
-                    <span :class="['stock-count', 
-                      product.stock === 0 ? 'low' : (product.stock > 0 && product.stock <= 5 ? 'warning' : '')
-                    ]">{{ $t('admin.inStock', {
-                      count:
-                      product.stock || 0 }) }}
-                    </span>
                     <div class="item-actions">
                       <button class="action-btn edit"><ion-icon
                           name="create-outline"></ion-icon></button>
@@ -1314,11 +1277,6 @@ const deleteDiyProduct = async (id) => {
                 <div class="item-info">
                   <strong>{{ prod.name_th ? `${prod.name} (${prod.name_th})` : prod.name }}</strong>
                   <span class="p-meta">SKU: {{ prod.sku }} | ฿{{ prod.price_1 }}</span>
-                  <div class="stock-control">
-                    <span :class="['stock-count', prod.stock === 0 ? 'low' : (prod.stock > 0 && prod.stock <= 5 ? 'warning' : '')]">
-                      {{ prod.stock || 0 }} in stock
-                    </span>
-                  </div>
                 </div>
                 <div class="item-actions">
                   <button class="action-btn edit">

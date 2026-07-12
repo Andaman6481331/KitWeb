@@ -575,8 +575,9 @@ export default {
 				const phoneNumber = formData.get("phoneNumber") as string;
 				const shippingAddress = formData.get("shippingAddress") as string;
 				const orderNote = (formData.get("orderNote") as string) || "";
-				const totalAmount = parseFloat(formData.get("totalAmount") as string);
 				const lineUserId = (formData.get("lineUserId") as string) || "";
+				const lineDisplayName = (formData.get("lineDisplayName") as string) || "";
+				const customerId = (formData.get("customerId") as string) || null;
 				const cartItemsRaw = formData.get("cartItems") as string;
 				// Only treat slipImage as a slip if it's an actual uploaded file. When the
 				// frontend has no slip it may append the string "null"/"" — ignore that.
@@ -585,12 +586,39 @@ export default {
 					? (slipFileRaw as File)
 					: null;
 
-				// A slip is required only when verification is on; the amount must always be numeric.
-				if (!customerName || isNaN(totalAmount) || (slipVerificationEnabled && !slipFile)) {
+				// Name, phone and address are required; a slip is required only when verification is on.
+				if (!customerName || !phoneNumber || !shippingAddress || (slipVerificationEnabled && !slipFile)) {
 					return corsResponse({ error: "Missing required fields" }, { status: 400 });
 				}
 
 				const cartItems: any[] = JSON.parse(cartItemsRaw || "[]");
+				if (cartItems.length === 0) {
+					return corsResponse({ error: "Cart is empty" }, { status: 400 });
+				}
+
+				// Price every line from the DB — client-sent prices/total are NOT trusted.
+				// Regular products: products.price; DIY kits (id "diy-N"): diy_products.price_1.
+				const pricedItems: { item: any; unitPrice: number; orderItemProductId: any }[] = [];
+				let totalAmount = 0;
+				for (const item of cartItems) {
+					const isDiy = typeof item.id === "string" && item.id.startsWith("diy-");
+					let unitPrice: number | null = null;
+					let orderItemProductId: any = null;
+					if (isDiy) {
+						const diyId = parseInt((item.id as string).substring(4), 10);
+						const p = await env.DB.prepare("SELECT price_1 FROM diy_products WHERE id = ?").bind(diyId).first() as any;
+						if (p) unitPrice = Number(p.price_1) || 0;
+					} else {
+						const p = await env.DB.prepare("SELECT price FROM products WHERE id = ?").bind(item.id).first() as any;
+						if (p) { unitPrice = Number(p.price) || 0; orderItemProductId = item.id; }
+					}
+					if (unitPrice === null) {
+						return corsResponse({ error: "PRODUCT_UNAVAILABLE", detail: item.name || String(item.id) }, { status: 400 });
+					}
+					const qty = Math.max(0, Number(item.quantity) || 0);
+					totalAmount += unitPrice * qty;
+					pricedItems.push({ item, unitPrice, orderItemProductId });
+				}
 
 				// Read the uploaded slip bytes once (used by verification and/or storage).
 				const arrayBuffer = slipFile ? await slipFile.arrayBuffer() : null;
@@ -661,50 +689,31 @@ export default {
 					slipUrl = `slips/${slipKey}`;
 				}
 
-				// Persist order to D1
+				// Persist order to D1 (server-computed total; linked to the account when logged in)
 				await env.DB.prepare(
-					"INSERT INTO orders (id, customer_name, total_amount, payment_method, note, customer_id, phone_number, shipping_address, slip_url, line_user_id, slip_transaction_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-				).bind(orderId, customerName, totalAmount, slipVerificationEnabled ? "PromptPay" : "PromptPay (manual)", orderNote, null, phoneNumber, shippingAddress, slipUrl, lineUserId || null, transRef).run();
+					"INSERT INTO orders (id, customer_name, total_amount, payment_method, note, customer_id, phone_number, shipping_address, slip_url, line_user_id, line_display_name, slip_transaction_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+				).bind(orderId, customerName, totalAmount, slipVerificationEnabled ? "PromptPay" : "PromptPay (manual)", orderNote, customerId, phoneNumber, shippingAddress, slipUrl, lineUserId || null, lineDisplayName || null, transRef).run();
 
-				// Persist order items + update stock
-				for (const item of cartItems) {
+				// Persist order items with server-side prices
+				for (const { item, unitPrice, orderItemProductId } of pricedItems) {
 					const productName = item.name_th || item.name;
-					const isDiy = typeof item.id === "string" && item.id.startsWith("diy-");
-					const dbTable = isDiy ? "diy_products" : "products";
-					const productId = isDiy ? parseInt((item.id as string).substring(4), 10) : item.id;
-
-					const p = await env.DB.prepare(`SELECT stock FROM ${dbTable} WHERE id = ?`).bind(productId).first() as any;
-
-					// order_items.product_id has a FK to products(id). DIY kits live in a separate
-					// table and deleted products no longer exist, so only store the id when it's a
-					// real, existing product — otherwise NULL (product_name is still recorded).
-					const orderItemProductId = (!isDiy && p) ? item.id : null;
 					await env.DB.prepare(
 						"INSERT INTO order_items (order_id, product_id, product_name, size, color, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?)"
-					).bind(orderId, orderItemProductId, productName, item.selectedSize, item.selectedColor, item.quantity, item.price).run();
-
-					if (p) {
-						const newStock = p.stock - item.quantity;
-						await env.DB.prepare(`UPDATE ${dbTable} SET stock = ? WHERE id = ?`).bind(newStock, productId).run();
-						if (!isDiy) {
-							await env.DB.prepare(
-								"INSERT INTO stock_history (product_id, admin_id, change_amount, new_stock, reason) VALUES (?, ?, ?, ?, ?)"
-							).bind(productId, "SYSTEM", -item.quantity, newStock, `ORDER_${orderId}`).run();
-						}
-					}
+					).bind(orderId, orderItemProductId, productName, item.selectedSize, item.selectedColor, item.quantity, unitPrice).run();
 				}
 
 				// Build staff LINE notification (use name_th)
 				let lineMsg = `🧾 คำสั่งซื้อใหม่ (เว็บไซต์)\n`;
 				lineMsg += `รหัส: ${orderId}\n`;
 				lineMsg += `ชื่อ: ${customerName}  โทร: ${phoneNumber}\n`;
+				if (lineDisplayName) lineMsg += `LINE: ${lineDisplayName}\n`;
 				lineMsg += `ที่อยู่: ${shippingAddress}\n\n`;
-				cartItems.forEach((item: any, i: number) => {
+				pricedItems.forEach(({ item, unitPrice }, i: number) => {
 					const name = item.name_th || item.name;
 					lineMsg += `${i + 1}) ${name}\n`;
 					lineMsg += `   ขนาด: ${item.selectedSize} | สี: ${item.selectedColor}\n`;
-					lineMsg += `   จำนวน: ${item.quantity} ชิ้น × ${item.price} บาท\n`;
-					lineMsg += `   รวม: ${(item.price * item.quantity).toFixed(2)} บาท\n\n`;
+					lineMsg += `   จำนวน: ${item.quantity} ชิ้น × ${unitPrice} บาท\n`;
+					lineMsg += `   รวม: ${(unitPrice * item.quantity).toFixed(2)} บาท\n\n`;
 				});
 				lineMsg += `รวมทั้งหมด: ${totalAmount.toFixed(2)} บาท\n`;
 				if (orderNote) lineMsg += `หมายเหตุ: ${orderNote}\n`;
@@ -733,9 +742,9 @@ export default {
 				// Push an order-confirmation Flex Message to the customer.
 				// This opens a 1:1 chat with them in the OA console and delivers their receipt.
 				if (lineUserId) {
-					const itemRows = cartItems.map((item: any) => {
+					const itemRows = pricedItems.map(({ item, unitPrice }) => {
 						const name = item.name_th || item.name;
-						const lineTotal = (item.price * item.quantity).toFixed(2);
+						const lineTotal = (unitPrice * item.quantity).toFixed(2);
 						return {
 							type: "box",
 							layout: "horizontal",
@@ -925,7 +934,53 @@ export default {
 						id: user.id,
 						email: user.email,
 						businessName: user.business_name,
-						owner_name: user.owner_name
+						ownerName: user.owner_name,
+						owner_name: user.owner_name,
+						phone: user.phone,
+						shippingAddress: user.shipping_address,
+						lineDisplayName: user.line_display_name,
+						lineUserId: user.line_user_id
+					}
+				});
+			}
+
+			// Update the logged-in customer's profile (prefill/save at checkout).
+			// Token is the user id (see login), passed in the Authorization header.
+			if (url.pathname === "/customer/update" && request.method === "POST") {
+				const userId = request.headers.get("Authorization");
+				if (!userId) {
+					return corsResponse({ error: "Unauthorized" }, { status: 401 });
+				}
+				const existing = await env.DB.prepare("SELECT id FROM customers WHERE id = ?").bind(userId).first();
+				if (!existing) {
+					return corsResponse({ error: "Unauthorized" }, { status: 401 });
+				}
+				const body = await request.json() as any;
+				// COALESCE keeps the existing value when a field isn't provided.
+				await env.DB.prepare(
+					"UPDATE customers SET business_name = COALESCE(?, business_name), owner_name = COALESCE(?, owner_name), phone = COALESCE(?, phone), shipping_address = COALESCE(?, shipping_address), line_display_name = COALESCE(?, line_display_name), line_user_id = COALESCE(?, line_user_id) WHERE id = ?"
+				).bind(
+					body.businessName ?? null,
+					body.ownerName ?? null,
+					body.phone ?? null,
+					body.shippingAddress ?? null,
+					body.lineDisplayName ?? null,
+					body.lineUserId ?? null,
+					userId
+				).run();
+				const updated = await env.DB.prepare("SELECT * FROM customers WHERE id = ?").bind(userId).first() as any;
+				return corsResponse({
+					success: true,
+					user: {
+						id: updated.id,
+						email: updated.email,
+						businessName: updated.business_name,
+						ownerName: updated.owner_name,
+						owner_name: updated.owner_name,
+						phone: updated.phone,
+						shippingAddress: updated.shipping_address,
+						lineDisplayName: updated.line_display_name,
+						lineUserId: updated.line_user_id
 					}
 				});
 			}
@@ -1099,6 +1154,68 @@ export default {
 				return corsResponse({ success: true, customerNotified });
 			}
 
+			// Staff full order edit: customer/fulfilment fields + line items.
+			// Prices/total are recomputed server-side from the DB when a product id is present.
+			if (url.pathname === "/orders/update" && request.method === "POST") {
+				const body = await request.json() as any;
+				const orderId = (body.orderId as string || "").trim();
+				if (!orderId) {
+					return corsResponse({ error: "orderId is required" }, { status: 400 });
+				}
+				const existing = await env.DB.prepare("SELECT id FROM orders WHERE id = ?").bind(orderId).first();
+				if (!existing) {
+					return corsResponse({ error: "Order not found" }, { status: 404 });
+				}
+
+				// Update editable fields (COALESCE keeps existing values when omitted).
+				await env.DB.prepare(
+					"UPDATE orders SET customer_name = COALESCE(?, customer_name), phone_number = COALESCE(?, phone_number), shipping_address = COALESCE(?, shipping_address), line_display_name = COALESCE(?, line_display_name), note = COALESCE(?, note), status = COALESCE(?, status), tracking_number = COALESCE(?, tracking_number) WHERE id = ?"
+				).bind(
+					body.customerName ?? null,
+					body.phoneNumber ?? null,
+					body.shippingAddress ?? null,
+					body.lineDisplayName ?? null,
+					body.note ?? null,
+					body.status ?? null,
+					body.trackingNumber ?? null,
+					orderId
+				).run();
+
+				// If an items array is supplied, replace the line items and recompute the total.
+				if (Array.isArray(body.items)) {
+					let newTotal = 0;
+					const priced: { item: any; unitPrice: number; orderItemProductId: any }[] = [];
+					for (const item of body.items) {
+						const isDiy = typeof item.id === "string" && item.id.startsWith("diy-");
+						let unitPrice: number | null = null;
+						let orderItemProductId: any = null;
+						if (isDiy) {
+							const diyId = parseInt((item.id as string).substring(4), 10);
+							const p = await env.DB.prepare("SELECT price_1 FROM diy_products WHERE id = ?").bind(diyId).first() as any;
+							if (p) unitPrice = Number(p.price_1) || 0;
+						} else if (item.id !== null && item.id !== undefined && item.id !== "") {
+							const p = await env.DB.prepare("SELECT price FROM products WHERE id = ?").bind(item.id).first() as any;
+							if (p) { unitPrice = Number(p.price) || 0; orderItemProductId = item.id; }
+						}
+						// Custom/manual line (no resolvable product): fall back to the staff-entered price.
+						if (unitPrice === null) unitPrice = Number(item.price) || 0;
+						const qty = Math.max(0, Number(item.quantity) || 0);
+						newTotal += unitPrice * qty;
+						priced.push({ item, unitPrice, orderItemProductId });
+					}
+
+					await env.DB.prepare("DELETE FROM order_items WHERE order_id = ?").bind(orderId).run();
+					for (const { item, unitPrice, orderItemProductId } of priced) {
+						await env.DB.prepare(
+							"INSERT INTO order_items (order_id, product_id, product_name, size, color, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?)"
+						).bind(orderId, orderItemProductId, item.name_th || item.name || "", item.selectedSize || null, item.selectedColor || null, item.quantity, unitPrice).run();
+					}
+					await env.DB.prepare("UPDATE orders SET total_amount = ? WHERE id = ?").bind(newTotal, orderId).run();
+				}
+
+				return corsResponse({ success: true });
+			}
+
 			// POS in-store cash sale: records a walk-in sale into pos_orders / pos_order_items
 			if (url.pathname === "/sellcash/submit" && request.method === "POST") {
 				const body = await request.json() as any;
@@ -1143,11 +1260,10 @@ export default {
 
 			if (url.pathname === "/products" && request.method === "POST") {
 				const body = await request.json() as any;
-				const { name, name_th, description, price, category, categories, image_key, usage, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images, stock } = body;
+				const { name, name_th, description, price, category, categories, image_key, usage, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images } = body;
 				const categoryList = normalizeCategoryList(categories, category);
 				const primaryCategory = categoryList[0] || category || null;
 				const activePrice = price || price_3 || 0;
-				const initialStock = stock || 0;
 				let productId: number | null = null;
 
 				if (!primaryCategory) {
@@ -1158,11 +1274,11 @@ export default {
 					const sku = await allocateProductSku(env, primaryCategory, body.sku);
 
 					const { meta } = await env.DB.prepare(
-						"INSERT INTO products (name, name_th, description, description_th, price, category, image_key, usage, usage_th, attribute, attribute_th, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, stock, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+						"INSERT INTO products (name, name_th, description, description_th, price, category, image_key, usage, usage_th, attribute, attribute_th, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 					).bind(
 						dbValue(name), dbValue(name_th), dbValue(description), dbValue(body.description_th || null), activePrice, primaryCategory,
 						dbValue(image_key), dbValue(usage), dbValue(body.usage_th || null), dbValue(body.attribute || null), dbValue(body.attribute_th || null), dbValue(varieties), dbValue(sizes), dbValue(colors),
-						price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, dbValue(moq), is_visible === false ? 0 : 1, initialStock, sku
+						price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, dbValue(moq), is_visible === false ? 0 : 1, sku
 					).run();
 
 					productId = meta.last_row_id;
@@ -1195,7 +1311,7 @@ export default {
 			if (url.pathname.startsWith("/products/") && request.method === "PUT") {
 				const id = url.pathname.split("/products/")[1];
 				const body = await request.json() as any;
-				const { name, name_th, description, price, category, categories, image_key, usage, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images, stock } = body;
+				const { name, name_th, description, price, category, categories, image_key, usage, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images } = body;
 				const categoryList = normalizeCategoryList(categories, category);
 				const primaryCategory = categoryList[0] || category || null;
 				const activePrice = price_3 || price || 0;
@@ -1204,24 +1320,15 @@ export default {
 					return corsResponse({ error: "At least one category is required" }, { status: 400 });
 				}
 
-				const currentProduct = await env.DB.prepare("SELECT stock FROM products WHERE id = ?").bind(id).first() as any;
-
 				await env.DB.prepare(
-					"UPDATE products SET name=?, name_th=?, description=?, description_th=?, price=?, category=?, image_key=?, usage=?, usage_th=?, attribute=?, attribute_th=?, varieties=?, sizes=?, colors=?, price_1=?, price_2=?, price_3=?, price_4=?, price_5=?, moq=?, is_visible=?, stock=? WHERE id=?"
+					"UPDATE products SET name=?, name_th=?, description=?, description_th=?, price=?, category=?, image_key=?, usage=?, usage_th=?, attribute=?, attribute_th=?, varieties=?, sizes=?, colors=?, price_1=?, price_2=?, price_3=?, price_4=?, price_5=?, moq=?, is_visible=? WHERE id=?"
 				).bind(
 					dbValue(name), dbValue(name_th), dbValue(description), dbValue(body.description_th || null), activePrice, primaryCategory,
 					dbValue(image_key), dbValue(usage), dbValue(body.usage_th || null), dbValue(body.attribute || null), dbValue(body.attribute_th || null), dbValue(varieties), dbValue(sizes), dbValue(colors),
-					price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, dbValue(moq), is_visible === false ? 0 : 1, stock ?? 0, id
+					price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, dbValue(moq), is_visible === false ? 0 : 1, id
 				).run();
 
 				await saveProductCategories(env, Number(id), categoryList);
-
-				if (currentProduct && stock !== undefined && currentProduct.stock !== stock) {
-					const change = stock - currentProduct.stock;
-					await env.DB.prepare(
-						"INSERT INTO stock_history (product_id, admin_id, change_amount, new_stock, reason) VALUES (?, ?, ?, ?, ?)"
-					).bind(id, 'admin', change, stock, 'PRODUCT_UPDATE').run();
-				}
 
 				// Update images: simplest way is to delete and re-insert
 				if (images && Array.isArray(images)) {
@@ -1248,32 +1355,9 @@ export default {
 				return corsResponse({ success: true });
 			}
 
-			// Stock Adjustment Endpoint
-			if (url.pathname.match(/^\/products\/\d+\/stock$/) && request.method === "POST") {
-				const id = url.pathname.split("/")[2];
-				const { change, admin_id, reason } = await request.json() as any;
-
-				// 1. Get current stock
-				const product = await env.DB.prepare("SELECT stock FROM products WHERE id = ?").bind(id).first() as any;
-				if (!product) return corsResponse({ error: "Product not found" }, { status: 404 });
-
-				const newStock = product.stock + change;
-
-				// 2. Update stock
-				await env.DB.prepare("UPDATE products SET stock = ? WHERE id = ?").bind(newStock, id).run();
-
-				// 3. Log history
-				await env.DB.prepare(
-					"INSERT INTO stock_history (product_id, admin_id, change_amount, new_stock, reason) VALUES (?, ?, ?, ?, ?)"
-				).bind(id, admin_id, change, newStock, reason || 'MANUAL_ADJUSTMENT').run();
-
-				return corsResponse({ success: true, newStock });
-			}
-
 			if (url.pathname === "/diy/products" && request.method === "POST") {
 				const body = await request.json() as any;
-				const { name, name_th, description, price_1, price_2, price_3, images, stock } = body;
-				const initialStock = stock || 0;
+				const { name, name_th, description, price_1, price_2, price_3, images } = body;
 
 				let seqVal = 0;
 				const seqResult = await env.DB.prepare("SELECT seq FROM sqlite_sequence WHERE name = 'diy_products'").first() as any;
@@ -1285,8 +1369,8 @@ export default {
 				const serializedImages = JSON.stringify(images || []);
 
 				const { meta } = await env.DB.prepare(
-					"INSERT INTO diy_products (name, name_th, description, price_1, price_2, price_3, images, stock, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-				).bind(name, name_th, description, price_1 || 0, price_2 || 0, price_3 || 0, serializedImages, initialStock, sku).run();
+					"INSERT INTO diy_products (name, name_th, description, price_1, price_2, price_3, images, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+				).bind(name, name_th, description, price_1 || 0, price_2 || 0, price_3 || 0, serializedImages, sku).run();
 
 				return corsResponse({ success: true, id: meta.last_row_id, sku });
 			}
@@ -1294,13 +1378,13 @@ export default {
 			if (url.pathname.startsWith("/diy/products/") && request.method === "PUT") {
 				const id = url.pathname.split("/diy/products/")[1];
 				const body = await request.json() as any;
-				const { name, name_th, description, price_1, price_2, price_3, images, stock } = body;
+				const { name, name_th, description, price_1, price_2, price_3, images } = body;
 
 				const serializedImages = JSON.stringify(images || []);
 
 				await env.DB.prepare(
-					"UPDATE diy_products SET name=?, name_th=?, description=?, price_1=?, price_2=?, price_3=?, images=?, stock=? WHERE id=?"
-				).bind(name, name_th, description, price_1 || 0, price_2 || 0, price_3 || 0, serializedImages, stock || 0, id).run();
+					"UPDATE diy_products SET name=?, name_th=?, description=?, price_1=?, price_2=?, price_3=?, images=? WHERE id=?"
+				).bind(name, name_th, description, price_1 || 0, price_2 || 0, price_3 || 0, serializedImages, id).run();
 
 				return corsResponse({ success: true });
 			}
@@ -1312,10 +1396,9 @@ export default {
 					await deleteR2Images(env.IMAGES, imageKeys);
 					// Set referencing order_items product_id to NULL to preserve order history without violating FK constraints
 					await env.DB.prepare("UPDATE order_items SET product_id = NULL WHERE product_id = ?").bind(id).run();
-					// Explicitly clean up related images and stock history
+					// Explicitly clean up related images
 					await env.DB.prepare("DELETE FROM product_images WHERE product_id = ?").bind(id).run();
 					await env.DB.prepare("DELETE FROM product_variants WHERE product_id = ?").bind(id).run();
-					await env.DB.prepare("DELETE FROM stock_history WHERE product_id = ?").bind(id).run();
 					// Delete standard product
 					await env.DB.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
 					return corsResponse({ success: true });

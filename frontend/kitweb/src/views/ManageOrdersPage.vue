@@ -43,7 +43,22 @@ const loadOrders = async () => {
       drafts[o.id] = {
         status: o.status || 'PENDING',
         trackingNumber: o.tracking_number || '',
+        editing: false,
+        customerName: o.customer_name || '',
+        phoneNumber: o.phone_number || '',
+        shippingAddress: o.shipping_address || '',
+        lineDisplayName: o.line_display_name || '',
+        note: o.note || '',
+        items: (o.items || []).map((it) => ({
+          id: it.product_id ?? null,
+          name: it.product_name || '',
+          selectedSize: it.size || '',
+          selectedColor: it.color || '',
+          quantity: Number(it.quantity) || 1,
+          price: Number(it.price) || 0,
+        })),
         saving: false,
+        savingEdit: false,
         message: '',
         error: false,
       };
@@ -89,6 +104,54 @@ const updateOrder = async (order) => {
     draft.message = e?.message || t('manageOrders.saveFailed');
   } finally {
     draft.saving = false;
+  }
+};
+
+const toggleEdit = (o) => {
+  const d = drafts[o.id];
+  if (d) d.editing = !d.editing;
+};
+
+const addItem = (o) => {
+  drafts[o.id]?.items.push({ id: null, name: '', selectedSize: '', selectedColor: '', quantity: 1, price: 0 });
+};
+
+const removeItem = (o, idx) => {
+  drafts[o.id]?.items.splice(idx, 1);
+};
+
+// Full edit: customer/fulfilment fields + line items. The backend recomputes the
+// total (and per-item prices for real products) from the catalog on save.
+const saveFullOrder = async (o) => {
+  const d = drafts[o.id];
+  if (!d) return;
+  d.savingEdit = true;
+  d.error = false;
+  try {
+    await api.updateOrder({
+      orderId: o.id,
+      customerName: d.customerName,
+      phoneNumber: d.phoneNumber,
+      shippingAddress: d.shippingAddress,
+      lineDisplayName: d.lineDisplayName,
+      note: d.note,
+      status: d.status,
+      trackingNumber: d.trackingNumber,
+      items: d.items.map((it) => ({
+        id: it.id,
+        name: it.name,
+        selectedSize: it.selectedSize,
+        selectedColor: it.selectedColor,
+        quantity: Number(it.quantity) || 0,
+        price: Number(it.price) || 0,
+      })),
+    });
+    // Reload to reflect the server-recomputed total and saved items.
+    await loadOrders();
+  } catch (e) {
+    d.error = true;
+    d.message = e?.message || t('manageOrders.saveFailed');
+    d.savingEdit = false;
   }
 };
 
@@ -172,7 +235,40 @@ onMounted(() => {
             <button class="update-btn" :disabled="drafts[o.id].saving" @click="updateOrder(o)">
               {{ drafts[o.id].saving ? t('manageOrders.saving') : t('manageOrders.updateNotify') }}
             </button>
+            <button class="edit-toggle-btn" @click="toggleEdit(o)">
+              {{ drafts[o.id].editing ? 'Close editor' : 'Edit details' }}
+            </button>
           </div>
+
+          <!-- Full editor: customer info + line items -->
+          <div v-if="drafts[o.id] && drafts[o.id].editing" class="order-editor">
+            <div class="edit-fields">
+              <label>Name<input v-model="drafts[o.id].customerName" type="text" /></label>
+              <label>Phone<input v-model="drafts[o.id].phoneNumber" type="text" /></label>
+              <label>LINE name<input v-model="drafts[o.id].lineDisplayName" type="text" /></label>
+              <label class="full">Address<textarea v-model="drafts[o.id].shippingAddress" rows="2"></textarea></label>
+              <label class="full">Note<textarea v-model="drafts[o.id].note" rows="2"></textarea></label>
+            </div>
+
+            <div class="edit-items">
+              <div class="edit-items-head">Items</div>
+              <div v-for="(it, idx) in drafts[o.id].items" :key="idx" class="edit-item-row">
+                <input v-model="it.name" type="text" class="ei-name" placeholder="Product name" />
+                <input v-model="it.selectedSize" type="text" class="ei-sm" placeholder="Size" />
+                <input v-model="it.selectedColor" type="text" class="ei-sm" placeholder="Color" />
+                <input v-model.number="it.quantity" type="number" min="0" class="ei-qty" title="Qty" />
+                <input v-model.number="it.price" type="number" min="0" class="ei-price" title="Unit ฿ (custom lines only)" />
+                <button class="ei-remove" @click="removeItem(o, idx)" title="Remove">✕</button>
+              </div>
+              <button class="add-item-btn" @click="addItem(o)">+ Add item</button>
+            </div>
+
+            <button class="save-edit-btn" :disabled="drafts[o.id].savingEdit" @click="saveFullOrder(o)">
+              {{ drafts[o.id].savingEdit ? t('manageOrders.saving') : 'Save changes' }}
+            </button>
+            <p class="edit-hint">Prices for catalog products are recalculated on save; the ฿ field only applies to custom lines.</p>
+          </div>
+
           <p
             v-if="drafts[o.id] && drafts[o.id].message"
             class="update-msg"
@@ -338,4 +434,94 @@ onMounted(() => {
 .update-btn:disabled { opacity: 0.6; cursor: default; }
 .update-msg { margin: 10px 0 0; font-size: 0.85rem; color: #2e9a52; }
 .update-msg.is-error { color: #c0392b; }
+
+/* Full editor */
+.edit-toggle-btn {
+  padding: 9px 16px;
+  border: 1px solid #ddd2c4;
+  border-radius: 8px;
+  background: #fff;
+  color: #7a6a5c;
+  font-weight: 600;
+  cursor: pointer;
+}
+.order-editor {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed #e6dccf;
+}
+.edit-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+}
+.edit-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #7a6a5c;
+}
+.edit-fields label.full { grid-column: 1 / -1; }
+.edit-fields input,
+.edit-fields textarea {
+  padding: 8px 10px;
+  border: 1px solid #ddd2c4;
+  border-radius: 7px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+}
+.edit-items { margin-top: 14px; }
+.edit-items-head { font-size: 0.78rem; font-weight: 700; color: #7a6a5c; margin-bottom: 8px; }
+.edit-item-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+  align-items: center;
+}
+.edit-item-row input {
+  padding: 7px 8px;
+  border: 1px solid #ddd2c4;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  min-width: 0;
+}
+.ei-name { flex: 3; }
+.ei-sm { flex: 1; }
+.ei-qty { width: 54px; flex: none; }
+.ei-price { width: 68px; flex: none; }
+.ei-remove {
+  border: none;
+  background: #f7e2e2;
+  color: #b03a3a;
+  border-radius: 6px;
+  width: 28px;
+  height: 30px;
+  cursor: pointer;
+  flex: none;
+}
+.add-item-btn {
+  margin-top: 4px;
+  padding: 7px 14px;
+  border: 1px dashed #c9b8a8;
+  background: #fff;
+  color: #7a6a5c;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.save-edit-btn {
+  margin-top: 14px;
+  padding: 10px 22px;
+  border: none;
+  border-radius: 8px;
+  background: #3D2B1F;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+.save-edit-btn:disabled { opacity: 0.6; cursor: default; }
+.edit-hint { margin: 8px 0 0; font-size: 0.78rem; color: #9e8272; }
 </style>

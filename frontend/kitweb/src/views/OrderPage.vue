@@ -55,7 +55,7 @@ const products = computed(() => {
         colors_th: p.colors_th ? (typeof p.colors_th === 'string' ? p.colors_th.split(',').map(c => c.trim()) : p.colors_th) : null,
         varieties: p.varieties ? (typeof p.varieties === 'string' ? p.varieties.split(',').map(v => v.trim()) : p.varieties) : null,
         varieties_th: p.varieties_th ? (typeof p.varieties_th === 'string' ? p.varieties_th.split(',').map(v => v.trim()) : p.varieties_th) : null,
-        inStock: p.stock !== undefined ? p.stock > 0 : true,
+        inStock: true,
         image: p.image_key ? `${API_URL}/images/${p.image_key}-thumb.webp` : placeholderImg('Product')
     }))
 
@@ -68,7 +68,7 @@ const products = computed(() => {
         colors_th: null,
         varieties: null,
         varieties_th: null,
-        inStock: p.stock !== undefined ? p.stock > 0 : true,
+        inStock: true,
         price: p.price_1 || 0,
         category: 'DIY Kit',
         image: getDiyImageUrl(p.images && p.images.length > 0 ? p.images[0] : '', 'thumb')
@@ -185,34 +185,14 @@ const filteredProducts = computed(() => {
     return filtered
 })
 
-// Cart calculations
-const DELIVERY_FEE = 30
+// Cart calculations (no delivery fee — the total is the items subtotal; staff
+// arrange any shipping cost manually over LINE).
 const cartTotal = computed(() => cartStore.cartTotal)
 const cartItemCount = computed(() => cartStore.cartItemCount)
-// The customer pays (and their slip shows) the grand total — items + delivery.
-// This is the single source of truth for both the summary display and the amount
-// the backend verifies the slip against.
-const grandTotal = computed(() => cartStore.cartTotal + DELIVERY_FEE)
 
 // Add to cart with selected size and color
 const addToCart = (product) => {
-    if (!product.inStock) {
-        showNotificationMsg(t('order.outOfStock'))
-        return
-    }
-
     const selection = productSelections.value[product.id]
-
-    // Total already in cart for this product (across all size/color combos)
-    const totalInCart = cart.value
-        .filter(i => i.id === product.id)
-        .reduce((sum, i) => sum + i.quantity, 0)
-
-    if (product.stock !== undefined && product.stock !== null && totalInCart >= product.stock) {
-        showNotificationMsg(t('order.outOfStock')) // Or a more specific message if available
-        return
-    }
-
     cartStore.addToCart(product, selection);
     showNotificationMsg(t('order.addedToCart', { name: product.name }))
 }
@@ -231,17 +211,6 @@ const updateColor = (productId, color) => {
 const updateQuantity = (cartItemKey, delta) => {
     const item = cart.value.find(i => i.cartItemKey === cartItemKey)
     if (item) {
-        if (delta > 0) {
-            // Check stock limit
-            const product = products.value.find(p => p.id === item.id)
-            const totalInCart = cart.value
-                .filter(i => i.id === item.id)
-                .reduce((sum, i) => sum + i.quantity, 0)
-            if (product && product.stock !== undefined && product.stock !== null && totalInCart >= product.stock) {
-                showNotificationMsg(t('order.outOfStock'))
-                return
-            }
-        }
         cartStore.updateQuantity(cartItemKey, delta);
     }
 }
@@ -298,10 +267,14 @@ watch(() => cart.value.length, (len) => {
 })
 
 // ---- Checkout form fields (in-place, replaces the product browser) ----
-const customerName = ref(authStore.user?.businessName || authStore.user?.ownerName || '')
-const phoneNumber = ref('')
-const shippingAddress = ref('')
+// Accounts are optional; when logged in we prefill from the saved profile.
+const isLoggedIn = computed(() => authStore.isAuthenticated)
+const acct = authStore.user || {}
+const customerName = ref(acct.businessName || acct.ownerName || '')
+const phoneNumber = ref(acct.phone || '')
+const shippingAddress = ref(acct.shippingAddress || '')
 const orderNote = ref('')
+const saveToAccount = ref(false)
 const slipImage = ref(null)
 const slipPreview = ref(null)
 const isSubmittingOrder = ref(false)
@@ -309,9 +282,10 @@ const isSubmittingOrder = ref(false)
 // goes to the LINE OA and staff handle payment manually. Mirrors the Worker's flag.
 const slipRequired = import.meta.env.VITE_SLIP_VERIFICATION_ENABLED === 'true'
 
-// Optional LINE connect
-const lineUserId = ref('')
-const lineDisplayName = ref('')
+// LINE: an optional typed display name (staff use it to find the customer) plus the
+// optional one-tap Connect (OAuth) that also yields a real userId for auto messages.
+const lineUserId = ref(acct.lineUserId || '')
+const lineDisplayName = ref(acct.lineDisplayName || '')
 const lineLoginEnabled = ref(false)
 const lineConnecting = ref(false)
 
@@ -392,8 +366,9 @@ const triggerLineLogin = () => {
 }
 
 const submitOrder = async () => {
-    if (!customerName.value.trim()) {
-        showNotificationMsg(t('order.pleaseEnterName'))
+    // Name, phone and address are required; the LINE display name is optional.
+    if (!customerName.value.trim() || !phoneNumber.value.trim() || !shippingAddress.value.trim()) {
+        showNotificationMsg(tt('order.pleaseFillRequired', 'Please fill in your name, phone and address.'))
         return
     }
     if (slipRequired && !slipImage.value) {
@@ -407,17 +382,20 @@ const submitOrder = async () => {
     formData.append('phoneNumber', phoneNumber.value)
     formData.append('shippingAddress', shippingAddress.value)
     formData.append('orderNote', orderNote.value)
-    // Verify the slip against the grand total (items + delivery) — what the customer actually pays.
-    formData.append('totalAmount', String(grandTotal.value))
     formData.append('lineUserId', lineUserId.value)
+    formData.append('lineDisplayName', lineDisplayName.value)
+    // Link the order to the account when logged in (so it appears under Track Orders).
+    if (isLoggedIn.value && authStore.user?.id) {
+        formData.append('customerId', authStore.user.id)
+    }
+    // The backend prices every line from the DB — prices are not sent from the client.
     formData.append('cartItems', JSON.stringify(cart.value.map(item => ({
         id: item.id,
         name: item.name,
         name_th: item.name_th || null,
         selectedSize: item.selectedSize,
         selectedColor: item.selectedColor,
-        quantity: item.quantity,
-        price: item.price
+        quantity: item.quantity
     }))))
     // Only attach a slip when one was actually uploaded — appending a null/empty value
     // stringifies to "null" and breaks the backend's file handling.
@@ -426,6 +404,10 @@ const submitOrder = async () => {
     }
 
     try {
+        // Optionally persist contact details back to the account for next time.
+        if (saveToAccount.value && isLoggedIn.value) {
+            await saveProfile(true)
+        }
         const result = await api.submitOrderWithSlip(formData)
         if (result.success) {
             cartStore.clearCart()
@@ -442,6 +424,7 @@ const submitOrder = async () => {
                 AMOUNT_MISMATCH: t('order.amountMismatch'),
                 WRONG_ACCOUNT: t('order.wrongAccount'),
                 DUPLICATE: t('order.duplicateSlip'),
+                PRODUCT_UNAVAILABLE: tt('order.productUnavailable', 'A product in your cart is no longer available.'),
             }
             showNotificationMsg(errMap[result.error] || t('order.orderFailed'))
         }
@@ -450,6 +433,26 @@ const submitOrder = async () => {
         showNotificationMsg(t('order.orderFailed'))
     } finally {
         isSubmittingOrder.value = false
+    }
+}
+
+// Save the current contact details to the logged-in customer's account.
+const saveProfile = async (silent = false) => {
+    if (!isLoggedIn.value) return
+    try {
+        const result = await api.updateCustomer({
+            phone: phoneNumber.value,
+            shippingAddress: shippingAddress.value,
+            lineDisplayName: lineDisplayName.value,
+            lineUserId: lineUserId.value || undefined
+        })
+        if (result?.user) {
+            authStore.login(result.user, authStore.token)
+        }
+        if (!silent) showNotificationMsg(tt('order.profileSaved', 'Saved to your account.'))
+    } catch (e) {
+        console.error('Failed to save profile:', e)
+        if (!silent) showNotificationMsg(t('order.orderFailed'))
     }
 }
 
@@ -701,22 +704,34 @@ const isProductInCart = (productId) => {
                         </div>
 
                         <div class="form-group">
-                            <label>{{ t('order.phoneNumber') }}</label>
+                            <label>{{ t('order.phoneNumber') }} <span class="required-star">*</span></label>
                             <input v-model="phoneNumber" type="tel" :placeholder="t('order.phoneNumberPlaceholder')"
-                                class="form-input" />
+                                class="form-input" required />
                         </div>
 
                         <div class="form-group">
-                            <label>{{ t('order.shippingAddress') }}</label>
+                            <label>{{ t('order.shippingAddress') }} <span class="required-star">*</span></label>
                             <textarea v-model="shippingAddress" :placeholder="t('order.shippingAddressPlaceholder')"
-                                class="form-textarea" rows="3"></textarea>
+                                class="form-textarea" rows="3" required></textarea>
                         </div>
 
-                        <div class="form-group no-margin">
+                        <div class="form-group">
+                            <label>{{ tt('order.lineDisplayName', 'LINE display name') }}</label>
+                            <input v-model="lineDisplayName" type="text"
+                                :placeholder="tt('order.lineDisplayNamePlaceholder', 'So staff can reach you on LINE (optional)')"
+                                class="form-input" />
+                        </div>
+
+                        <div class="form-group" :class="{ 'no-margin': !isLoggedIn }">
                             <label>{{ t('order.orderNote') }}</label>
                             <textarea v-model="orderNote" :placeholder="t('order.orderNotePlaceholder')"
                                 class="form-textarea" rows="2"></textarea>
                         </div>
+
+                        <label v-if="isLoggedIn" class="save-account-label">
+                            <input type="checkbox" v-model="saveToAccount" />
+                            <span>{{ tt('order.saveToAccount', 'Save these details to my account') }}</span>
+                        </label>
                     </div>
 
                     <!-- Payment slip — shown only when slip verification is enabled -->
@@ -832,17 +847,9 @@ const isProductInCart = (productId) => {
                     <!-- Cart Footer Modern -->
                     <div class="cart-footer-modern" v-if="cart.length > 0">
                         <div class="cart-summary-modern">
-                            <div class="summary-row">
-                                <span>{{ t('order.subtotal') }}</span>
-                                <span>฿{{ cartTotal }}</span>
-                            </div>
-                            <div class="summary-row">
-                                <span>{{ t('order.delivery') }}</span>
-                                <span>฿{{ DELIVERY_FEE }}</span>
-                            </div>
                             <div class="summary-row total">
                                 <span>{{ t('order.total') }}</span>
-                                <span>฿{{ grandTotal }}</span>
+                                <span>฿{{ cartTotal }}</span>
                             </div>
                         </div>
 
@@ -1734,6 +1741,23 @@ const isProductInCart = (productId) => {
     color: #8C7B6E;
     line-height: 1.4;
     margin: -2px 0 12px;
+}
+
+.save-account-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    font-size: 13px;
+    color: #7A6A5C;
+    cursor: pointer;
+    user-select: none;
+}
+
+.save-account-label input {
+    width: auto;
+    margin: 0;
+    flex-shrink: 0;
 }
 
 .hidden-input {

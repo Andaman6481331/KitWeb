@@ -88,6 +88,21 @@ export const api = {
     return data;
   },
 
+  // Update the logged-in customer's saved profile (address / LINE name / phone / owner name).
+  async updateCustomer(profile) {
+    const response = await fetch(`${API_URL}/customer/update`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': this.getToken()
+      },
+      body: JSON.stringify(profile)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to update profile');
+    return data;
+  },
+
   async getProducts(category = null, { includeHidden = false } = {}) {
     const params = new URLSearchParams();
     if (category) params.set('category', category);
@@ -240,15 +255,20 @@ export const api = {
     return await response.json();
   },
 
-  async adjustStock(productId, change, reason = 'MANUAL_ADJUSTMENT') {
-    const response = await fetch(`${API_URL}/products/${productId}/stock`, {
+  // Admin: full order edit — customer/fulfilment fields + line items.
+  // The backend recomputes the total server-side from DB prices.
+  async updateOrder(payload) {
+    const response = await fetch(`${API_URL}/orders/update`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': this.getToken()
       },
-      body: JSON.stringify({ change, reason, admin_id: 'admin' }) // admin_id can be dynamic if you have multiple admins
+      body: JSON.stringify(payload)
     });
+    if (!response.ok) {
+      throw new Error(await parseApiError(response, 'Failed to update order'));
+    }
     return await response.json();
   },
 
