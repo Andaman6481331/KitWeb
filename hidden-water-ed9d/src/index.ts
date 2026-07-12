@@ -25,6 +25,8 @@ interface Env {
 	LINE_LOGIN_CHANNEL_SECRET?: string;
 	EASYSLIP_API_KEY?: string;
 	PROMPTPAY_ACCOUNT?: string;
+	// Feature flag: "true" turns on EasySlip slip verification. Unset/other = off (manual payment via LINE OA).
+	SLIP_VERIFICATION_ENABLED?: string;
 	ADMIN_PASSWORD?: string;
 	JWT_SECRET?: string;
 }
@@ -553,76 +555,95 @@ export default {
 				if (!token || !staffUserId) {
 					return corsResponse({ error: "LINE Messaging API credentials not configured" }, { status: 500 });
 				}
-				if (!env.EASYSLIP_API_KEY) {
-					return corsResponse({ error: "EasySlip API key not configured" }, { status: 500 });
-				}
-				if (!env.PROMPTPAY_ACCOUNT) {
-					return corsResponse({ error: "PromptPay account not configured" }, { status: 500 });
+
+				// Slip verification (EasySlip) is gated behind a flag so we can launch with
+				// manual / LINE-OA payment now and switch on automated slip checks later.
+				// Enabled ONLY when the var is exactly "true"; anything else (incl. unset) = off.
+				const slipVerificationEnabled = env.SLIP_VERIFICATION_ENABLED === "true";
+
+				if (slipVerificationEnabled) {
+					if (!env.EASYSLIP_API_KEY) {
+						return corsResponse({ error: "EasySlip API key not configured" }, { status: 500 });
+					}
+					if (!env.PROMPTPAY_ACCOUNT) {
+						return corsResponse({ error: "PromptPay account not configured" }, { status: 500 });
+					}
 				}
 
 				const formData = await request.formData();
 				const customerName = formData.get("customerName") as string;
 				const phoneNumber = formData.get("phoneNumber") as string;
 				const shippingAddress = formData.get("shippingAddress") as string;
+				const orderNote = (formData.get("orderNote") as string) || "";
 				const totalAmount = parseFloat(formData.get("totalAmount") as string);
 				const lineUserId = (formData.get("lineUserId") as string) || "";
 				const cartItemsRaw = formData.get("cartItems") as string;
-				const slipFile = formData.get("slipImage") as File;
+				// Only treat slipImage as a slip if it's an actual uploaded file. When the
+				// frontend has no slip it may append the string "null"/"" — ignore that.
+				const slipFileRaw = formData.get("slipImage");
+				const slipFile = (slipFileRaw && typeof (slipFileRaw as any).arrayBuffer === "function")
+					? (slipFileRaw as File)
+					: null;
 
-				if (!customerName || !slipFile || isNaN(totalAmount)) {
+				// A slip is required only when verification is on; the amount must always be numeric.
+				if (!customerName || isNaN(totalAmount) || (slipVerificationEnabled && !slipFile)) {
 					return corsResponse({ error: "Missing required fields" }, { status: 400 });
 				}
 
 				const cartItems: any[] = JSON.parse(cartItemsRaw || "[]");
 
-				// Convert slip to base64 (stack-safe reduce — do NOT spread Uint8Array)
-				const arrayBuffer = await slipFile.arrayBuffer();
-				const base64String = btoa(
-					new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), "")
-				);
-				const dataUri = `data:image/jpeg;base64,${base64String}`;
+				// Read the uploaded slip bytes once (used by verification and/or storage).
+				const arrayBuffer = slipFile ? await slipFile.arrayBuffer() : null;
+				let transRef = crypto.randomUUID();
 
-				// Call EasySlip API v2
-				const easySlipRes = await fetch("https://api.easyslip.com/v2/verify/bank", {
-					method: "POST",
-					headers: {
-						"Authorization": `Bearer ${env.EASYSLIP_API_KEY}`,
-						"Content-Type": "application/json"
-					},
-					body: JSON.stringify({ base64: dataUri })
-				});
+				if (slipVerificationEnabled) {
+					// Convert slip to base64 (stack-safe reduce — do NOT spread Uint8Array)
+					const base64String = btoa(
+						new Uint8Array(arrayBuffer!).reduce((data, byte) => data + String.fromCharCode(byte), "")
+					);
+					const dataUri = `data:image/jpeg;base64,${base64String}`;
 
-				if (!easySlipRes.ok) {
-					const errBody = await easySlipRes.json().catch(() => ({})) as any;
-					console.error("EasySlip error:", easySlipRes.status, errBody);
-					return corsResponse({ error: "SLIP_INVALID" }, { status: 400 });
-				}
+					// Call EasySlip API v2
+					const easySlipRes = await fetch("https://api.easyslip.com/v2/verify/bank", {
+						method: "POST",
+						headers: {
+							"Authorization": `Bearer ${env.EASYSLIP_API_KEY}`,
+							"Content-Type": "application/json"
+						},
+						body: JSON.stringify({ base64: dataUri })
+					});
 
-				const slipData = await easySlipRes.json() as any;
+					if (!easySlipRes.ok) {
+						const errBody = await easySlipRes.json().catch(() => ({})) as any;
+						console.error("EasySlip error:", easySlipRes.status, errBody);
+						return corsResponse({ error: "SLIP_INVALID" }, { status: 400 });
+					}
 
-				// Validate amount
-				const slipAmount = slipData?.data?.amount ?? slipData?.amount;
-				if (Math.abs(parseFloat(slipAmount) - totalAmount) > 0.01) {
-					return corsResponse({ error: "AMOUNT_MISMATCH" }, { status: 400 });
-				}
+					const slipData = await easySlipRes.json() as any;
 
-				// Validate receiver account
-				const receiverAccount =
-					slipData?.data?.receiver?.accountNo ??
-					slipData?.data?.receiver?.promptpay ??
-					slipData?.receiver?.accountNo ?? "";
-				if (!receiverAccount.replace(/[-\s]/g, "").includes(env.PROMPTPAY_ACCOUNT.replace(/[-\s]/g, ""))) {
-					return corsResponse({ error: "WRONG_ACCOUNT" }, { status: 400 });
-				}
+					// Validate amount
+					const slipAmount = slipData?.data?.amount ?? slipData?.amount;
+					if (Math.abs(parseFloat(slipAmount) - totalAmount) > 0.01) {
+						return corsResponse({ error: "AMOUNT_MISMATCH" }, { status: 400 });
+					}
 
-				// Check duplicate transaction ref
-				const transRef: string =
-					slipData?.data?.transRef ?? slipData?.transRef ?? crypto.randomUUID();
-				const dupCheck = await env.DB.prepare(
-					"SELECT id FROM orders WHERE slip_transaction_ref = ?"
-				).bind(transRef).first();
-				if (dupCheck) {
-					return corsResponse({ error: "DUPLICATE" }, { status: 400 });
+					// Validate receiver account
+					const receiverAccount =
+						slipData?.data?.receiver?.accountNo ??
+						slipData?.data?.receiver?.promptpay ??
+						slipData?.receiver?.accountNo ?? "";
+					if (!receiverAccount.replace(/[-\s]/g, "").includes(env.PROMPTPAY_ACCOUNT!.replace(/[-\s]/g, ""))) {
+						return corsResponse({ error: "WRONG_ACCOUNT" }, { status: 400 });
+					}
+
+					// Check duplicate transaction ref
+					transRef = slipData?.data?.transRef ?? slipData?.transRef ?? crypto.randomUUID();
+					const dupCheck = await env.DB.prepare(
+						"SELECT id FROM orders WHERE slip_transaction_ref = ?"
+					).bind(transRef).first();
+					if (dupCheck) {
+						return corsResponse({ error: "DUPLICATE" }, { status: 400 });
+					}
 				}
 
 				// Generate order ID
@@ -630,30 +651,38 @@ export default {
 				const random = Math.floor(Math.random() * 99999).toString().padStart(5, "0");
 				const orderId = `WH-${now.getFullYear()}-${random}`;
 
-				// Upload slip to R2
-				const slipKey = `slips/${orderId}-${Date.now()}.jpg`;
-				await env.SLIPS.put(slipKey, arrayBuffer, {
-					httpMetadata: { contentType: slipFile.type || "image/jpeg" }
-				});
-				const slipUrl = `slips/${slipKey}`;
+				// Store the uploaded slip (if any) — kept even when unverified so staff can review it.
+				let slipUrl: string | null = null;
+				if (arrayBuffer && slipFile) {
+					const slipKey = `slips/${orderId}-${Date.now()}.jpg`;
+					await env.SLIPS.put(slipKey, arrayBuffer, {
+						httpMetadata: { contentType: slipFile.type || "image/jpeg" }
+					});
+					slipUrl = `slips/${slipKey}`;
+				}
 
 				// Persist order to D1
 				await env.DB.prepare(
 					"INSERT INTO orders (id, customer_name, total_amount, payment_method, note, customer_id, phone_number, shipping_address, slip_url, line_user_id, slip_transaction_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-				).bind(orderId, customerName, totalAmount, "PromptPay", "", null, phoneNumber, shippingAddress, slipUrl, lineUserId || null, transRef).run();
+				).bind(orderId, customerName, totalAmount, slipVerificationEnabled ? "PromptPay" : "PromptPay (manual)", orderNote, null, phoneNumber, shippingAddress, slipUrl, lineUserId || null, transRef).run();
 
 				// Persist order items + update stock
 				for (const item of cartItems) {
 					const productName = item.name_th || item.name;
-					await env.DB.prepare(
-						"INSERT INTO order_items (order_id, product_id, product_name, size, color, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?)"
-					).bind(orderId, item.id, productName, item.selectedSize, item.selectedColor, item.quantity, item.price).run();
-
 					const isDiy = typeof item.id === "string" && item.id.startsWith("diy-");
 					const dbTable = isDiy ? "diy_products" : "products";
 					const productId = isDiy ? parseInt((item.id as string).substring(4), 10) : item.id;
 
 					const p = await env.DB.prepare(`SELECT stock FROM ${dbTable} WHERE id = ?`).bind(productId).first() as any;
+
+					// order_items.product_id has a FK to products(id). DIY kits live in a separate
+					// table and deleted products no longer exist, so only store the id when it's a
+					// real, existing product — otherwise NULL (product_name is still recorded).
+					const orderItemProductId = (!isDiy && p) ? item.id : null;
+					await env.DB.prepare(
+						"INSERT INTO order_items (order_id, product_id, product_name, size, color, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?)"
+					).bind(orderId, orderItemProductId, productName, item.selectedSize, item.selectedColor, item.quantity, item.price).run();
+
 					if (p) {
 						const newStock = p.stock - item.quantity;
 						await env.DB.prepare(`UPDATE ${dbTable} SET stock = ? WHERE id = ?`).bind(newStock, productId).run();
@@ -678,19 +707,28 @@ export default {
 					lineMsg += `   รวม: ${(item.price * item.quantity).toFixed(2)} บาท\n\n`;
 				});
 				lineMsg += `รวมทั้งหมด: ${totalAmount.toFixed(2)} บาท\n`;
-				lineMsg += `หลักฐานการโอน: ${slipUrl}`;
+				if (orderNote) lineMsg += `หมายเหตุ: ${orderNote}\n`;
+				lineMsg += slipUrl
+					? `หลักฐานการโอน: ${slipUrl}`
+					: `การชำระเงิน: รอชำระ/ตรวจสอบโดยเจ้าหน้าที่`;
 
-				await fetch("https://api.line.me/v2/bot/message/push", {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						"Authorization": `Bearer ${token}`
-					},
-					body: JSON.stringify({
-						to: staffUserId,
-						messages: [{ type: "text", text: lineMsg }]
-					})
-				});
+				// The order is already saved — don't let a LINE push failure 500 the request
+				// (that would make the customer retry and create duplicate orders).
+				try {
+					await fetch("https://api.line.me/v2/bot/message/push", {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							"Authorization": `Bearer ${token}`
+						},
+						body: JSON.stringify({
+							to: staffUserId,
+							messages: [{ type: "text", text: lineMsg }]
+						})
+					});
+				} catch (err) {
+					console.error(`Staff LINE push failed for order ${orderId}:`, err);
+				}
 
 				// Push an order-confirmation Flex Message to the customer.
 				// This opens a 1:1 chat with them in the OA console and delivers their receipt.

@@ -186,8 +186,13 @@ const filteredProducts = computed(() => {
 })
 
 // Cart calculations
+const DELIVERY_FEE = 30
 const cartTotal = computed(() => cartStore.cartTotal)
 const cartItemCount = computed(() => cartStore.cartItemCount)
+// The customer pays (and their slip shows) the grand total — items + delivery.
+// This is the single source of truth for both the summary display and the amount
+// the backend verifies the slip against.
+const grandTotal = computed(() => cartStore.cartTotal + DELIVERY_FEE)
 
 // Add to cart with selected size and color
 const addToCart = (product) => {
@@ -300,11 +305,15 @@ const orderNote = ref('')
 const slipImage = ref(null)
 const slipPreview = ref(null)
 const isSubmittingOrder = ref(false)
+// When slip verification is off (default), the payment slip is optional — the order
+// goes to the LINE OA and staff handle payment manually. Mirrors the Worker's flag.
+const slipRequired = import.meta.env.VITE_SLIP_VERIFICATION_ENABLED === 'true'
 
 // Optional LINE connect
 const lineUserId = ref('')
 const lineDisplayName = ref('')
 const lineLoginEnabled = ref(false)
+const lineConnecting = ref(false)
 
 const handleSlipUpload = (event) => {
     const file = event.target.files[0]
@@ -315,11 +324,18 @@ const handleSlipUpload = (event) => {
 }
 
 const triggerLineLogin = () => {
-    const state = crypto.randomUUID()
-    sessionStorage.setItem('line_oauth_state', state)
-    const callbackBase = window.location.origin
-    const redirectUri = encodeURIComponent(`${callbackBase}/line-callback`)
     const channelId = import.meta.env.VITE_LINE_LOGIN_CHANNEL_ID
+    if (!channelId) {
+        showNotificationMsg(tt('order.lineConfigMissing', 'LINE login is not configured yet.'))
+        return
+    }
+
+    const state = crypto.randomUUID()
+    // Use localStorage (shared across same-origin tabs/popup), not sessionStorage:
+    // the popup opens on LINE's origin first, so it never inherits this tab's
+    // sessionStorage and would otherwise read an empty state on return.
+    localStorage.setItem('line_oauth_state', state)
+    const redirectUri = encodeURIComponent(`${window.location.origin}/line-callback`)
     const url =
         `https://access.line.me/oauth2/v2.1/authorize?response_type=code` +
         `&client_id=${channelId}` +
@@ -327,17 +343,52 @@ const triggerLineLogin = () => {
         `&state=${state}` +
         `&scope=profile%20openid` +
         `&bot_prompt=aggressive`
+
     const popup = window.open(url, 'lineLogin', 'width=500,height=700')
+    if (!popup) {
+        showNotificationMsg(tt('order.linePopupBlocked', 'Please allow pop-ups to connect LINE.'))
+        return
+    }
+
+    lineConnecting.value = true
+    let settled = false
+    let pollId = null
+
+    const cleanup = () => {
+        window.removeEventListener('message', handler)
+        if (pollId) clearInterval(pollId)
+        lineConnecting.value = false
+    }
+
     const handler = (e) => {
         if (e.origin !== window.location.origin) return
         if (e.data?.type === 'LINE_AUTH') {
+            settled = true
             lineUserId.value = e.data.lineUserId
             lineDisplayName.value = e.data.displayName
-            window.removeEventListener('message', handler)
+            cleanup()
             popup?.close()
+            showNotificationMsg(tt('order.lineConnected', 'LINE connected'))
+        } else if (e.data?.type === 'LINE_AUTH_ERROR') {
+            settled = true
+            cleanup()
+            popup?.close()
+            showNotificationMsg(tt('order.lineConnectFailed', 'Could not connect to LINE. Please try again.'))
         }
     }
     window.addEventListener('message', handler)
+
+    // Catch the user closing the popup without finishing — either a manual cancel
+    // or LINE's own error page (e.g. a channel-status 400 that never reaches our callback).
+    pollId = setInterval(() => {
+        if (popup.closed) {
+            clearInterval(pollId)
+            if (!settled) {
+                cleanup()
+                showNotificationMsg(tt('order.lineConnectCancelled', 'LINE connection was cancelled.'))
+            }
+        }
+    }, 600)
 }
 
 const submitOrder = async () => {
@@ -345,7 +396,7 @@ const submitOrder = async () => {
         showNotificationMsg(t('order.pleaseEnterName'))
         return
     }
-    if (!slipImage.value) {
+    if (slipRequired && !slipImage.value) {
         showNotificationMsg(t('order.pleaseUploadSlip'))
         return
     }
@@ -356,7 +407,8 @@ const submitOrder = async () => {
     formData.append('phoneNumber', phoneNumber.value)
     formData.append('shippingAddress', shippingAddress.value)
     formData.append('orderNote', orderNote.value)
-    formData.append('totalAmount', String(cartTotal.value))
+    // Verify the slip against the grand total (items + delivery) — what the customer actually pays.
+    formData.append('totalAmount', String(grandTotal.value))
     formData.append('lineUserId', lineUserId.value)
     formData.append('cartItems', JSON.stringify(cart.value.map(item => ({
         id: item.id,
@@ -367,7 +419,11 @@ const submitOrder = async () => {
         quantity: item.quantity,
         price: item.price
     }))))
-    formData.append('slipImage', slipImage.value)
+    // Only attach a slip when one was actually uploaded — appending a null/empty value
+    // stringifies to "null" and breaks the backend's file handling.
+    if (slipImage.value) {
+        formData.append('slipImage', slipImage.value)
+    }
 
     try {
         const result = await api.submitOrderWithSlip(formData)
@@ -379,6 +435,8 @@ const submitOrder = async () => {
                 query: { orderId: result.orderId }
             })
         } else {
+            // Log the raw backend response so unmapped errors are diagnosable in the console.
+            console.error('Order submit failed:', result)
             const errMap = {
                 SLIP_INVALID: t('order.slipInvalid'),
                 AMOUNT_MISMATCH: t('order.amountMismatch'),
@@ -661,8 +719,8 @@ const isProductInCart = (productId) => {
                         </div>
                     </div>
 
-                    <!-- Payment slip -->
-                    <div class="form-card">
+                    <!-- Payment slip — shown only when slip verification is enabled -->
+                    <div class="form-card" v-if="slipRequired">
                         <h2 class="card-title">{{ tt('order.paymentTitle', 'Payment') }}</h2>
                         <div class="form-group no-margin">
                             <label>{{ t('order.uploadSlip') }} <span class="required-star">*</span></label>
@@ -691,14 +749,14 @@ const isProductInCart = (productId) => {
                         </label>
                         <div v-if="lineLoginEnabled" class="line-connect-action">
                             <button v-if="!lineUserId" type="button" class="line-connect-btn"
-                                @click="triggerLineLogin">
+                                @click="triggerLineLogin" :disabled="lineConnecting">
                                 <svg width="18" height="18" viewBox="0 0 40 40" fill="none">
                                     <rect width="40" height="40" rx="8" fill="#06C755" />
                                     <path
                                         d="M20 8C13.4 8 8 12.5 8 18c0 3.7 2.4 6.9 6 8.8l-.8 3.9 4.5-2.4c.7.1 1.5.2 2.3.2 6.6 0 12-4.5 12-10S26.6 8 20 8z"
                                         fill="white" />
                                 </svg>
-                                {{ t('order.connectLine') }}
+                                {{ lineConnecting ? tt('order.lineConnecting', 'Connecting…') : t('order.connectLine') }}
                             </button>
                             <div v-else class="line-connected-badge">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#06C755"
@@ -780,11 +838,11 @@ const isProductInCart = (productId) => {
                             </div>
                             <div class="summary-row">
                                 <span>{{ t('order.delivery') }}</span>
-                                <span>฿30</span>
+                                <span>฿{{ DELIVERY_FEE }}</span>
                             </div>
                             <div class="summary-row total">
                                 <span>{{ t('order.total') }}</span>
-                                <span>฿{{ cartTotal + 30 }}</span>
+                                <span>฿{{ grandTotal }}</span>
                             </div>
                         </div>
 
@@ -794,7 +852,7 @@ const isProductInCart = (productId) => {
                             </button>
                             <button v-else @click="submitOrder" class="checkout-btn-modern"
                                 :disabled="isSubmittingOrder">
-                                <span v-if="!isSubmittingOrder">{{ t('order.verifyAndOrder') }}</span>
+                                <span v-if="!isSubmittingOrder">{{ slipRequired ? t('order.verifyAndOrder') : tt('order.placeOrder', 'Place Order') }}</span>
                                 <span v-else>{{ t('order.sending') }}</span>
                             </button>
                         </div>
@@ -1671,6 +1729,13 @@ const isProductInCart = (productId) => {
     margin-left: 2px;
 }
 
+.field-hint {
+    font-size: 12px;
+    color: #8C7B6E;
+    line-height: 1.4;
+    margin: -2px 0 12px;
+}
+
 .hidden-input {
     display: none;
 }
@@ -1759,6 +1824,11 @@ const isProductInCart = (productId) => {
 
 .line-connect-btn:hover {
     background: #05a847;
+}
+
+.line-connect-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .line-connected-badge {

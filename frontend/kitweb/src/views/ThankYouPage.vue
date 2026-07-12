@@ -14,7 +14,7 @@ const customerName = computed(
 )
 const currentLang = computed(() => route.params.lang || 'th')
 
-const LINE_OA_URL = 'https://line.me/R/ti/p/@kitcharoen'
+const LINE_OA_URL = 'https://line.me/R/ti/p/@oar4837p'
 
 const goShop = () => {
   router.push({ name: 'catalog', params: { lang: currentLang.value } })
