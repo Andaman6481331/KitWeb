@@ -41,6 +41,11 @@
     "specialOffer": "Special Offer!",
     "promoText": "Get 20% off on all yarn products this week",
     "shopSale": "Shop Sale Items",
+    "newArrivalsEyebrow": "Just In",
+    "newArrivalsTitle": "New Arrivals",
+    "wholesaleTitle": "Wholesale Pricing, Since 1984",
+    "wholesaleText": "Shops, studios and schools buy from us by the box. Tiered pricing, no minimum order value, and forty years of getting stock out the door on time.",
+    "wholesaleCta": "See Wholesale Terms",
     "feature1Title": "High Quality Products",
     "feature1Desc": "Carefully selected products for everyday use",
     "feature2Title": "Affordable Prices",
@@ -51,68 +56,92 @@
     "feature4Desc": "Good products that you will love",
     "nav": {
       "categories": "Categories",
+      "color": "Color",
       "about": "About Us",
       "video": "Videos",
       "instagram": "Instagram",
       "reviews": "Reviews",
-      "promo": "Offers"
-    }
+      "featured": "Featured",
+      "newArrivals": "New In",
+      "articles": "Articles",
+      "promo": "Wholesale",
+      "makers": "Our Makers"
+    },
+    "makersEyebrow": "Community",
+    "makersTitle": "From our makers"
   },
   "categories": {
     "title": "Shop by Category",
     "subtitle": "Find exactly what you need",
-      "all": "All Products",
-      "allDesc": "Browse our complete collection of craft supplies, threads, tools, and more — sorted alphabetically for easy discovery.",
-      "yarn": "Yarn",
-      "yarnDesc": "Premium wholesale knitting yarns and crochet threads carefully selected for makers, boutique brands, and DIY crafting enthusiasts. Available in a wide spectrum of vibrant colors, heavy-duty weights, and soft textures, our yarn collection is highly optimized for hand-knitting, crocheting, weaving, and structural handmade craft projects. We focus on consistent dye lots, comfortable handling, and dependable material quality at accessible bulk prices, making it the perfect sourcing hub for both retail shop inventories and independent fiber artists.",
-      
-      "needles": "Needles & Pins",
-      "needlesDesc": "Durable hand-sewing, embroidery, and crafting needles engineered for smooth fabric penetration and dependable everyday wear-and-tear. Our collection features heavy-duty steel needles chosen for high tensile strength, comfortable grip, and long-lasting usability. Ideal for bulk garment manufacturing, detailed embroidery work, structural repairs, and specialized DIY craft projects, ensuring professional-grade precision for wholesale distributors and seasoned creators alike.",
-
-      "thread": "Threads",
-      "threadDesc": "High-tensile strength sewing threads, industrial stitching spools, and creative embroidery threads designed for seamless machine and hand-sewing performance. Selected for smooth textures, minimal fraying, and vibrant color fastness, our durable thread collection supports everyday repairs, garment production, and intricate textile art. Enjoy practical durability, consistent thickness, and highly competitive wholesale pricing tailored for storefronts and mass-production workshops.",
-
-      "threadString": "Thread & String",
-      "threadStringDesc": "Sewing and embroidery threads paired with durable nylon strings and beading cords — everything you need to stitch, string, and assemble. From fine machine threads to high-tensile clear nylon line, this range covers garment work, jewelry making, and sturdy craft assembly at dependable wholesale prices.",
-
-      "strings": "String",
-      "stringsDesc": "Strong nylon strings, clear beading line, and durable craft cords selected for jewelry making, beadwork, and sturdy assembly. Smooth, knot-friendly, and reliably consistent in thickness.",
-
-      "elastics": "Elastic Band",
-      "elasticsDesc": "Stretchable elastic bands and cords in a range of widths and tensions, ideal for garment waistbands, masks, accessories, and DIY craft projects. Selected for lasting stretch recovery and comfortable wear at practical wholesale prices.",
-
-      "tools": "Tools (Glue Gun, Plier, etc.)",
-      "toolsDesc": "Professional-grade sewing tools, craft cutting instruments, and essential DIY supplies carefully curated to streamline your creative production. From hot glue guns and pliers to fabric clips, measuring tools, and specialized hardware, every item is selected for ergonomics, ease of use, and industrial reliability. Perfect for equipping local craft workshops, tailoring businesses, and commercial studios with dependable tools that offer lasting retail value.",
-
-      "scissors": "Scissors",
-      "scissorsDesc": "High-precision crafting and fabric scissors with sharp, long-lasting blades and comfortable grips, built for clean cuts in garment work, paper craft, and everyday studio use.",
-
-      "knifes": "Knives",
-      "knifesDesc": "Sharp craft and utility knives engineered for precise cutting, trimming, and detailing across fabric, paper, and craft materials, with dependable durability for repeated use.",
-
-      "scissorsKnifes": "Scissors & Knives",
-      "scissorsKnifesDesc": "Sharp, precise cutting tools for every craft — from fabric and crafting scissors to utility and detail knives. Selected for clean cuts, comfortable handling, and long-lasting blades at wholesale value.",
-
-      "colors": "Fabric Dye",
-      "colorsDesc": "Vibrant fabric dyes and colorants for tie-dye, garment coloring, and craft projects, offering rich, even saturation and reliable color fastness across a wide spectrum of shades.",
-      
-      "beads": "Beads",
-      "beadsDesc": "Thailand’s premium wholesale hub for decorative craft beads, high-contrast acrylic spacers, and custom jewelry-making supplies. Our extensive catalog proudly features the authentic trademarked Tiger Brand (ตราเสือ) solid round beads, including the highly sought-after 20mm 'Meatball' beads (ลูกปัดลูกชิ้น 20มิล) widely used for traditional Thai festival bull decorations and cattle pageantry. We also supply an exclusive collection of high-trend Y2K style Aurora Borealis (AB) iridescent mixes, pastel macaron flower wheel beads, matte spacer rounds, and festive heart-shaped acrylic blends. Featuring clean, pre-drilled threading channels and weather-resistant finishes, our bulk beads are engineered for retail shop distribution, phone strap (Phone Charm) designs, personalized friendship bracelets, and custom novelty accessories at accessible wholesale rates.",
-      
-      "flora": "Artificial Flowers",
-      "floraDesc": "Vibrant artificial flowers, realistic faux silk botanicals, and commercial floral arrangement supplies optimized for event decoration, bridal bouquets, and retail window displays. Crafted from high-grade, fade-resistant materials, our botanical collection captures a lifelike appearance with versatile styling flexibility. Excellent for boutique hotel staging, festive community celebrations, custom wreaths, and everyday interior decor accents seeking durable, low-maintenance elegance.",
-      
-      "decorative": "Decorative Supply & Chenille Stem",
-      "decorativeDesc": "A comprehensive wholesale catalog of premium crafting embellishments, novelties, and haberdashery accessories designed to elevate handmade products and artisanal collections. From geometric spacer accents and pearlized resin charms to custom clothing fasteners, we specialize in high-demand, practical-quality supplies. We provide retail store owners, online craft sellers, and B2B manufacturers with a diverse inventory of dependable materials at fair, direct-from-factory pricing.",
-      "ribbons": "Ribbons",
-      "ribbonsDesc": "Luxury satin ribbons, patterned grosgrain bands, and decorative organza trims available in an endless variety of widths, finishes, and seasonal colors. Highly flexible and featuring clean, fray-resistant edges, our ribbon collection is meticulously selected for premium gift wrapping, corporate packaging, floral arrangements, and garment accents. Designed to satisfy both high-volume B2B e-commerce orders and creative boutique styling needs with uncompromising aesthetic appeal."
-    },
+    "all": "All Products",
+    "allDesc": "Browse our complete collection of craft supplies, threads, tools, and more — sorted alphabetically for easy discovery.",
+    "yarn": "Yarn",
+    "yarnDesc": "Premium wholesale knitting yarns and crochet threads carefully selected for makers, boutique brands, and DIY crafting enthusiasts. Available in a wide spectrum of vibrant colors, heavy-duty weights, and soft textures, our yarn collection is highly optimized for hand-knitting, crocheting, weaving, and structural handmade craft projects. We focus on consistent dye lots, comfortable handling, and dependable material quality at accessible bulk prices, making it the perfect sourcing hub for both retail shop inventories and independent fiber artists.",
+    "needles": "Needles & Pins",
+    "needlesDesc": "Durable hand-sewing, embroidery, and crafting needles engineered for smooth fabric penetration and dependable everyday wear-and-tear. Our collection features heavy-duty steel needles chosen for high tensile strength, comfortable grip, and long-lasting usability. Ideal for bulk garment manufacturing, detailed embroidery work, structural repairs, and specialized DIY craft projects, ensuring professional-grade precision for wholesale distributors and seasoned creators alike.",
+    "thread": "Threads",
+    "threadDesc": "High-tensile strength sewing threads, industrial stitching spools, and creative embroidery threads designed for seamless machine and hand-sewing performance. Selected for smooth textures, minimal fraying, and vibrant color fastness, our durable thread collection supports everyday repairs, garment production, and intricate textile art. Enjoy practical durability, consistent thickness, and highly competitive wholesale pricing tailored for storefronts and mass-production workshops.",
+    "threadString": "Thread & String",
+    "threadStringDesc": "Sewing and embroidery threads paired with durable nylon strings and beading cords — everything you need to stitch, string, and assemble. From fine machine threads to high-tensile clear nylon line, this range covers garment work, jewelry making, and sturdy craft assembly at dependable wholesale prices.",
+    "strings": "String",
+    "stringsDesc": "Strong nylon strings, clear beading line, and durable craft cords selected for jewelry making, beadwork, and sturdy assembly. Smooth, knot-friendly, and reliably consistent in thickness.",
+    "elastics": "Elastic Band",
+    "elasticsDesc": "Stretchable elastic bands and cords in a range of widths and tensions, ideal for garment waistbands, masks, accessories, and DIY craft projects. Selected for lasting stretch recovery and comfortable wear at practical wholesale prices.",
+    "tools": "Tools (Glue Gun, Plier, etc.)",
+    "toolsDesc": "Professional-grade sewing tools, craft cutting instruments, and essential DIY supplies carefully curated to streamline your creative production. From hot glue guns and pliers to fabric clips, measuring tools, and specialized hardware, every item is selected for ergonomics, ease of use, and industrial reliability. Perfect for equipping local craft workshops, tailoring businesses, and commercial studios with dependable tools that offer lasting retail value.",
+    "scissors": "Scissors",
+    "scissorsDesc": "High-precision crafting and fabric scissors with sharp, long-lasting blades and comfortable grips, built for clean cuts in garment work, paper craft, and everyday studio use.",
+    "knifes": "Knives",
+    "knifesDesc": "Sharp craft and utility knives engineered for precise cutting, trimming, and detailing across fabric, paper, and craft materials, with dependable durability for repeated use.",
+    "scissorsKnifes": "Scissors & Knives",
+    "scissorsKnifesDesc": "Sharp, precise cutting tools for every craft — from fabric and crafting scissors to utility and detail knives. Selected for clean cuts, comfortable handling, and long-lasting blades at wholesale value.",
+    "colors": "Fabric Dye",
+    "colorsDesc": "Vibrant fabric dyes and colorants for tie-dye, garment coloring, and craft projects, offering rich, even saturation and reliable color fastness across a wide spectrum of shades.",
+    "beads": "Beads",
+    "beadsDesc": "Thailand’s premium wholesale hub for decorative craft beads, high-contrast acrylic spacers, and custom jewelry-making supplies. Our extensive catalog proudly features the authentic trademarked Tiger Brand (ตราเสือ) solid round beads, including the highly sought-after 20mm 'Meatball' beads (ลูกปัดลูกชิ้น 20มิล) widely used for traditional Thai festival bull decorations and cattle pageantry. We also supply an exclusive collection of high-trend Y2K style Aurora Borealis (AB) iridescent mixes, pastel macaron flower wheel beads, matte spacer rounds, and festive heart-shaped acrylic blends. Featuring clean, pre-drilled threading channels and weather-resistant finishes, our bulk beads are engineered for retail shop distribution, phone strap (Phone Charm) designs, personalized friendship bracelets, and custom novelty accessories at accessible wholesale rates.",
+    "flora": "Artificial Flowers",
+    "floraDesc": "Vibrant artificial flowers, realistic faux silk botanicals, and commercial floral arrangement supplies optimized for event decoration, bridal bouquets, and retail window displays. Crafted from high-grade, fade-resistant materials, our botanical collection captures a lifelike appearance with versatile styling flexibility. Excellent for boutique hotel staging, festive community celebrations, custom wreaths, and everyday interior decor accents seeking durable, low-maintenance elegance.",
+    "decorative": "Decorative Supply & Chenille Stem",
+    "decorativeDesc": "A comprehensive wholesale catalog of premium crafting embellishments, novelties, and haberdashery accessories designed to elevate handmade products and artisanal collections. From geometric spacer accents and pearlized resin charms to custom clothing fasteners, we specialize in high-demand, practical-quality supplies. We provide retail store owners, online craft sellers, and B2B manufacturers with a diverse inventory of dependable materials at fair, direct-from-factory pricing.",
+    "ribbons": "Ribbons",
+    "embro": "Embroidery Supply",
+    "buttons": "Buttons",
+    "ribbonsDesc": "Luxury satin ribbons, patterned grosgrain bands, and decorative organza trims available in an endless variety of widths, finishes, and seasonal colors. Highly flexible and featuring clean, fray-resistant edges, our ribbon collection is meticulously selected for premium gift wrapping, corporate packaging, floral arrangements, and garment accents. Designed to satisfy both high-volume B2B e-commerce orders and creative boutique styling needs with uncompromising aesthetic appeal."
+  },
+  "spotlight": {
+    "eyebrow": "Color of the Month",
+    "noProducts": "Products in this color are on their way."
+  },
+  "projects": {
+    "sectionTitle": "KitCraft",
+    "featuredEyebrow": "Featured Project",
+    "latestEyebrow": "Make Something",
+    "latestTitle": "Latest from KitCraft",
+    "readTutorial": "Read the tutorial",
+    "viewAll": "View all projects",
+    "whatYouNeed": "What you'll need",
+    "loading": "Loading...",
+    "notFound": "We couldn't find that project.",
+    "weeklyInspiration": "This Week’s Inspiration",
+    "archiveTitle": "DIY Articles & Tutorials",
+    "archiveSubtitle": "Everything we’ve written, from quick tips to full projects.",
+    "filter": {
+      "all": "All",
+      "tutorial": "Tutorials",
+      "inspiration": "Inspiration"
+    }
+  },
   "about": {
     "eyebrow": "Our Story",
     "title": "About Kitcharoen",
     "subtitle": "Your Trusted Handicraft Partner Since 1984",
     "description": "Kitcharoen is a family-run craft supply shop located in Sampeng Market, Bangkok, near Yaowarat (Chinatown). Founded in 1984, our business has been passed down through three generations, from my grandfather to my father and now to me. The name Kitcharoen comes from Thai words meaning business and prosperity, reflecting our belief in honest, steady growth.",
-    "mission": "We offer a wide range of craft supplies and sewing materials, including yarns, ribbons, needles, beads, crochet supplies, artificial flowers, and more. Our products are good, reliable quality with wholesale-friendly prices, and we take pride in our kind service, honesty, and long-term trust with customers."
+    "mission": "We offer a wide range of craft supplies and sewing materials, including yarns, ribbons, needles, beads, crochet supplies, artificial flowers, and more. Our products are good, reliable quality with wholesale-friendly prices, and we take pride in our kind service, honesty, and long-term trust with customers.",
+    "readStory": "Read our story",
+    "visitTitle": "Visit the shop",
+    "visitAddress": "Address",
+    "visitPhone": "Phone",
+    "visitEmail": "Email"
   },
   "contact": {
     "eyebrow": "Talk to Us",
@@ -167,6 +196,13 @@
     }
   },
   "events": {
+    "nav": {
+      "past": "Past Events",
+      "videos": "Videos",
+      "contact": "Join Workshop",
+      "articles": "Articles",
+      "gallery": "Creator Gallery"
+    },
     "bannerBadge": "Community",
     "bannerText": "Bringing craft lovers together — follow us for upcoming events, workshops & pop-ups in Bangkok",
     "heroTagline": "DIY Craft Workshops & Events",
@@ -210,14 +246,25 @@
     "thankyou": "Thank you for your interest! We will get back to you within 24 hours.",
     "requiredFields": "Please fill in all required fields.",
     "images": "Images",
-    "videos": "Videos"
+    "videos": "Videos",
+    "comingSoon": "Coming Soon",
+    "getNotified": "Get notified early",
+    "mediaGallery": "Event Media Gallery",
+    "sendFailed": "Something went wrong. Please try again.",
+    "followTitle": "Follow along",
+    "followSubtitle": "New projects, workshop dates and behind-the-scenes on Instagram."
   },
   "catalog": {
+    "nav": {
+      "material": "Materials",
+      "diy": "DIY Kits"
+    },
     "bannerBadge": "Wholesale Pricing",
     "bannerText": "Buy by the box for the best rates — prices shown per piece so you can compare with ease",
     "since": "SINCE 1984",
     "title": "Browse Our Collection",
     "subtitle": "Four decades of craftsman quality, curated by category for the modern maker and the traditional tailor.",
+    "breadcrumb": "Breadcrumb",
     "shopCategory": "Shop Category",
     "filter": "Filter & Categories",
     "allCategories": "All Categories",
@@ -253,6 +300,11 @@
     "qtyRoundedToBox": "Adjusted to nearest box of {moq}",
     "currentTierNote": "Tier {tier} pricing applied ({total} pcs total)",
     "grandTotal": "Grand Total",
+    "noAdditionalDetails": "No additional details available for this product.",
+    "productNotFound": "We couldn't find that product.",
+    "relatedTitle": "You might also need",
+    "tutorialTitle": "How to use it",
+    "inspirationTitle": "Made with this",
     "categoryDescriptions": {
       "Yarns": "Hand-dyed cotton and northern Thai silk, perfect for weaving stories into every stitch.",
       "Ribbons": "Bespoke satin and velvet trims, gathered from the finest looms across Southeast Asia.",
@@ -262,7 +314,8 @@
       "Buttons": "Hand-carved wood, mother-of-pearl, and signature metal closures for distinct finishes.",
       "Tools": "Professional-grade shears, needles, and measuring tools for the serious craftsperson.",
       "Default": "Sourced directly from the vibrant heart of Sampeng Market, our curated selection represents four decades of excellence. Every item is hand-picked for quality and character."
-    }
+    },
+    "customerGalleryTitle": "From our customers"
   },
   "videoSection": {
     "title": "Our Story In Motion",
@@ -315,7 +368,7 @@
     "reasonsTitle1": "Inventory Management Made Simple",
     "reasonsDescription1": "Reduce tracking friction with our combined Material & Tool Sets. We curate compatible components so you don't have to manage dozens of separate SKUs for a single project line.",
     "reasonsTitle2": "Low Material Costs, High Margins",
-    "reasonsDescription2": "Leverage our decades-old relationships in Sampeng Market to access bulk pricing. We provide the affordability needed for attractive retail points while maintaining healthy margins.", 
+    "reasonsDescription2": "Leverage our decades-old relationships in Sampeng Market to access bulk pricing. We provide the affordability needed for attractive retail points while maintaining healthy margins.",
     "reasonsTitle3": "Turnkey Store Sections",
     "reasonsDescription3": "Expand your retail footprint effortlessly. We help map and stock dedicated handicraft shelves, providing planograms and curated assortments that have proven sales velocity.",
     "reasonsTitle4": "Careful Commercial Packing",
@@ -339,7 +392,6 @@
         "express1": "J&T EXPRESS THAILAND CO., LTD.",
         "express2": "FLASH EXPRESS CO., LTD.",
         "express3": "THAILAND POST CO., LTD. (EMS)"
-
       },
       "international": {
         "title": "International Export (Worldwide Cargo)",
@@ -483,36 +535,36 @@
     "eyebrow": "Our Collections",
     "groupCrafting": "Crafting Tools & Supplies",
     "groupDecor": "Decorative & Flora",
-  "items": {
-    "needles": {
-      "name": "Needles",
-      "description": "Precision-engineered and hand-polished tools crafted for lasting durability and ergonomic comfort."
-    },
-    "yarn": {
-      "name": "Yarn",
-      "description": "Premium organic fibers dyed in a curated palette of craftsman tones for a superior tactile experience."
-    },
-    "tools": {
-      "name": "Accessories",
-      "description": "Professional-grade essentials, including scissors and tapes, designed for the most meticulous crafter."
-    },
-    "beads": {
-      "name": "Beads",
-      "description": "Exquisite glass and crystal accents curated to bring brilliance and fine detail to any creative project."
-    },
-    "thread": {
-      "name": "Thread",
-      "description": "Durable sewing and embroidery threads in a full spectrum of colors for every stitch and craft."
-    },
-    "decorative": {
-      "name": "Decorative",
-      "description": "Velvet wire, trims and finishing touches to add character and detail to your handmade creations."
-    },
-    "flora": {
-      "name": "Flora",
-      "description": "Lifelike artificial flowers and foliage, perfect for arrangements, décor and lasting displays."
+    "items": {
+      "needles": {
+        "name": "Needles",
+        "description": "Precision-engineered and hand-polished tools crafted for lasting durability and ergonomic comfort."
+      },
+      "yarn": {
+        "name": "Yarn",
+        "description": "Premium organic fibers dyed in a curated palette of craftsman tones for a superior tactile experience."
+      },
+      "tools": {
+        "name": "Accessories",
+        "description": "Professional-grade essentials, including scissors and tapes, designed for the most meticulous crafter."
+      },
+      "beads": {
+        "name": "Beads",
+        "description": "Exquisite glass and crystal accents curated to bring brilliance and fine detail to any creative project."
+      },
+      "thread": {
+        "name": "Thread",
+        "description": "Durable sewing and embroidery threads in a full spectrum of colors for every stitch and craft."
+      },
+      "decorative": {
+        "name": "Decorative",
+        "description": "Velvet wire, trims and finishing touches to add character and detail to your handmade creations."
+      },
+      "flora": {
+        "name": "Flora",
+        "description": "Lifelike artificial flowers and foliage, perfect for arrangements, décor and lasting displays."
+      }
     }
-  }
   },
   "kitcraft": {
     "eyebrow": "Handmade Crafts",
@@ -796,5 +848,11 @@
     "selectedItems": "Selected Items in Request ({count})",
     "cancel": "Cancel",
     "submitQuote": "Submit Quote Request"
+  },
+  "gallery": {
+    "title": "Creator Gallery",
+    "subtitle": "Made by our community, at our workshops and at home.",
+    "shopThis": "Shop this",
+    "submitPrompt": "Made something with our materials? Tag us at"
   }
 }
