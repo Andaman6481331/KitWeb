@@ -1,9 +1,9 @@
 <script setup>
 import { RouterLink, useRoute } from 'vue-router';
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { getUtilsUrl } from '@/services/api';
-import { codeToPath, defaultLang } from '@/utils/localeRoutes';
+import { defaultLang } from '@/utils/localeRoutes';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -13,25 +13,7 @@ const aboutInfo = computed(() => ({
     title: t('about.title'),
     subtitle: t('about.subtitle'),
     description: t('about.description'),
-    mission: t('about.mission'),
-    features: [
-        {
-            icon: '🧶',
-            title: t('contact.premiumMaterials'),
-            description: t('contact.premiumMaterialsDesc')
-        },
-        {
-            icon: '🎨',
-            title: t('contact.expertGuidance'),
-            description: t('contact.expertGuidanceDesc')
-        }
-    ],
-    contact: {
-        address: '376 Wanich 1, Chakkrawat, Samphantawong, Bangkok 10100',
-        phone: '+66 2 222 3456',
-        email: 'info@kitcharoen.com',
-        hours: 'Mon-Sat: 9:00 AM - 6:00 PM'
-    }
+    mission: t('about.mission')
 }));
 
 </script>
@@ -136,13 +118,6 @@ const aboutInfo = computed(() => ({
     color: #555;
     line-height: 1.8;
     margin-bottom: 16px;
-}
-
-.features-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 24px;
-    margin-bottom: 40px;
 }
 
 /* Right Side - Image */

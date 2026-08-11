@@ -25,6 +25,8 @@ export const routes = [
       { path: 'institutional-catalog', name: 'institutional-catalog', component: () => import('../views/InstitutionalCatalogPage.vue') },
       { path: 'orderpage', name: 'orderpage', component: OrderPage },
       { path: 'ordertracking', name: 'ordertracking', component: () => import('../views/OrderTrackingPage.vue'), meta: { requiresAuth: true } },
+      { path: 'about', name: 'about', component: () => import('../views/AboutPage.vue') },
+      { path: 'project/:slug', name: 'project', component: () => import('../views/ProjectPage.vue') },
       { path: 'contactus', name: 'contactus', component: ContactUsPage },
       { path: 'login', name: 'login', component: Login },
       { path: 'event', name: 'event', component: EventPage },

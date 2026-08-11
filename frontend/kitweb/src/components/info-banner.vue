@@ -17,14 +17,17 @@ defineProps({
 </template>
 
 <style scoped>
+/* Deliberately low-contrast: this strip sits above the page title, so it must
+   not out-shout it. Warm cream ground, brown text, hairline rule. */
 .info-banner {
-    background: linear-gradient(135deg, #604539 0%, #4a3429 100%);
-    color: #fff;
-    padding: 10px 20px;
+    background: #F0E4D4;
+    color: #6b5145;
+    padding: 8px 20px;
     text-align: center;
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 500;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
+    border-bottom: 1px solid #e2d2bd;
     animation: slideDown 0.5s ease-out;
 }
 
@@ -42,10 +45,12 @@ defineProps({
     margin: 0 auto;
 }
 
+/* The badge keeps the accent colour but as an outline, not a solid fill. */
 .banner-badge {
-    background-color: #DD876E;
-    color: #fff;
-    font-size: 10px;
+    background-color: transparent;
+    color: #C4694E;
+    border: 1px solid #e3b7a6;
+    font-size: 9.5px;
     font-weight: 700;
     text-transform: uppercase;
     padding: 2px 8px;

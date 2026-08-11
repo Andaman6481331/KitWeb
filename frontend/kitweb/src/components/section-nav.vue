@@ -160,8 +160,9 @@ onBeforeUnmount(() => {
   color: var(--sn-accent, #DD876E);
 }
 
-/* The mini-map rail needs horizontal room; hide it on smaller screens */
-@media (max-width: 1024px) {
+/* The mini-map rail needs horizontal room; hide it only on phone-width screens
+   (tablets and up keep it). */
+@media (max-width: 640px) {
   .section-nav {
     display: none;
   }

@@ -24,6 +24,7 @@ const pageTitleMap = {
   catalog: 'categories.title',
   'category-products': 'categories.title',
   contactus: 'contact.title',
+  about: 'about.title',
   login: 'admin.loginTitle',
   event: 'events.heroTagline',
   partners: 'partner.heroTitle',
@@ -37,6 +38,7 @@ const pageDescriptionMap = {
   catalog: 'home.heroSubtitle',
   'category-products': 'home.heroSubtitle',
   contactus: 'contact.subtitle',
+  about: 'about.subtitle',
   login: 'auth.signInSubtitle',
   event: 'events.heroSubtitle',
   partners: 'partner.heroSubtitle',
@@ -81,6 +83,8 @@ const pageSeoTitle = computed(() => {
       return 'ไหมพรม อุปกรณ์งานฝีมือ ขายส่งสำเพ็ง ราคาถูก | กิจเจริญ สำเพ็ง';
     case 'contactus':
       return 'ติดต่อสอบถาม สั่งซื้อไหมพรม ริบบิ้น ลูกปัด | กิจเจริญ สำเพ็ง';
+    case 'about':
+      return 'เกี่ยวกับเรา ร้านอุปกรณ์งานฝีมือ ตั้งแต่ปี 2527 | กิจเจริญ สำเพ็ง';
     case 'event':
       return 'เวิร์คช็อป DIY และกิจกรรมงานฝีมือ | กิจเจริญ สำเพ็ง';
     case 'partners':
@@ -103,6 +107,8 @@ switch (route) {
     return 'Wholesale Yarn & Craft Supplies Sampeng | Kitcharoen';
   case 'contactus':
     return 'Contact Us for Wholesale Yarn, Ribbons & Beads | Kitcharoen';
+  case 'about':
+    return 'About Us - Family Craft Supply Shop Since 1984 | Kitcharoen';
   case 'event':
     return 'DIY Craft Workshops & Events in Bangkok | Kitcharoen';
   case 'partners':
@@ -281,18 +287,35 @@ const closeCart = () => { cartTimer = setTimeout(() => { showCartMenu.value = fa
 const closeAllMenus = () => { showCatalogMenu.value = false; showCompanyMenu.value = false; showCartMenu.value = false }
 const isCompanyActive = computed(() => ['partners', 'faq', 'contactus'].includes(String(route.name)))
 
+// Publish the navbar's live height as a global --nav-h CSS variable. The navbar
+// wraps to a taller, variable height on mobile (and shifts with language), so
+// pages that overlay it (e.g. the catalog drawer) can offset by var(--nav-h)
+// instead of guessing a fixed pixel value.
+const navBarEl = ref(null)
+let navResizeObserver = null
+const syncNavHeight = () => {
+  const h = navBarEl.value?.offsetHeight
+  if (h) document.documentElement.style.setProperty('--nav-h', `${h}px`)
+}
+
 onMounted(() => {
   document.addEventListener('click', closeAllMenus)
+  syncNavHeight()
+  if (navBarEl.value && 'ResizeObserver' in window) {
+    navResizeObserver = new ResizeObserver(syncNavHeight)
+    navResizeObserver.observe(navBarEl.value)
+  }
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', closeAllMenus)
+  navResizeObserver?.disconnect()
 })
 </script>
 
 <template>
   <div>
-    <div class="NavBar">
+    <div class="NavBar" ref="navBarEl">
       <!-- Left: Logo -->
       <div class="nav-left">
         <router-link :to="{ name: 'home', params: { lang: currentLang } }"  @click="scrollToTop">
@@ -513,7 +536,7 @@ onUnmounted(() => {
   <h4>{{ $t('footer.quickLinks') }}</h4>
   <ul>
     <li>
-      <router-link :to="{ name: 'home', params: { lang: currentLang } }" @click="scrollToTop">
+      <router-link :to="{ name: 'about', params: { lang: currentLang } }" @click="scrollToTop">
         {{ $t('footer.aboutUs') }}
       </router-link>
     </li>
@@ -610,6 +633,43 @@ onUnmounted(() => {
 @import url('https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@100;200;300;400;500;600;700&display=swap');
 
+/* Sao Chingcha — Thai UI face, self-hosted from /public/fonts.
+   Three real cuts are mapped to 300/400/700 so existing font-weight rules pick a
+   drawn weight instead of a browser-synthesised bold. Only downloaded on pages
+   that actually reference the family (i.e. Thai). */
+@font-face {
+  font-family: 'SaoChingcha';
+  src: url('/fonts/SaoChingcha-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SaoChingcha';
+  src: url('/fonts/SaoChingcha-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SaoChingcha';
+  src: url('/fonts/SaoChingcha-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Declared but unused — available for display/heading treatments. */
+@font-face {
+  font-family: 'BKKDraft5';
+  src: url('/fonts/BKKDraft5-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 html, body {
   width: 100%;
   overflow-x: clip;
@@ -625,10 +685,24 @@ html, body {
   box-sizing: border-box;
 }
 
-/* Override font for Thai language */
-body.thai-font * {
-  font-family: 'Kanit', sans-serif !important;
-  /* font-family: 'Prompt', sans-serif !important; */
+/* Override font for Thai language.
+   Two selectors on purpose:
+     - html[lang="th"] is present in the pre-rendered SSG markup, so Thai pages
+       paint in Sao Chingcha immediately instead of flashing the Latin face and
+       swapping once the body class is attached on hydration.
+     - body.thai-font keeps the existing runtime language switch working.
+   Each is doubled to reach specificity 0-2-1. Scoped component styles compile
+   their `!important` font rules to 0-2-0 (e.g. products-stock.vue
+   .category-title-text), which would otherwise win and leave those elements in
+   the Latin face on Thai pages.
+   Kanit stays as fallback for the few codepoints Sao Chingcha doesn't cover. */
+html[lang="th"][lang="th"] *,
+html[lang="th"][lang="th"] *::before,
+html[lang="th"][lang="th"] *::after,
+body.thai-font.thai-font *,
+body.thai-font.thai-font *::before,
+body.thai-font.thai-font *::after {
+  font-family: 'SaoChingcha', 'Kanit', sans-serif !important;
 }
 
 body.chinese-font * {
