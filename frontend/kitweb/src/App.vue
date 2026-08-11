@@ -207,8 +207,13 @@ const changeLanguage = (langCode) => {
   }).catch(() => {})
 }
 
+// Hover to open, like the Catalog and Company menus. The click toggle stays: on a
+// touch screen there is no hover, and a tap fires mouseenter then click, so
+// without it the first tap would open the menu and the click would shut it again.
 const toggleLanguageMenu = () => {
   showLanguageMenu.value = !showLanguageMenu.value
+  showCatalogMenu.value = false
+  showCompanyMenu.value = false
 }
 
 const handleLogout = () => {
@@ -262,6 +267,7 @@ const showCartMenu = ref(false)
 let catalogTimer = null
 let companyTimer = null
 let cartTimer = null
+let languageTimer = null
 
 // ── Mini-cart ─────────────────────────────────
 const cartItems = computed(() => cartStore.cart)
@@ -281,11 +287,27 @@ const openCompany  = () => { clearTimeout(companyTimer); showCompanyMenu.value =
 const closeCompany = () => { companyTimer = setTimeout(() => { showCompanyMenu.value = false }, 130) }
 const toggleCompany = () => { showCompanyMenu.value = !showCompanyMenu.value; showCatalogMenu.value = false }
 
+// Hover only where hover exists. On a touch device the pointer never leaves, so
+// mouseenter would latch the menu open with no way to close it but the toggle.
+const canHover = () => typeof window !== 'undefined'
+  && window.matchMedia?.('(hover: hover)').matches
+const openLanguage  = () => {
+  if (!canHover()) return
+  clearTimeout(languageTimer)
+  showLanguageMenu.value = true
+  showCatalogMenu.value = false
+  showCompanyMenu.value = false
+}
+const closeLanguage = () => {
+  if (!canHover()) return
+  languageTimer = setTimeout(() => { showLanguageMenu.value = false }, 130)
+}
+
 const openCart  = () => { clearTimeout(cartTimer); showCartMenu.value = true }
 const closeCart = () => { cartTimer = setTimeout(() => { showCartMenu.value = false }, 130) }
 
-const closeAllMenus = () => { showCatalogMenu.value = false; showCompanyMenu.value = false; showCartMenu.value = false }
-const isCompanyActive = computed(() => ['partners', 'faq', 'contactus'].includes(String(route.name)))
+const closeAllMenus = () => { showCatalogMenu.value = false; showCompanyMenu.value = false; showCartMenu.value = false; showLanguageMenu.value = false }
+const isCompanyActive = computed(() => ['about', 'partners', 'faq', 'contactus'].includes(String(route.name)))
 
 // Publish the navbar's live height as a global --nav-h CSS variable. The navbar
 // wraps to a taller, variable height on mobile (and shifts with language), so
@@ -391,6 +413,18 @@ onUnmounted(() => {
           <Transition name="nav-dd">
             <div v-if="showCompanyMenu" class="dd-menu company-dd" @click.stop>
               <router-link
+                :to="{ name: 'about', params: { lang: currentLang } }"
+                class="dd-page-link"
+                active-class="dd-page-link-active"
+                @click="scrollToTop; closeAllMenus()"
+              >
+                <span class="dd-page-icon"><ion-icon name="storefront-outline"></ion-icon></span>
+                <span class="dd-page-text">
+                  <span class="dd-page-title">{{ $t('nav.about') }}</span>
+                  <span class="dd-page-desc">{{ $t('nav.aboutDesc') }}</span>
+                </span>
+              </router-link>
+              <router-link
                 :to="{ name: 'partners', params: { lang: currentLang } }"
                 class="dd-page-link"
                 active-class="dd-page-link-active"
@@ -436,18 +470,41 @@ onUnmounted(() => {
       <div class="nav-right" style="justify-content: center; align-items: center; text-align: center;">
 
         <div class="action-icons">
-          <div class="lang-globe" @click="toggleLanguageMenu">
+          <!-- .stop so the document-level click handler that closes every menu
+               doesn't fire on the same click that just opened this one. -->
+          <div
+            class="lang-globe"
+            @mouseenter="openLanguage"
+            @mouseleave="closeLanguage"
+            @click.stop="toggleLanguageMenu"
+          >
             <ion-icon name="globe-outline"></ion-icon>
             <span class="current-lang-code">{{ currentLanguage }}</span>
 
-            <!-- Language Dropdown -->
-            <transition name="dropdown-fade">
-              <div v-if="showLanguageMenu" class="lang-popup">
-                <div v-for="lang in languages" :key="lang.code" class="lang-item"
-                  :class="{ active: currentLanguage === lang.code }" @click.stop="changeLanguage(lang.code)">
-                  <span class="lang-flag">{{ lang.flag }}</span>
-                  {{ lang.label }}
-                </div>
+            <!-- Language dropdown. Same shell and row treatment as the Catalog and
+                 Company menus (dd-menu / dd-page-link), so the navbar has one
+                 dropdown design rather than two. -->
+            <transition name="nav-dd">
+              <div v-if="showLanguageMenu" class="dd-menu lang-dd">
+                <button
+                  v-for="lang in languages"
+                  :key="lang.code"
+                  type="button"
+                  class="dd-page-link lang-item"
+                  :class="{ 'dd-page-link-active': currentLanguage === lang.code }"
+                  :aria-current="currentLanguage === lang.code ? 'true' : undefined"
+                  @click.stop="changeLanguage(lang.code)"
+                >
+                  <span class="dd-page-icon lang-code">{{ lang.flag }}</span>
+                  <span class="dd-page-text">
+                    <span class="dd-page-title">{{ lang.label }}</span>
+                  </span>
+                  <ion-icon
+                    v-if="currentLanguage === lang.code"
+                    class="lang-check"
+                    name="checkmark-outline"
+                  ></ion-icon>
+                </button>
               </div>
             </transition>
           </div>
@@ -632,6 +689,9 @@ onUnmounted(() => {
 <style>
 @import url('https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@100;200;300;400;500;600;700&display=swap');
+/* Latin pairing for the English UI: Crimson Pro for headings, Work Sans for text.
+   Loaded here rather than per-component so one copy serves the whole app. */
+@import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;600;700&family=Work+Sans:wght@300;400;500;600;700&display=swap');
 
 /* Sao Chingcha — Thai UI face, self-hosted from /public/fonts.
    Three real cuts are mapped to 300/400/700 so existing font-weight rules pick a
@@ -666,6 +726,40 @@ onUnmounted(() => {
   font-family: 'BKKDraft5';
   src: url('/fonts/BKKDraft5-Regular.otf') format('opentype');
   font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* The Seasons — display face for English headings.
+   A licensed font, so the files are not committed: drop them into public/fonts/
+   and these rules pick them up. Two naming conventions are listed per weight
+   because the family ships under both; the browser walks the src list and uses
+   the first that loads, so whichever pair you have will work.
+   Until the files exist, every heading falls through to Crimson Pro — nothing
+   breaks, the type just stays as it is now. */
+@font-face {
+  font-family: 'The Seasons';
+  src: url('/fonts/TheSeasons-Light.otf') format('opentype'),
+       url('/fonts/theseasons-lt.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'The Seasons';
+  src: url('/fonts/TheSeasons-Regular.otf') format('opentype'),
+       url('/fonts/theseasons-reg.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'The Seasons';
+  src: url('/fonts/TheSeasons-Bold.otf') format('opentype'),
+       url('/fonts/theseasons-bd.otf') format('opentype');
+  font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
@@ -707,6 +801,33 @@ body.thai-font.thai-font *::after {
 
 body.chinese-font * {
   font-family: 'Noto Sans SC', sans-serif !important;
+}
+
+/* English.
+   The global `*` rule above sets ZCOOL XiaoWei — a Chinese display serif — for
+   every language that has no override, so English has been rendering in a face
+   drawn for Han characters. Thai and Chinese each opt out; this is English's.
+
+   Same doubled-attribute trick as the Thai rule (0-2-1) so it outranks scoped
+   component styles, which compile their `!important` font rules to 0-2-0. The
+   heading rule is 0-2-2 and so wins over the body rule below it.
+
+   Work Sans and Crimson Pro are the pairing every component built for this site
+   already asks for by name; until now the global rule was overriding all of them. */
+html[lang="en"][lang="en"] *,
+html[lang="en"][lang="en"] *::before,
+html[lang="en"][lang="en"] *::after {
+  font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+
+/* Headings get the display face; body copy stays Work Sans. The Seasons is a
+   high-contrast display serif — it is built for large type and gets thin and
+   hard to read at paragraph sizes, which is why it is scoped to h1-h4. */
+html[lang="en"][lang="en"] h1,
+html[lang="en"][lang="en"] h2,
+html[lang="en"][lang="en"] h3,
+html[lang="en"][lang="en"] h4 {
+  font-family: 'The Seasons', 'Crimson Pro', 'Georgia', serif !important;
 }
 
 body {
@@ -1008,50 +1129,68 @@ body {
   transition: color 0.2s ease;
 }
 
-.lang-popup {
-  position: absolute;
-  top: 45px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+/* Language dropdown: shell, shadow and row treatment all come from .dd-menu and
+   .dd-page-link above. Only what a language row needs differently lives here. */
+.lang-dd {
+  width: 200px;
+  max-width: calc(100vw - 32px);
   padding: 8px;
-  min-width: 140px;
-  z-index: 100;
-  border: 1px solid #f0f0f0;
 }
 
+/* The globe sits at the right end of the navbar, so a centred menu runs off the
+   screen on narrow viewports. Anchor it to the right edge instead, and drop the
+   shared centering transform from the transition — same treatment as .cart-dd. */
+@media (max-width: 768px) {
+  .dd-menu.lang-dd {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+
+  .lang-dd.nav-dd-enter-from,
+  .lang-dd.nav-dd-leave-to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* The rows are buttons, not links, so reset what the browser adds. */
 .lang-item {
-  padding: 10px 14px;
-  font-size: 14px;
-  color: #2d3436;
-  border-radius: 8px;
-  transition: all 0.2s;
-  display: flex;
+  width: 100%;
   align-items: center;
-  gap: 10px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
 }
 
-.lang-item:hover {
-  background: #f8f3ee;
-  color: #8b6f47;
-}
-
-.lang-item.active {
-  background: #008080;
-  color: white;
-}
-
-.lang-flag {
-  font-size: 10px;
+/* The old rows used a teal (#008080) active state that appears nowhere else in
+   the site; the shared terracotta/cream treatment marks the current one now. */
+.lang-code {
+  font-size: 11px;
   font-weight: 800;
-  background: #f0f2f5;
-  color: #3D2B1F;
-  padding: 3px 6px;
-  border-radius: 4px;
-  min-width: 32px;
-  text-align: center;
+  letter-spacing: 0.4px;
+  color: #DD876E;
+  /* Narrower than .dd-page-icon's 36px square: a two-letter code, not an icon. */
+  width: 34px;
+  height: 28px;
+}
+
+.dd-page-link-active .lang-code {
+  color: #fff;
+}
+
+/* Scoped through .lang-globe to outrank `.lang-globe ion-icon`, which sets the
+   globe's own 24px/brown and would otherwise capture this tick too. */
+.lang-globe .lang-check {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 15px;
+  color: #DD876E;
+}
+
+.lang-globe .dd-page-link-active .lang-check {
+  color: #b4614a;
 }
 
 .lang-item.active .lang-flag {
@@ -1528,17 +1667,8 @@ body {
   }
 }
 
-/* Language dropdown animation */
-.dropdown-fade-enter-active,
-.dropdown-fade-leave-active {
-  transition: all 0.3s ease;
-}
-
-.dropdown-fade-enter-from,
-.dropdown-fade-leave-to {
-  opacity: 0;
-  transform: translateX(-50%) translateY(10px);
-}
+/* The language dropdown used to have its own `dropdown-fade` animation; it uses
+   nav-dd with the other menus now. AdminDashboard defines its own copy. */
 
 /* Nav dropdown animation */
 .nav-dd-enter-active,

@@ -16,7 +16,9 @@
     "faq": "よくある質問",
     "faqDesc": "よくあるご質問への回答",
     "b2bCatalog": "B2B カタログ",
-    "contactUsDesc": "私たちのチームにお問い合わせください"
+    "contactUsDesc": "私たちのチームにお問い合わせください",
+    "about": "私たちについて",
+    "aboutDesc": "1984年から続く私たちの歩み"
   },
   "footer": {
     "companyName": "キッチャルーン",

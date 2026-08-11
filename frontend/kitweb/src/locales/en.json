@@ -16,7 +16,9 @@
     "faq": "FAQ",
     "faqDesc": "Common questions answered",
     "b2bCatalog": "B2B Catalog",
-    "contactUsDesc": "Get in touch with our team"
+    "contactUsDesc": "Get in touch with our team",
+    "about": "About Us",
+    "aboutDesc": "Our story, since 1984"
   },
   "footer": {
     "companyName": "Kitcharoen",
