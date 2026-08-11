@@ -51,6 +51,112 @@ function formatProductSku(prefix: string, sequence: number): string {
 	return `${prefix}${sequence.toString().padStart(3, '0')}`;
 }
 
+/**
+ * Build a URL slug for a product.
+ *
+ * The storefront used to do this in the browser, but its regex stripped every
+ * non-ASCII character, so a Thai-only name produced a bare "-42". Product URLs are
+ * prerendered now, so we fall back through name -> sku -> id until something
+ * usable survives.
+ */
+function generateProductSlug(name: string | null, sku: string | null, id: number | string): string {
+	const ascii = (name || "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+	if (ascii) return `${ascii}-${id}`;
+
+	const skuPart = (sku || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+	if (skuPart) return `${skuPart}-${id}`;
+
+	return `product-${id}`;
+}
+
+/** Slug for editorial content. Falls back to a dated stub when the title is non-Latin. */
+function generateProjectSlug(title: string, id?: number | string): string {
+	const ascii = (title || "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+	if (ascii) return id ? `${ascii}-${id}` : ascii;
+	return `project-${id ?? Date.now()}`;
+}
+
+/** Parse the projects.product_ids JSON column into a number array, tolerating bad data. */
+function parseProductIds(raw: any): number[] {
+	if (Array.isArray(raw)) return raw.map(Number).filter((n) => Number.isFinite(n));
+	if (typeof raw !== "string" || !raw.trim()) return [];
+	try {
+		const parsed = JSON.parse(raw);
+		return Array.isArray(parsed) ? parsed.map(Number).filter((n) => Number.isFinite(n)) : [];
+	} catch {
+		return [];
+	}
+}
+
+/** Shape a raw projects row for the API. */
+function mapProjectRow(row: any) {
+	return {
+		...row,
+		product_ids: parseProductIds(row.product_ids),
+		is_featured: Number(row.is_featured) === 1,
+		is_published: row.is_published === null || row.is_published === undefined ? true : Number(row.is_published) === 1
+	};
+}
+
+/** Shape a raw spotlights row for the API. */
+function mapSpotlightRow(row: any) {
+	return {
+		...row,
+		product_ids: parseProductIds(row.product_ids),
+		is_active: Number(row.is_active) === 1
+	};
+}
+
+/** Shape a raw gallery row for the API. */
+function mapGalleryRow(row: any) {
+	return {
+		...row,
+		product_id: row.product_id === null || row.product_id === undefined ? null : Number(row.product_id),
+		project_id: row.project_id === null || row.project_id === undefined ? null : Number(row.project_id),
+		is_visible: row.is_visible === null || row.is_visible === undefined ? true : Number(row.is_visible) === 1
+	};
+}
+
+/**
+ * Parse the events.gallery JSON column into a media array, dropping anything that
+ * is not a usable {type, src} pair rather than letting it reach the template.
+ */
+function parseEventGallery(raw: any): any[] {
+	const list = Array.isArray(raw) ? raw : (() => {
+		if (typeof raw !== "string" || !raw.trim()) return [];
+		try {
+			const parsed = JSON.parse(raw);
+			return Array.isArray(parsed) ? parsed : [];
+		} catch {
+			return [];
+		}
+	})();
+
+	return list
+		.filter((m: any) => m && typeof m.src === "string" && m.src.trim())
+		.map((m: any) => ({
+			type: m.type === "video" ? "video" : "image",
+			src: String(m.src).trim(),
+			title: typeof m.title === "string" ? m.title : ""
+		}));
+}
+
+/** Shape a raw events row for the API. */
+function mapEventRow(row: any) {
+	return {
+		...row,
+		gallery: parseEventGallery(row.gallery),
+		is_upcoming: Number(row.is_upcoming) === 1,
+		is_visible: row.is_visible === null || row.is_visible === undefined ? true : Number(row.is_visible) === 1
+	};
+}
+
 /** Allocate the next unused base product SKU for a category prefix (e.g. tools -> TO001). */
 async function allocateProductSku(env: Env, category: string, preferredSku?: string | null): Promise<string> {
 	if (preferredSku) {
@@ -394,12 +500,148 @@ export default {
 				const parsedProducts = products.map((p: any) => {
 					return {
 						...p,
+						// Prefer the persisted slug; older rows predate the column, so
+						// derive one on read rather than shipping a null to the router.
+						slug: p.slug || generateProductSlug(p.name, p.sku, p.id),
 						categories: parseProductCategories(p.categories, p.category),
 						images: typeof p.images === 'string' ? JSON.parse(p.images) : (p.images || [])
 					};
 				});
 
 				return corsResponse(parsedProducts);
+			}
+
+			// ── Projects (editorial content) ──────────────────────────────
+			// Query params:
+			//   featured=1     -> the single homepage slot (falls back to newest)
+			//   product_id=12  -> projects that link this product (product page)
+			//   limit=3        -> cap results (teasers)
+			//   include_unpublished=1 (admin lists; still safe to expose read-only)
+			if (url.pathname === "/projects" && request.method === "GET") {
+				const featured = url.searchParams.get("featured") === "1";
+				const productId = url.searchParams.get("product_id");
+				const limitParam = parseInt(url.searchParams.get("limit") || "", 10);
+				const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 50) : null;
+				const includeUnpublished = url.searchParams.get("include_unpublished") === "1";
+
+				const conditions: string[] = [];
+				if (!includeUnpublished) {
+					conditions.push("(is_published IS NULL OR is_published = 1)");
+				}
+
+				let query = "SELECT * FROM projects";
+				if (conditions.length) query += " WHERE " + conditions.join(" AND ");
+				query += " ORDER BY published_at DESC, id DESC";
+
+				const { results } = await env.DB.prepare(query).all();
+				let rows = (results || []).map(mapProjectRow);
+
+				// Linked-product filter is applied here rather than in SQL because
+				// product_ids is a JSON column, not a junction table.
+				if (productId) {
+					const wanted = Number(productId);
+					rows = rows.filter((r: any) => r.product_ids.includes(wanted));
+				}
+
+				if (featured) {
+					const flagged = rows.filter((r: any) => r.is_featured);
+					// Never return an empty homepage slot: fall back to the newest post.
+					rows = flagged.length ? [flagged[0]] : rows.slice(0, 1);
+				}
+
+				if (limit) rows = rows.slice(0, limit);
+
+				return corsResponse(rows);
+			}
+
+			if (url.pathname.startsWith("/projects/") && request.method === "GET") {
+				const slug = decodeURIComponent(url.pathname.slice("/projects/".length));
+				if (!slug) return corsResponse({ error: "Slug required" }, { status: 400 });
+
+				const row = await env.DB.prepare("SELECT * FROM projects WHERE slug = ?").bind(slug).first();
+				if (!row) return corsResponse({ error: "Not found" }, { status: 404 });
+
+				return corsResponse(mapProjectRow(row));
+			}
+
+			// ── Color of the Month ────────────────────────────────────────
+			// active=1 returns just the current color (falls back to the newest
+			// row, so the homepage band is never empty). No param returns the
+			// full list, newest first, for the admin panel and the archive.
+			if (url.pathname === "/spotlights" && request.method === "GET") {
+				const activeOnly = url.searchParams.get("active") === "1";
+
+				const { results } = await env.DB.prepare(
+					"SELECT * FROM spotlights ORDER BY starts_on DESC, id DESC"
+				).all();
+				let rows = (results || []).map(mapSpotlightRow);
+
+				if (activeOnly) {
+					const flagged = rows.filter((r: any) => r.is_active);
+					rows = flagged.length ? [flagged[0]] : rows.slice(0, 1);
+				}
+
+				// products.colors is empty for the whole catalog right now, so
+				// curated product_ids is the real source. This fallback costs one
+				// query per unlinked row and makes the section fill itself in as
+				// soon as staff start recording colors on products.
+				for (const row of rows as any[]) {
+					if (row.product_ids.length) continue;
+					const { results: matched } = await env.DB.prepare(
+						"SELECT id FROM products WHERE is_visible = 1 AND colors LIKE ? LIMIT 8"
+					).bind(`%${row.color_name}%`).all();
+					row.product_ids = (matched || []).map((p: any) => Number(p.id));
+				}
+
+				return corsResponse(rows);
+			}
+
+			// ── Creator gallery ───────────────────────────────────────────
+			// Query params:
+			//   product_id=12 / project_id=3 -> photos attached to one thing
+			//   limit=8                      -> cap results (home teaser)
+			//   include_hidden=1             -> admin list
+			if (url.pathname === "/gallery" && request.method === "GET") {
+				const productId = url.searchParams.get("product_id");
+				const projectId = url.searchParams.get("project_id");
+				const limitParam = parseInt(url.searchParams.get("limit") || "", 10);
+				const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 60) : null;
+				const includeHidden = url.searchParams.get("include_hidden") === "1";
+
+				const conditions: string[] = [];
+				const binds: any[] = [];
+				if (!includeHidden) conditions.push("(is_visible IS NULL OR is_visible = 1)");
+				if (productId) {
+					conditions.push("product_id = ?");
+					binds.push(Number(productId));
+				}
+				if (projectId) {
+					conditions.push("project_id = ?");
+					binds.push(Number(projectId));
+				}
+
+				let query = "SELECT * FROM gallery";
+				if (conditions.length) query += " WHERE " + conditions.join(" AND ");
+				// sort_order is the curated running order; id breaks ties newest-first.
+				query += " ORDER BY sort_order ASC, id DESC";
+				if (limit) query += ` LIMIT ${limit}`;
+
+				const { results } = await env.DB.prepare(query).bind(...binds).all();
+				return corsResponse((results || []).map(mapGalleryRow));
+			}
+
+			// ── Workshops & market appearances ────────────────────────────
+			// Chronological, with anything flagged upcoming pushed to the end so the
+			// grid finishes on what is next rather than what is over.
+			if (url.pathname === "/events" && request.method === "GET") {
+				const includeHidden = url.searchParams.get("include_hidden") === "1";
+
+				let query = "SELECT * FROM events";
+				if (!includeHidden) query += " WHERE (is_visible IS NULL OR is_visible = 1)";
+				query += " ORDER BY is_upcoming ASC, starts_on ASC, id ASC";
+
+				const { results } = await env.DB.prepare(query).all();
+				return corsResponse((results || []).map(mapEventRow));
 			}
 
 			if (url.pathname === "/diy/products" && request.method === "GET") {
@@ -1044,6 +1286,238 @@ export default {
 				return corsResponse("Unauthorized", { status: 401 });
 			}
 
+			// ── Projects: create / update ─────────────────────────────────
+			// Sending an id updates that row; omitting it inserts a new one.
+			if (url.pathname === "/projects" && request.method === "POST") {
+				const body = await request.json() as any;
+				const title = (body.title || "").trim();
+				if (!title) return corsResponse({ error: "title is required" }, { status: 400 });
+
+				const productIds = JSON.stringify(parseProductIds(body.product_ids));
+				const isFeatured = body.is_featured ? 1 : 0;
+				const isPublished = body.is_published === false ? 0 : 1;
+				const publishedAt = (body.published_at || "").trim() || new Date().toISOString();
+
+				// Only one project can hold the homepage slot.
+				if (isFeatured) {
+					await env.DB.prepare("UPDATE projects SET is_featured = 0").run();
+				}
+
+				if (body.id) {
+					await env.DB.prepare(
+						`UPDATE projects SET title = ?, title_th = ?, cover_image_key = ?, excerpt = ?,
+						 excerpt_th = ?, body = ?, body_th = ?, video_url = ?, product_ids = ?,
+						 is_featured = ?, is_published = ?, published_at = ? WHERE id = ?`
+					).bind(
+						title, body.title_th || null, body.cover_image_key || null, body.excerpt || null,
+						body.excerpt_th || null, body.body || null, body.body_th || null, body.video_url || null,
+						productIds, isFeatured, isPublished, publishedAt, body.id
+					).run();
+
+					const updated = await env.DB.prepare("SELECT * FROM projects WHERE id = ?").bind(body.id).first();
+					return corsResponse(mapProjectRow(updated));
+				}
+
+				// Insert with a placeholder slug, then rewrite it with the row id
+				// appended so slugs stay unique even when two posts share a title.
+				const placeholder = `pending-${crypto.randomUUID()}`;
+				const inserted = await env.DB.prepare(
+					`INSERT INTO projects (title, title_th, slug, cover_image_key, excerpt, excerpt_th,
+					 body, body_th, video_url, product_ids, is_featured, is_published, published_at)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+				).bind(
+					title, body.title_th || null, placeholder, body.cover_image_key || null, body.excerpt || null,
+					body.excerpt_th || null, body.body || null, body.body_th || null, body.video_url || null,
+					productIds, isFeatured, isPublished, publishedAt
+				).first() as any;
+
+				const newId = inserted.id;
+				const slug = generateProjectSlug(title, newId);
+				await env.DB.prepare("UPDATE projects SET slug = ? WHERE id = ?").bind(slug, newId).run();
+
+				const created = await env.DB.prepare("SELECT * FROM projects WHERE id = ?").bind(newId).first();
+				return corsResponse(mapProjectRow(created));
+			}
+
+			if (url.pathname === "/projects/delete" && request.method === "POST") {
+				const body = await request.json() as any;
+				if (!body.id) return corsResponse({ error: "id is required" }, { status: 400 });
+				await env.DB.prepare("DELETE FROM projects WHERE id = ?").bind(body.id).run();
+				return corsResponse({ success: true });
+			}
+
+			// ── Color of the Month: create / update ───────────────────────
+			// Sending an id updates that row; omitting it inserts a new one.
+			if (url.pathname === "/spotlights" && request.method === "POST") {
+				const body = await request.json() as any;
+				const colorName = (body.color_name || "").trim();
+				if (!colorName) return corsResponse({ error: "color_name is required" }, { status: 400 });
+
+				const hex = (body.hex || "").trim() || "#C4694E";
+				const productIds = JSON.stringify(parseProductIds(body.product_ids));
+				const isActive = body.is_active ? 1 : 0;
+				const startsOn = (body.starts_on || "").trim() || new Date().toISOString();
+
+				// Only one color can be the current one.
+				if (isActive) {
+					await env.DB.prepare("UPDATE spotlights SET is_active = 0").run();
+				}
+
+				if (body.id) {
+					await env.DB.prepare(
+						`UPDATE spotlights SET color_name = ?, color_name_th = ?, hex = ?, blurb = ?,
+						 blurb_th = ?, product_ids = ?, is_active = ?, starts_on = ? WHERE id = ?`
+					).bind(
+						colorName, body.color_name_th || null, hex, body.blurb || null,
+						body.blurb_th || null, productIds, isActive, startsOn, body.id
+					).run();
+
+					const updated = await env.DB.prepare("SELECT * FROM spotlights WHERE id = ?").bind(body.id).first();
+					return corsResponse(mapSpotlightRow(updated));
+				}
+
+				const inserted = await env.DB.prepare(
+					`INSERT INTO spotlights (color_name, color_name_th, hex, blurb, blurb_th,
+					 product_ids, is_active, starts_on)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+				).bind(
+					colorName, body.color_name_th || null, hex, body.blurb || null,
+					body.blurb_th || null, productIds, isActive, startsOn
+				).first() as any;
+
+				const created = await env.DB.prepare("SELECT * FROM spotlights WHERE id = ?").bind(inserted.id).first();
+				return corsResponse(mapSpotlightRow(created));
+			}
+
+			if (url.pathname === "/spotlights/delete" && request.method === "POST") {
+				const body = await request.json() as any;
+				if (!body.id) return corsResponse({ error: "id is required" }, { status: 400 });
+				await env.DB.prepare("DELETE FROM spotlights WHERE id = ?").bind(body.id).run();
+				return corsResponse({ success: true });
+			}
+
+			// ── Creator gallery: create / update ──────────────────────────
+			// Sending an id updates that row; omitting it inserts a new one.
+			if (url.pathname === "/gallery" && request.method === "POST") {
+				const body = await request.json() as any;
+				const imageKey = (body.image_key || "").trim();
+				if (!imageKey) return corsResponse({ error: "image_key is required" }, { status: 400 });
+
+				// A blank select in the admin form posts "" — store NULL, not 0, or the
+				// row would claim to belong to a product that does not exist.
+				const productId = body.product_id ? Number(body.product_id) : null;
+				const projectId = body.project_id ? Number(body.project_id) : null;
+				const isVisible = body.is_visible === false ? 0 : 1;
+				const sortOrder = Number.isFinite(Number(body.sort_order)) ? Number(body.sort_order) : 0;
+				// Handles are stored bare; the client renders the '@'.
+				const handle = (body.credit_handle || "").trim().replace(/^@+/, "") || null;
+
+				if (body.id) {
+					await env.DB.prepare(
+						`UPDATE gallery SET image_key = ?, caption = ?, caption_th = ?, credit_name = ?,
+						 credit_handle = ?, credit_url = ?, product_id = ?, project_id = ?,
+						 is_visible = ?, sort_order = ? WHERE id = ?`
+					).bind(
+						imageKey, body.caption || null, body.caption_th || null, body.credit_name || null,
+						handle, body.credit_url || null, productId, projectId,
+						isVisible, sortOrder, body.id
+					).run();
+
+					const updated = await env.DB.prepare("SELECT * FROM gallery WHERE id = ?").bind(body.id).first();
+					return corsResponse(mapGalleryRow(updated));
+				}
+
+				const inserted = await env.DB.prepare(
+					`INSERT INTO gallery (image_key, caption, caption_th, credit_name, credit_handle,
+					 credit_url, product_id, project_id, is_visible, sort_order)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+				).bind(
+					imageKey, body.caption || null, body.caption_th || null, body.credit_name || null,
+					handle, body.credit_url || null, productId, projectId, isVisible, sortOrder
+				).first() as any;
+
+				const created = await env.DB.prepare("SELECT * FROM gallery WHERE id = ?").bind(inserted.id).first();
+				return corsResponse(mapGalleryRow(created));
+			}
+
+			if (url.pathname === "/gallery/delete" && request.method === "POST") {
+				const body = await request.json() as any;
+				if (!body.id) return corsResponse({ error: "id is required" }, { status: 400 });
+				await env.DB.prepare("DELETE FROM gallery WHERE id = ?").bind(body.id).run();
+				return corsResponse({ success: true });
+			}
+
+			// ── Workshops: create / update ────────────────────────────────
+			// Sending an id updates that row; omitting it inserts a new one.
+			if (url.pathname === "/events" && request.method === "POST") {
+				const body = await request.json() as any;
+				const title = (body.title || "").trim();
+				if (!title) return corsResponse({ error: "title is required" }, { status: 400 });
+
+				// Re-serialise rather than trusting the posted string: a malformed
+				// gallery would otherwise sit in the column until it broke the page.
+				const gallery = JSON.stringify(parseEventGallery(body.gallery));
+				const isUpcoming = body.is_upcoming ? 1 : 0;
+				const isVisible = body.is_visible === false ? 0 : 1;
+				const startsOn = (body.starts_on || "").trim() || null;
+
+				if (body.id) {
+					await env.DB.prepare(
+						`UPDATE events SET title = ?, title_th = ?, date_label = ?, date_label_th = ?,
+						 cover_image_key = ?, description = ?, description_th = ?, location = ?, location_th = ?,
+						 participants = ?, participants_th = ?, gallery = ?, is_upcoming = ?, is_visible = ?,
+						 starts_on = ? WHERE id = ?`
+					).bind(
+						title, body.title_th || null, body.date_label || null, body.date_label_th || null,
+						body.cover_image_key || null, body.description || null, body.description_th || null,
+						body.location || null, body.location_th || null, body.participants || null,
+						body.participants_th || null, gallery, isUpcoming, isVisible, startsOn, body.id
+					).run();
+
+					const updated = await env.DB.prepare("SELECT * FROM events WHERE id = ?").bind(body.id).first();
+					return corsResponse(mapEventRow(updated));
+				}
+
+				const inserted = await env.DB.prepare(
+					`INSERT INTO events (title, title_th, date_label, date_label_th, cover_image_key,
+					 description, description_th, location, location_th, participants, participants_th,
+					 gallery, is_upcoming, is_visible, starts_on)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+				).bind(
+					title, body.title_th || null, body.date_label || null, body.date_label_th || null,
+					body.cover_image_key || null, body.description || null, body.description_th || null,
+					body.location || null, body.location_th || null, body.participants || null,
+					body.participants_th || null, gallery, isUpcoming, isVisible, startsOn
+				).first() as any;
+
+				const created = await env.DB.prepare("SELECT * FROM events WHERE id = ?").bind(inserted.id).first();
+				return corsResponse(mapEventRow(created));
+			}
+
+			if (url.pathname === "/events/delete" && request.method === "POST") {
+				const body = await request.json() as any;
+				if (!body.id) return corsResponse({ error: "id is required" }, { status: 400 });
+				await env.DB.prepare("DELETE FROM events WHERE id = ?").bind(body.id).run();
+				return corsResponse({ success: true });
+			}
+
+			// One-shot: persist a slug for every product that predates the column.
+			// Safe to re-run; it only touches rows where slug IS NULL.
+			if (url.pathname === "/products/backfill-slugs" && request.method === "POST") {
+				const { results } = await env.DB.prepare(
+					"SELECT id, name, sku FROM products WHERE slug IS NULL OR TRIM(slug) = ''"
+				).all();
+
+				let updated = 0;
+				for (const p of (results || []) as any[]) {
+					const slug = generateProductSlug(p.name, p.sku, p.id);
+					await env.DB.prepare("UPDATE products SET slug = ? WHERE id = ?").bind(slug, p.id).run();
+					updated++;
+				}
+
+				return corsResponse({ success: true, updated });
+			}
+
 			// Update an order's status + tracking number, and notify the customer on LINE
 			// (in the same 1:1 OA thread) if they connected their LINE account at checkout.
 			if (url.pathname === "/orders/status" && request.method === "POST") {
@@ -1284,6 +1758,9 @@ export default {
 					productId = meta.last_row_id;
 
 					if (productId) {
+						// Slug needs the row id, so it is written straight after insert.
+						await env.DB.prepare("UPDATE products SET slug = ? WHERE id = ?")
+							.bind(generateProductSlug(name, sku, productId), productId).run();
 						await saveProductCategories(env, productId, categoryList);
 					}
 
@@ -1327,6 +1804,14 @@ export default {
 					dbValue(image_key), dbValue(usage), dbValue(body.usage_th || null), dbValue(body.attribute || null), dbValue(body.attribute_th || null), dbValue(varieties), dbValue(sizes), dbValue(colors),
 					price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, dbValue(moq), is_visible === false ? 0 : 1, id
 				).run();
+
+				// Keep the slug in step with a renamed product. The id suffix means
+				// the URL stays unique; old links 404 rather than silently mismatching.
+				// SKU is read back from the row because the edit form does not always
+				// send it, and it is the fallback when the name has no Latin characters.
+				const existing = await env.DB.prepare("SELECT sku FROM products WHERE id = ?").bind(id).first() as any;
+				await env.DB.prepare("UPDATE products SET slug = ? WHERE id = ?")
+					.bind(generateProductSlug(name, existing?.sku || null, id), id).run();
 
 				await saveProductCategories(env, Number(id), categoryList);
 
