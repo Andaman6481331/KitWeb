@@ -4,31 +4,26 @@
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import AboutKitcharoen from '../components/AboutKitcharoen.vue';
+import VideoCard from '../components/video-card.vue';
 import { defaultLang } from '../utils/localeRoutes';
 
+// No breadcrumb: this page is reached from the Company menu, not by drilling down
+// through a hierarchy, so there is no trail to retrace.
 const route = useRoute();
 const currentLang = computed(() => route.params.lang || defaultLang);
 </script>
 
 <template>
     <div class="about-page">
-        <!-- Breadcrumb, matching the catalog's bar so navigation reads the same
-             everywhere the user is one level below home. -->
-        <nav class="about-breadcrumb" :aria-label="$t('catalog.breadcrumb')">
-            <ol class="breadcrumb-list">
-                <li>
-                    <router-link :to="{ name: 'home', params: { lang: currentLang } }">{{ $t('nav.home') }}</router-link>
-                </li>
-                <li aria-hidden="true" class="breadcrumb-sep">
-                    <ion-icon name="chevron-forward-outline"></ion-icon>
-                </li>
-                <li class="breadcrumb-current" aria-current="page">{{ $t('about.title') }}</li>
-            </ol>
-        </nav>
-
         <h1 class="about-page-title">{{ $t('about.title') }}</h1>
 
         <AboutKitcharoen />
+
+        <!-- The story, shown rather than told. Sits between the written history
+             and the address, which is the order someone reads this page in. -->
+        <section class="about-videos">
+            <VideoCard />
+        </section>
 
         <!-- Visit us: the shop is a physical destination in Sampeng, so the
              address belongs on the story page, not only in the footer. -->
@@ -65,39 +60,28 @@ const currentLang = computed(() => route.params.lang || defaultLang);
     background-color: #FBF7F2;
 }
 
-/* ── Breadcrumb bar (mirrors CatalogPage) ───────────── */
-.about-breadcrumb {
-    background: #FBF7F2;
-    border-bottom: 1px solid #f0e6da;
-    padding: 0 clamp(12px, 5%, 48px);
+/* ── Video showcase ─────────────────────────────────── */
+/* VideoCard brings its own heading and inner spacing, so this only separates it
+   from the story above and the address below. */
+.about-videos {
+    margin-top: 8px;
+    border-top: 1px solid #f0e6da;
 }
 
-.breadcrumb-list {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    height: 42px;
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 0;
-    list-style: none;
-    font-family: 'Work Sans', sans-serif;
-    font-size: 13px;
-    white-space: nowrap;
-}
-
-.breadcrumb-list a { color: #9e8272; text-decoration: none; transition: color 0.15s; }
-.breadcrumb-list a:hover { color: #DD876E; }
-.breadcrumb-sep { display: flex; align-items: center; color: #c9b8a8; font-size: 11px; }
-.breadcrumb-current { color: #5d4037; font-weight: 600; }
-
+/* Shares AboutKitcharoen's container geometry (1300px cap, 40px gutters falling
+   to 20px) so the title sits on the same left edge as the story below it. The
+   `margin: 0 auto` is what was missing: with a max-width and no auto margin the
+   block hugged the viewport's left edge on anything wider than 1380px, while the
+   content under it stayed centred. */
 .about-page-title {
     max-width: 1300px;
-    margin: 40px auto 0 auto;
-    padding: 0 40px;
+    margin: 0 auto;
+    padding: 40px 40px 0 40px;
     font-family: 'Crimson Pro', serif;
-    font-size: 2.6rem;
+    /* One fluid ramp instead of two fixed sizes with a jump at 640px. */
+    font-size: clamp(1.9rem, 4.6vw, 2.6rem);
     font-weight: 600;
+    line-height: 1.15;
     color: #604539;
 }
 
@@ -166,13 +150,8 @@ const currentLang = computed(() => route.params.lang || defaultLang);
 }
 
 @media (max-width: 640px) {
-    .breadcrumb-list { height: 38px; font-size: 12px; }
-
-    .about-page-title {
-        margin-top: 28px;
-        padding: 0 20px;
-        font-size: 2rem;
-    }
+    /* Matches .container's 20px gutter in AboutKitcharoen at the same breakpoint. */
+    .about-page-title { padding: 28px 20px 0 20px; }
 
     .visit-section { padding: 20px 20px 60px 20px; }
 }

@@ -51,7 +51,7 @@ const aboutInfo = computed(() => ({
 
 <style scoped>
 .about-section {
-    padding: 50px 0;
+    padding:  20px 0 50px 0;
     position: relative;
     overflow: hidden;
 }

@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { getUtilsUrl } from '@/services/api';
+import VideoCard from '../components/video-card.vue';
 
 const { t } = useI18n();
 
@@ -358,6 +359,12 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
             </div>
         </div>
     </section>
+
+    <!-- The shop, on video. Someone deciding whether to visit or write to us has
+         just read about the place; this is the closest thing to seeing it. -->
+    <section class="contact-videos">
+        <VideoCard />
+    </section>
 </template>
 
 <style scoped>
@@ -483,6 +490,13 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
     padding: 50px 0 100px;
     position: relative;
     overflow: hidden;
+}
+
+/* VideoCard owns its heading and inner spacing; this only sets the ground it
+   sits on, so it reads as part of the page rather than a pasted-in block. */
+.contact-videos {
+    background-color: #FBF7F2;
+    border-top: 1px solid #f0e6da;
 }
 
 .wave-top {
