@@ -1,10 +1,18 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { api, API_URL, getDiyImageUrl } from '../services/api';
 import { processProductImage } from '../services/image-processor';
 import { useI18n } from 'vue-i18n';
+import { defaultLang } from '../utils/localeRoutes';
+import AdminProjects from '../components/admin-projects.vue';
+import AdminSpotlights from '../components/admin-spotlights.vue';
+import AdminGallery from '../components/admin-gallery.vue';
+import AdminEvents from '../components/admin-events.vue';
 
 const { t } = useI18n();
+const route = useRoute();
+const currentLang = computed(() => route.params.lang || defaultLang);
 
 const products = ref([]);
 const categories = ref([]);
@@ -739,6 +747,9 @@ const deleteDiyProduct = async (id) => {
             count: categories.length }) }}</p>
         </div>
         <div class="header-actions">
+          <router-link class="cat-btn orders-btn" :to="{ name: 'manageorders', params: { lang: currentLang } }">
+            <ion-icon name="receipt-outline"></ion-icon> {{ $t('manageOrders.title') }}
+          </router-link>
           <button class="cat-btn" @click="showCategoryManager = !showCategoryManager">
             <ion-icon name="list-outline"></ion-icon> {{ $t('admin.editCategories') }}
           </button>
@@ -754,7 +765,26 @@ const deleteDiyProduct = async (id) => {
         <button type="button" :class="{ active: activeAdminSection === 'diy' }" @click="activeAdminSection = 'diy'; resetDiyForm();">
           <ion-icon name="construct-outline"></ion-icon> DIY Sets Collection
         </button>
+        <button type="button" :class="{ active: activeAdminSection === 'projects' }" @click="activeAdminSection = 'projects'; resetForm();">
+          <ion-icon name="book-outline"></ion-icon> Projects &amp; Articles
+        </button>
+        <button type="button" :class="{ active: activeAdminSection === 'colors' }" @click="activeAdminSection = 'colors'; resetForm();">
+          <ion-icon name="color-palette-outline"></ion-icon> Color of the Month
+        </button>
+        <button type="button" :class="{ active: activeAdminSection === 'gallery' }" @click="activeAdminSection = 'gallery'; resetForm();">
+          <ion-icon name="images-outline"></ion-icon> Creator Gallery
+        </button>
+        <button type="button" :class="{ active: activeAdminSection === 'events' }" @click="activeAdminSection = 'events'; resetForm();">
+          <ion-icon name="calendar-outline"></ion-icon> Workshops &amp; Events
+        </button>
       </div>
+
+      <!-- Editorial content lives in its own component; it shares nothing with the
+           product form above beyond the tab it sits under. -->
+      <AdminProjects v-if="activeAdminSection === 'projects'" />
+      <AdminSpotlights v-if="activeAdminSection === 'colors'" />
+      <AdminGallery v-if="activeAdminSection === 'gallery'" />
+      <AdminEvents v-if="activeAdminSection === 'events'" />
 
       <!-- Category Manager Section (Togglable) -->
       <transition name="slide-fade">
@@ -1174,7 +1204,9 @@ const deleteDiyProduct = async (id) => {
         
       </transition>
 
-      <section class="list-section">
+      <!-- Product list belongs to the inventory tabs only; the editorial tabs bring
+           their own list. Named explicitly so a new tab doesn't inherit it. -->
+      <section v-if="activeAdminSection === 'standard' || activeAdminSection === 'diy'" class="list-section">
           <template v-if="activeAdminSection === 'standard'">
             <div class="list-header">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
@@ -1414,6 +1446,11 @@ header {
   display: flex;
   align-items: center;
   gap: 5px;
+}
+
+.orders-btn {
+  background: #0984e3;
+  text-decoration: none;
 }
 
 .logout-btn {

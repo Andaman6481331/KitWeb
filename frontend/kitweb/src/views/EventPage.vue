@@ -1,12 +1,33 @@
 <script setup>
-import { ref } from 'vue';
+// KitCraft: the craft side of the business. Everything editorial lives here —
+// the week's inspiration, the article archive, video tutorials, community photos,
+// and the workshops themselves. The homepage only teases these; this is the page
+// that has to be worth coming back to.
+import { ref, computed, onMounted, onServerPrefetch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import AutoScrollEvent from '../components/auto-scroll-event.vue';
-import { getUtilsUrl } from '@/services/api';
+import SectionNav from '../components/section-nav.vue';
+import InfoBanner from '../components/info-banner.vue';
+import VideoCard from '../components/video-card.vue';
+import FeaturedProject from '../components/featured-project.vue';
+import DiyArticles from '../components/diy-articles.vue';
+import CreatorGallery from '../components/creator-gallery.vue';
+import InstagramCard from '../components/instragram-card.vue';
+import { api, getUtilsUrl, getEventMediaUrl } from '@/services/api';
 import comingSoonImg from '../assets/card-img05.webp';
 import emailjs from '@emailjs/browser';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
+const isThai = computed(() => String(locale.value).toLowerCase() === 'th');
+
+// Section navigator (right-side mini-map rail)
+const sections = computed(() => [
+    { id: 'event-articles', label: t('events.nav.articles') },
+    { id: 'event-videos',   label: t('events.nav.videos') },
+    { id: 'event-gallery',  label: t('events.nav.gallery') },
+    { id: 'event-past',     label: t('events.nav.past') },
+    { id: 'event-contact',  label: t('events.nav.contact') },
+]);
 
 const contactFormLoc = ref(null); // Create the template ref
 
@@ -15,44 +36,51 @@ const scrollToContact = () => {
     contactFormLoc.value?.scrollIntoView({ behavior: 'smooth' });
 };
 
-const pastEvents = ref([
-    {
-        id: 1,
-        title: 'KitCraft DIY Workshop | Libi Home Cafe',
-        date: 'December 13-14, 2025',
-        image: getUtilsUrl('eventA_tn-large.webp'),
-        participants: '50+',
-        location: 'Libi home cafe, Bangkok',
-        description: 'A fun casual workshow of our DIY beads collection and handcrafted accessories.',
-        gallery: [
-            { type: 'video', src: 'eventA_0.mp4', title: 'KitCraft Weekend Vibes' },
-            { type: 'image', src: 'eventA_1-large.webp', title: '' },
-            { type: 'image', src: 'eventA_2-large.webp', title: '' },
-            { type: 'image', src: 'eventA_3-large.webp', title: '' },
-            { type: 'image', src: 'eventA_4-large.webp', title: '' },
-            { type: 'image', src: 'eventA_5-large.webp', title: '' },
-            { type: 'image', src: 'eventA_6-large.webp', title: '' },
-            { type: 'image', src: 'eventA_7-large.webp', title: '' },
-            { type: 'image', src: 'eventA_8-large.webp', title: '' },
-            { type: 'image', src: 'eventA_9-large.webp', title: '' },
-        ]
-    },
-    {
-        id: 2,
-        title: 'KIN KAN CRAFTS | THE LUENRIT STREET CRAFTS',
-        date: 'February 7-8, 2026',
-        image: getUtilsUrl('eventB_tn-large.webp'),
-        participants: '80+',
-        location: 'The Luenrit, Yaowarat, Bangkok',
-        description: 'An interactive premium showcase of our handcrafted accessories, custom DIY crochet sets, and wholesale yarn creations.',
-        gallery: [
-            { type: 'image', src: 'eventB_2-large.webp', title: 'Craft Showcase & Beads' },
-            { type: 'image', src: 'eventB_3-large.webp', title: 'Premium Yarn Detail' },
-            { type: 'video', src: 'eventB_0.mp4', title: 'Grand Showcase Walkthrough' },
-            { type: 'video', src: 'eventB_1.mp4', title: 'Craft Workshop Highlights (.mp4)' }
-        ]
-    },
-]);
+// ── Content ──────────────────────────────────────────────────────
+// Articles and workshops both come from D1. The page owns the fetch rather than
+// letting each section fetch for itself, because it has to know which post is
+// featured in order to keep the archive from repeating it — and a child's
+// onServerPrefetch resolves too late for the parent to read during prerendering.
+const projects = ref([]);
+const pastEvents = ref([]);
+const hasLoaded = ref(false);
+
+async function loadContent() {
+    // Settled, not all: an empty gallery should not also cost us the workshops.
+    const [projectsResult, eventsResult] = await Promise.allSettled([
+        api.getProjects({}),
+        api.getEvents()
+    ]);
+
+    if (projectsResult.status === 'fulfilled') projects.value = projectsResult.value;
+    else console.error('Error loading projects:', projectsResult.reason);
+
+    if (eventsResult.status === 'fulfilled') pastEvents.value = eventsResult.value;
+    else console.error('Error loading events:', eventsResult.reason);
+
+    hasLoaded.value = true;
+}
+
+onServerPrefetch(loadContent);
+onMounted(() => { if (!hasLoaded.value) loadContent(); });
+
+// Whichever post is flagged, else the newest — the same rule the API applies for
+// the homepage slot, repeated here because this page fetches the full list.
+const featuredProject = computed(() =>
+    projects.value.find(p => p.is_featured) || projects.value[0] || null
+);
+
+// Thai copy where a row has it, English otherwise (zh/ja have no translations).
+const te = (row, field) => {
+    if (!row) return '';
+    if (isThai.value && row[`${field}_th`]) return row[`${field}_th`];
+    return row[field] || '';
+};
+
+const eventCover = (event) =>
+    event.cover_image_key ? getEventMediaUrl(event.cover_image_key) : comingSoonImg;
+
+const mediaCount = (event, type) => (event.gallery || []).filter(m => m.type === type).length;
 
 const selectedEvent = ref(null);
 const showEventPopup = ref(false);
@@ -77,33 +105,19 @@ const contactForm = ref({
     preferredDate: ''
 });
 
-const selectedProduct = ref(null);
-const showProductModal = ref(false);
-
-const viewProduct = (product) => {
-    selectedProduct.value = product;
-    showProductModal.value = true;
-};
-
-const closeModal = () => {
-    showProductModal.value = false;
-};
-
-const handleContactSubmit = () => {
-    console.log('Contact form:', contactForm.value);
-    alert('Thank you! We will contact you within 24 hours to discuss your event.');
-    contactForm.value = {
-        name: '',
-        email: '',
-        phone: '',
-        eventType: 'workshop',
-        groupSize: '',
-        message: '',
-        preferredDate: ''
-    };
-};
 const errorMessage = ref(false);
 const formSubmitted = ref(false);
+
+// EmailJS credentials. These ship in the client bundle either way — moving them to
+// env is about being able to change the account without a code edit, not secrecy.
+// Set them in frontend/kitweb/.env; the form reports a failure rather than posting
+// into the void when they are missing.
+const EMAILJS = {
+    serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID,
+    templateId: import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
+    publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY
+};
+
 const submitForm = async () => {
     // 1. Run your validation block
     if (
@@ -122,11 +136,16 @@ const submitForm = async () => {
     }
 
     // 2. Send the data if validation passes
+    if (!EMAILJS.serviceId || !EMAILJS.templateId || !EMAILJS.publicKey) {
+        console.error('EmailJS is not configured: set VITE_EMAILJS_* in .env');
+        alert(t('events.sendFailed'));
+        return;
+    }
+
     try {
-        // Replace these string placeholders with your actual keys from EmailJS dashboard
         await emailjs.send(
-            'service_gnqb7po', 
-            'template_om8vuv9', 
+            EMAILJS.serviceId,
+            EMAILJS.templateId,
             {
                 name: contactForm.value.name,
                 email: contactForm.value.email,
@@ -134,8 +153,9 @@ const submitForm = async () => {
                 eventType: contactForm.value.eventType,
                 groupSize: contactForm.value.groupSize,
                 preferredDate: contactForm.value.preferredDate,
+                message: contactForm.value.message,
             },
-            'WtvQxxvgU57WMDs6K'
+            EMAILJS.publicKey
         );
 
         // Success state
@@ -151,7 +171,7 @@ const submitForm = async () => {
 
     } catch (error) {
         console.error('Email failed to send:', error);
-        alert('Something went wrong. Please try again.');
+        alert(t('events.sendFailed'));
     }
 };
 
@@ -160,12 +180,7 @@ const submitForm = async () => {
 <template>
     <div class="diy-page">
         <!-- Info Banner -->
-        <div class="info-banner">
-            <div class="banner-content">
-                <span class="banner-badge">{{ t('events.bannerBadge') }}</span>
-                <span class="banner-text">{{ t('events.bannerText') }}</span>
-            </div>
-        </div>
+        <InfoBanner :badge="$t('events.bannerBadge')" :text="$t('events.bannerText')" />
 
         <!-- Hero Section -->
         <img :src="getUtilsUrl('shop05-large.webp')" fetchpriority="high" aria-hidden="true"
@@ -188,76 +203,98 @@ const submitForm = async () => {
 
         <AutoScrollEvent />
 
+        <!-- This week's inspiration: the post flagged in the admin panel. Same
+             component as the homepage band, different eyebrow — it is the one
+             thing on this page that is meant to change every week. -->
+        <FeaturedProject :project="featuredProject" eyebrow-key="projects.weeklyInspiration" />
+
+        <!-- The article archive, filtered into tutorials and inspiration. -->
+        <section id="event-articles" class="event-anchor">
+            <DiyArticles :items="projects" :exclude-id="featuredProject?.id" />
+        </section>
+
+        <!-- Video Tutorials. Moved here from the homepage: the clips are craft
+             instruction, so they belong beside the workshops rather than above
+             the product categories. -->
+        <section id="event-videos" class="videos-section event-anchor">
+            <VideoCard />
+        </section>
+
+        <!-- Creator Gallery: photos from workshops and from makers. -->
+        <section id="event-gallery" class="event-anchor">
+            <CreatorGallery />
+        </section>
+
+        <!-- Instagram. The card alone, not the homepage's full KitCraft pitch —
+             that band already exists one click away and repeating it here would
+             sell the page the visitor is already on. -->
+        <section class="ig-section">
+            <div class="container">
+                <div class="section-header">
+                    <h2>{{ $t('events.followTitle') }}</h2>
+                    <p>{{ $t('events.followSubtitle') }}</p>
+                </div>
+                <div class="ig-wrap">
+                    <InstagramCard />
+                </div>
+            </div>
+        </section>
+
         <!-- Past Events Section -->
-        <section class="events-section">
+        <section id="event-past" class="events-section event-anchor">
             <div class="container">
                 <div class="section-header">
                     <h2>{{ $t('events.pastEvents') }}</h2>
                     <p>{{ $t('events.pastEventsSubtitle') }}</p>
                 </div>
 
-                <div class="events-grid">
-                    <div v-for="event in pastEvents" :key="event.id" class="event-card" @click="openEventPopup(event)"
-                        style="cursor: pointer;">
+                <div v-if="pastEvents.length" class="events-grid">
+                    <!-- One card shape for both: an upcoming row swaps the media
+                         badges for the notify-me treatment and scrolls to the form
+                         instead of opening a gallery it does not have yet. -->
+                    <div
+                        v-for="event in pastEvents"
+                        :key="event.id"
+                        class="event-card"
+                        :class="{ 'coming-soon-card': event.is_upcoming }"
+                        style="cursor: pointer;"
+                        @click="event.is_upcoming ? scrollToContact() : openEventPopup(event)"
+                    >
                         <div class="event-image">
-                            <img :src="event.image" :alt="event.title" />
-                            <div class="event-overlay">
-                                <div class="gallery-preview"
-                                    style="display: flex; gap: 10px; justify-content: center; width: 100%;">
-                                    <span class="preview-badge"
-                                        style="background: rgba(255,255,255,0.2); backdrop-filter: blur(5px); padding: 6px 12px; border-radius: 20px; color: white; font-weight: 700; font-size: 13px; border: 1px solid rgba(255,255,255,0.3);">
-                                        📸 {{event.gallery.filter(m => m.type === 'image').length}} {{
-                                            $t('events.images') || 'Images' }}
+                            <img :src="eventCover(event)" :alt="te(event, 'title')" />
+
+                            <div v-if="event.is_upcoming" class="coming-soon-overlay">
+                                <span class="coming-soon-badge">✨ {{ $t('events.comingSoon') }}</span>
+                            </div>
+                            <div v-else-if="event.gallery.length" class="event-overlay">
+                                <div class="gallery-preview">
+                                    <span v-if="mediaCount(event, 'image')" class="preview-badge">
+                                        📸 {{ mediaCount(event, 'image') }} {{ $t('events.images') }}
                                     </span>
-                                    <span class="preview-badge"
-                                        style="background: rgba(255,255,255,0.2); backdrop-filter: blur(5px); padding: 6px 12px; border-radius: 20px; color: white; font-weight: 700; font-size: 13px; border: 1px solid rgba(255,255,255,0.3);">
-                                        🎥 {{event.gallery.filter(m => m.type === 'video').length}} {{
-                                            $t('events.videos') || 'Videos' }}
+                                    <span v-if="mediaCount(event, 'video')" class="preview-badge">
+                                        🎥 {{ mediaCount(event, 'video') }} {{ $t('events.videos') }}
                                     </span>
                                 </div>
                             </div>
                         </div>
-                        <div class="event-details">
-                            <div class="event-date">{{ event.date }}</div>
-                            <h3>{{ event.title }}</h3>
-                            <p class="event-desc">{{ event.description }}</p>
-                            <div class="event-meta">
-                                <span class="meta-item">
-                                    <span class="icon">👥</span>
-                                    {{ event.participants }} {{ $t('events.attendees') }}
-                                </span>
-                                <span class="meta-item">
-                                    <span class="icon">📍</span>
-                                    {{ event.location }}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- Coming Soon Event Card -->
-                    <div class="event-card coming-soon-card" @click="scrollToContact" style="cursor: pointer;">
-                        <div class="event-image">
-                            <img :src="comingSoonImg" alt="Coming Soon Event" />
-                            <div class="coming-soon-overlay">
-                                <span class="coming-soon-badge">✨ Coming Soon</span>
-                            </div>
-                        </div>
                         <div class="event-details">
-                            <div class="event-date">Stay Tuned!</div>
-                            <h3>Cozy Crochet & Vibing Workshop</h3>
-                            <p class="event-desc">We are preparing our next intimate DIY workshop! Learn advanced crochet techniques while enjoying premium teas and sweets.</p>
+                            <div class="event-date">{{ te(event, 'date_label') }}</div>
+                            <h3>{{ te(event, 'title') }}</h3>
+                            <p class="event-desc">{{ te(event, 'description') }}</p>
                             <div class="event-meta">
-                                <span class="meta-item">
+                                <span v-if="te(event, 'participants')" class="meta-item">
                                     <span class="icon">👥</span>
-                                    Limited Seats
+                                    {{ te(event, 'participants') }}
+                                    <template v-if="!event.is_upcoming">{{ $t('events.attendees') }}</template>
                                 </span>
-                                <span class="meta-item">
+                                <span v-if="te(event, 'location')" class="meta-item">
                                     <span class="icon">📍</span>
-                                    Bangkok (Secret Location)
+                                    {{ te(event, 'location') }}
                                 </span>
                             </div>
-                            <div class="rsvp-teaser">
-                                <span>Get Notified Early</span>
+                            <div v-if="event.is_upcoming" class="rsvp-teaser">
+                                <span>{{ $t('events.getNotified') }}</span>
                                 <span class="arrow">→</span>
                             </div>
                         </div>
@@ -266,10 +303,8 @@ const submitForm = async () => {
             </div>
         </section>
 
-
-
         <!-- Contact for Event Participation -->
-        <section class="contact-section" id="contact">
+        <section class="contact-section event-anchor" id="event-contact">
             <div class="container">
                 <div class="contact-grid">
                     <!-- Left - Contact Info -->
@@ -331,7 +366,9 @@ const submitForm = async () => {
                     <!-- Right - Contact Form -->
                     <div class="contact-form" ref="contactFormLoc">
                         <h3>{{ $t('events.requestEvent') }}</h3>
-                        <form @submit.prevent="handleContactSubmit">
+                        <!-- Submitting with Enter used to call a handler that does
+                             not exist; the button's click was the only path in. -->
+                        <form @submit.prevent="submitForm">
                             <div class="form-group">
                                 <label>{{ $t('events.yourName') }} *</label>
                                 <input type="text" v-model="contactForm.name" required />
@@ -375,7 +412,7 @@ const submitForm = async () => {
                                 <textarea v-model="contactForm.message" rows="4"
                                     :placeholder="$t('events.messagePlaceholder')"></textarea>
                             </div>
-                            <button type="submit" class="submit-btn" @click="submitForm()">{{ $t('events.sendRequest') }}</button>
+                            <button type="submit" class="submit-btn">{{ $t('events.sendRequest') }}</button>
                             <div v-if="formSubmitted" class="form-note">
                                 <span>* {{ $t('events.thankyou') }}</span>
                             </div>
@@ -389,48 +426,10 @@ const submitForm = async () => {
         </section>
 
 
-        <!-- Product Modal -->
-        <div v-if="showProductModal" class="modal-overlay" @click="closeModal">
-            <div class="modal-content" @click.stop>
-                <button class="close-btn" @click="closeModal">✕</button>
-                <div class="modal-grid" v-if="selectedProduct">
-                    <div class="modal-image">
-                        <img :src="selectedProduct.image" :alt="selectedProduct.name" />
-                    </div>
-                    <div class="modal-details">
-                        <div class="difficulty-badge" :class="selectedProduct.difficulty.toLowerCase()">
-                            {{ selectedProduct.difficulty }}
-                        </div>
-                        <h2>{{ selectedProduct.name }}</h2>
-                        <div class="modal-price">฿{{ selectedProduct.price }}</div>
-                        <p class="modal-desc">{{ selectedProduct.description }}</p>
-
-                        <div class="modal-meta">
-                            <div class="meta-row">
-                                <span class="icon">⏱️</span>
-                                <span>{{ $t('events.completionTime') }}: {{ selectedProduct.duration }}</span>
-                            </div>
-                            <div class="meta-row">
-                                <span class="icon">📊</span>
-                                <span>{{ $t('events.difficulty') }}: {{ selectedProduct.difficulty }}</span>
-                            </div>
-                        </div>
-
-                        <div class="kit-includes">
-                            <h4>What's Included:</h4>
-                            <ul>
-                                <li v-for="(item, idx) in selectedProduct.includes" :key="idx">
-                                    {{ item }}
-                                </li>
-                            </ul>
-                        </div>
-
-                        <button class="add-cart-btn">{{ $t('events.addToCart') }}</button>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
+
+    <!-- Section Navigator: right-side mini-map rail -->
+    <SectionNav :sections="sections" />
 
     <!-- Past Event Details Popup Modal -->
     <Teleport to="body">
@@ -440,31 +439,34 @@ const submitForm = async () => {
                     <button class="event-close-btn" @click="closeEventPopup" aria-label="Close">✕</button>
 
                     <div class="event-modal-header">
-                        <span class="event-modal-date">{{ selectedEvent.date }}</span>
-                        <h2 class="event-modal-title">{{ selectedEvent.title }}</h2>
-                        <p class="event-modal-desc">{{ selectedEvent.description }}</p>
+                        <span class="event-modal-date">{{ te(selectedEvent, 'date_label') }}</span>
+                        <h2 class="event-modal-title">{{ te(selectedEvent, 'title') }}</h2>
+                        <p class="event-modal-desc">{{ te(selectedEvent, 'description') }}</p>
 
                         <div class="event-modal-meta">
-                            <span class="meta-item">👥 {{ selectedEvent.participants }} {{ $t('events.attendees')
-                            }}</span>
-                            <span class="meta-item">📍 {{ selectedEvent.location }}</span>
+                            <span v-if="te(selectedEvent, 'participants')" class="meta-item">
+                                👥 {{ te(selectedEvent, 'participants') }} {{ $t('events.attendees') }}
+                            </span>
+                            <span v-if="te(selectedEvent, 'location')" class="meta-item">
+                                📍 {{ te(selectedEvent, 'location') }}
+                            </span>
                         </div>
                     </div>
 
-                    <div class="event-modal-gallery">
-                        <h3 class="gallery-section-title">Event Media Gallery</h3>
+                    <div v-if="selectedEvent.gallery.length" class="event-modal-gallery">
+                        <h3 class="gallery-section-title">{{ $t('events.mediaGallery') }}</h3>
                         <div class="gallery-grid">
                             <div v-for="(media, idx) in selectedEvent.gallery" :key="idx" class="gallery-item-card">
                                 <!-- Image Card -->
                                 <div v-if="media.type === 'image'" class="gallery-image-wrapper">
-                                    <img :src="getUtilsUrl(media.src)" :alt="media.title" class="gallery-media-img" />
-                                    <div class="media-title-overlay">{{ media.title }}</div>
+                                    <img :src="getEventMediaUrl(media.src)" :alt="media.title" class="gallery-media-img" />
+                                    <div v-if="media.title" class="media-title-overlay">{{ media.title }}</div>
                                 </div>
                                 <!-- Video Card -->
-                                <div v-else-if="media.type === 'video'" class="gallery-video-wrapper">
-                                    <video :src="getUtilsUrl(media.src)" controls playsinline
+                                <div v-else class="gallery-video-wrapper">
+                                    <video :src="getEventMediaUrl(media.src)" controls playsinline
                                         class="gallery-media-video" crossorigin="anonymous" preload="metadata"></video>
-                                    <div class="media-title-overlay">
+                                    <div v-if="media.title" class="media-title-overlay">
                                         🎥 {{ media.title }}
                                     </div>
                                 </div>
@@ -484,46 +486,14 @@ const submitForm = async () => {
     box-sizing: border-box;
 }
 
-.info-banner {
-    background: linear-gradient(135deg, #604539 0%, #4a3429 100%);
-    color: #fff;
-    padding: 10px 20px;
-    text-align: center;
-    font-size: 13px;
-    font-weight: 500;
-    letter-spacing: 0.5px;
-    animation: slideDown 0.5s ease-out;
-}
-
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-8px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-
-.banner-content {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 12px;
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
-.banner-badge {
-    background-color: #DD876E;
-    color: #fff;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    padding: 2px 8px;
-    border-radius: 4px;
-    letter-spacing: 1px;
-    flex-shrink: 0;
-}
-
 .diy-page {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: #fafafa;
+}
+
+/* Land section headings clear of the sticky navbar when jumped to via the rail */
+.event-anchor {
+    scroll-margin-top: 100px;
 }
 
 /* Hero Section */
@@ -643,6 +613,28 @@ const submitForm = async () => {
     background: linear-gradient(135deg, #f5f7fa 0%, #e8ebe8 100%);
 }
 
+/* Video tutorials. VideoCard brings its own inner spacing and heading, so this
+   wrapper only sets the surrounding ground colour. */
+.videos-section {
+    background: #FBF7F2;
+}
+
+/* Instagram. The embed component is right-aligned for the homepage's two-column
+   band; centre it here, where it stands on its own. */
+.ig-section {
+    background: #fff;
+    padding: clamp(48px, 6vw, 84px) 0;
+}
+
+.ig-wrap {
+    display: flex;
+    justify-content: center;
+}
+
+.ig-wrap :deep(.ig-card) {
+    justify-self: center;
+}
+
 .events-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(350px, 1fr));
@@ -691,11 +683,21 @@ const submitForm = async () => {
 
 .gallery-preview {
     display: flex;
-    gap: 8px;
+    gap: 10px;
+    justify-content: center;
+    width: 100%;
 }
 
-.photo-icon {
-    font-size: 1.5rem;
+/* Was a wall of inline style on every badge; same look, declared once. */
+.preview-badge {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 20px;
+    padding: 6px 12px;
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
 }
 
 .event-details {
@@ -971,103 +973,6 @@ const submitForm = async () => {
     color: #ff6b6b;
     font-weight: 600;
     text-align: center;
-}
-
-/* Modal */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: 20px;
-}
-
-.modal-content {
-    background: white;
-    border-radius: 20px;
-    max-width: 900px;
-    width: 100%;
-    max-height: 90vh;
-    overflow-y: auto;
-    position: relative;
-    animation: modalSlideIn 0.3s ease;
-}
-
-@keyframes modalSlideIn {
-    from {
-        opacity: 0;
-        transform: translateY(50px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.close-btn {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    width: 40px;
-    height: 40px;
-    background: white;
-    border: none;
-    border-radius: 50%;
-    font-size: 1.5rem;
-    cursor: pointer;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-    z-index: 10;
-    transition: all 0.3s ease;
-}
-
-.close-btn:hover {
-    transform: rotate(90deg);
-    background: #f0f0f0;
-}
-
-.modal-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-}
-
-.modal-image {
-    height: 100%;
-}
-
-.modal-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.modal-details {
-    padding: 40px;
-}
-
-.modal-details h2 {
-    font-size: 2rem;
-    color: #2d2d2d;
-    margin-bottom: 16px;
-    margin-top: 12px;
-}
-
-.modal-price {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: #ff6b6b;
-    margin-bottom: 20px;
-}
-
-.modal-desc {
-    font-size: 1.05rem;
-    color: #666;
 }
 
 /* ===== PREMIUM PAST EVENT GALLERY MODAL STYLE ===== */
