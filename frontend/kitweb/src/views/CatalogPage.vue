@@ -1,22 +1,54 @@
 <script setup>
-import ProductStock from '../components/products-stock.vue';
 import DiyProductKit from '../components/diy-product-kit.vue';
 import CategoryView from '../views/CategoryView.vue';
+import ProductPage from '../views/ProductPage.vue';
 import InfoBanner from '../components/info-banner.vue';
-import { getUtilsUrl } from '@/services/api';
+import SectionNav from '../components/section-nav.vue';
+import BreadcrumbBar from '../components/breadcrumb-bar.vue';
 import { useRoute, useRouter } from 'vue-router';
 import { computed, ref } from 'vue';
-import { codeToPath, defaultLang } from '@/utils/localeRoutes';
+import { defaultLang } from '@/utils/localeRoutes';
 import { catalogGroups } from '@/utils/catalogCategories';
 import { scrollIntent } from '@/router';
 import { useI18n } from 'vue-i18n';
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const route = useRoute();
 const router = useRouter();
 
 const currentLang = computed(() => route.params.lang || defaultLang);
 const currentCategory = computed(() => route.params.category || "all");
+
+// A product slug turns this route into a product page: the grid, its sidebar and
+// the DIY block step aside so the product gets the whole page. The route itself
+// is unchanged, which is what keeps every existing link and the canonical valid.
+// ProductPage draws its own breadcrumb, since only it knows the product's name.
+const isProductView = computed(() => Boolean(route.params.productSlug));
+
+// Group keys are camelCase, raw backend slugs lowercase. Fall back to the raw
+// value rather than printing a missing key path at the user.
+const tCategory = (key) => {
+    if (!key) return '';
+    const raw = String(key).trim();
+    if (te(`categories.${raw}`, 'en')) return t(`categories.${raw}`);
+    const lower = raw.toLowerCase();
+    if (te(`categories.${lower}`, 'en')) return t(`categories.${lower}`);
+    return key;
+};
+
+const crumbs = computed(() => {
+    const items = [{ label: t('nav.home'), to: { name: 'home', params: { lang: currentLang.value } } }];
+    if (currentCategory.value === 'all') {
+        items.push({ label: t('nav.products') });
+        return items;
+    }
+    items.push({
+        label: t('nav.products'),
+        to: { name: 'catalog', params: { lang: currentLang.value, category: 'all' } }
+    });
+    items.push({ label: tCategory(currentCategory.value) });
+    return items;
+});
 
 const sortBy = ref('popular');
 const sidebarOpen = ref(false);
@@ -41,25 +73,24 @@ const selectCategory = (cat) => {
     params: { lang: currentLang.value, category: cat }
   });
 };
+
+const sections = computed(() => [
+  { id: 'catalog-material', label: t('catalog.nav.material') },
+  { id: 'catalog-diy',      label: t('catalog.nav.diy') },
+]);
 </script>
 
 <template>
     <!-- Info Banner -->
     <InfoBanner :badge="$t('catalog.bannerBadge')" :text="$t('catalog.bannerText')" />
 
-    <!-- Preload hero image -->
-    <img :src="getUtilsUrl('shop06-large.webp')" fetchpriority="high" aria-hidden="true"
-        style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">
+    <!-- Product page: the grid, sidebar and DIY block are not rendered here. -->
+    <ProductPage v-if="isProductView" />
 
-    <!-- Page Header -->
-    <div class="catalog-header" :style="{ backgroundImage: `url(${getUtilsUrl('shop06-large.webp')})` }">
-        <div class="overlay"></div>
-        <div class="header-content">
-            <span class="since-badge" v-reveal delay="0.2s">{{ $t('catalog.since') }}</span>
-            <h1 class="catalog-title" v-reveal>{{ $t('catalog.title') }}</h1>
-            <p class="catalog-subtitle" v-reveal delay="0.6s">{{ $t('catalog.subtitle') }}</p>
-        </div>
-    </div>
+    <template v-else>
+    <!-- Breadcrumb bar. Replaces the old photo hero: the category panel below
+         already titles the page, so this slot is spent on navigation instead. -->
+    <BreadcrumbBar :items="crumbs" />
 
     <!-- Mobile filter bar -->
     <div class="mobile-filter-bar">
@@ -67,14 +98,14 @@ const selectCategory = (cat) => {
             <ion-icon name="funnel-outline"></ion-icon>
             {{ $t('catalog.filter') || 'Filter & Categories' }}
         </button>
-        <span class="mobile-current-cat">{{ $t(`categories.${currentCategory}`) }}</span>
+        <span class="mobile-current-cat">{{ tCategory(currentCategory) }}</span>
     </div>
 
     <!-- Sidebar overlay (mobile) -->
     <div v-if="sidebarOpen" class="sidebar-overlay" @click="sidebarOpen = false"></div>
 
     <!-- Main layout: sidebar + content -->
-    <div class="catalog-layout">
+    <div id="catalog-material" class="catalog-layout catalog-anchor">
 
         <!-- Sidebar -->
         <aside class="catalog-sidebar" :class="{ open: sidebarOpen }">
@@ -138,74 +169,21 @@ const selectCategory = (cat) => {
     </div>
 
     <!-- DIY Kit -->
-    <div class="section-header" v-reveal>
-        <span class="section-tag">{{ $t('diyKits.tag') }}</span>
-        <h2 class="section-title">{{ $t('diyKits.title') }}</h2>
-        <p class="section-description">{{ $t('diyKits.description') }}</p>
+    <div id="catalog-diy" class="catalog-anchor">
+        <div class="section-header" v-reveal>
+            <span class="section-tag">{{ $t('diyKits.tag') }}</span>
+            <h2 class="section-title">{{ $t('diyKits.title') }}</h2>
+            <p class="section-description">{{ $t('diyKits.description') }}</p>
+        </div>
+        
+        <DiyProductKit />
     </div>
-    <DiyProductKit />
+    <!-- Section Navigator: right-side mini-map rail -->
+    <SectionNav :sections="sections" />
+    </template>
 </template>
 
 <style scoped>
-/* ── Page Header ─────────────────────────────────────── */
-.catalog-header {
-    padding: 120px 5% 100px 5%;
-    background-size: cover;
-    background-position: center;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-}
-
-.overlay {
-    position: absolute;
-    inset: 0;
-    background:
-        radial-gradient(
-            circle at center,
-            rgba(250, 244, 236, 0.838) 0%,
-            rgba(80, 60, 45, 0.18) 60%,
-            rgba(40, 28, 20, 0.337) 100%
-        );
-    z-index: 1;
-}
-
-.header-content {
-    position: relative;
-    z-index: 2;
-    max-width: 1000px;
-    margin: 0 auto;
-}
-
-.since-badge {
-    display: block;
-    font-family: 'Work Sans', sans-serif;
-    font-size: 14px;
-    font-weight: 700;
-    color: #604539e0;
-    letter-spacing: 4px;
-    margin-bottom: 15px;
-    text-transform: uppercase;
-}
-
-.catalog-title {
-    font-family: 'ZCOOL XiaoWei', serif;
-    font-size: 4rem;
-    color: #604539;
-    margin: 0 auto 25px;
-    line-height: 1.1;
-    font-weight: 400;
-}
-
-.catalog-subtitle {
-    font-family: 'Work Sans', sans-serif;
-    font-size: 1.35rem;
-    color: #604539e0;
-    max-width: 800px;
-    margin: 0 auto;
-    line-height: 1.6;
-}
-
 /* ── Mobile filter bar ───────────────────────────────── */
 .mobile-filter-bar {
     display: none;
@@ -256,6 +234,10 @@ const selectCategory = (cat) => {
     background: #FBF7F2;
 }
 
+.catalog-anchor{
+    scroll-margin-top: 100px;
+}
+
 /* ── Sidebar ─────────────────────────────────────────── */
 .catalog-sidebar {
     width: 230px;
@@ -268,14 +250,6 @@ const selectCategory = (cat) => {
     max-height: calc(100vh - 100px); */
     /* overflow-y: auto; */
 }
-
-/* .catalog-sidebar::-webkit-scrollbar {
-    width: 4px;
-}
-.catalog-sidebar::-webkit-scrollbar-thumb {
-    background: #d4b896;
-    border-radius: 4px;
-} */
 
 .sidebar-close-btn {
     display: none;
@@ -486,11 +460,14 @@ const selectCategory = (cat) => {
 
     .catalog-sidebar {
         position: fixed;
-        top: 0;
+        /* Sit flush below the sticky navbar (which wraps to a taller, variable
+           height on mobile) instead of overflowing behind it. */
+        top: var(--nav-h, 80px);
         left: -290px;
         width: 280px;
-        height: 100vh;
-        max-height: 100vh;
+        height: calc(100dvh - var(--nav-h, 80px));
+        max-height: calc(100dvh - var(--nav-h, 80px));
+        overflow-y: auto;
         z-index: 99;
         transition: left 0.28s ease;
         box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
@@ -506,23 +483,10 @@ const selectCategory = (cat) => {
 
     .catalog-layout {
         padding: 12px;
-    }
+    } 
 }
 
 @media (max-width: 768px) {
-    .catalog-header {
-        height: 40vh;
-        padding: 50px 5%;
-    }
-
-    .catalog-title {
-        font-size: 2.5rem;
-    }
-
-    .catalog-subtitle {
-        font-size: 1rem;
-    }
-
     .section-title {
         font-size: 36px;
     }

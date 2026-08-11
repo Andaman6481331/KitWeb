@@ -28,6 +28,39 @@ async function fetchCategorySlugs() {
   }
 }
 
+// Product detail pages. One URL per product — the product's own category, which
+// is what the grid links to, so a merged group ('threadString') never mints a
+// second indexable address for the same item.
+async function fetchProductPaths() {
+  try {
+    const response = await fetch(`${API_URL}/products`)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch products: ${response.status}`)
+    }
+    const products = await response.json()
+    return products
+      .filter((p) => p.slug && p.category)
+      .map((p) => `${encodeURIComponent(p.category)}/${encodeURIComponent(p.slug)}`)
+  } catch (error) {
+    console.warn('[vite-ssg] Could not fetch products for prerender routes:', error)
+    return []
+  }
+}
+
+async function fetchProjectSlugs() {
+  try {
+    const response = await fetch(`${API_URL}/projects`)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch projects: ${response.status}`)
+    }
+    const projects = await response.json()
+    return projects.map((p) => p.slug).filter(Boolean)
+  } catch (error) {
+    console.warn('[vite-ssg] Could not fetch projects for prerender routes:', error)
+    return []
+  }
+}
+
 export async function includedRoutes(paths = []) {
   const expanded = []
 
@@ -55,6 +88,23 @@ export async function includedRoutes(paths = []) {
     const categorySegment = encodeURIComponent(category)
     supportedLocales.forEach((lang) => {
       expanded.push(`/${lang}/catalog/${categorySegment}`)
+    })
+  }
+
+  const productPaths = await fetchProductPaths()
+  for (const path of productPaths) {
+    supportedLocales.forEach((lang) => {
+      expanded.push(`/${lang}/catalog/${path}`)
+    })
+  }
+
+  // Editorial pages are the main thing search traffic can land on, so they get
+  // prerendered per locale like categories do.
+  const projectSlugs = await fetchProjectSlugs()
+  for (const slug of projectSlugs) {
+    const slugSegment = encodeURIComponent(slug)
+    supportedLocales.forEach((lang) => {
+      expanded.push(`/${lang}/project/${slugSegment}`)
     })
   }
 
