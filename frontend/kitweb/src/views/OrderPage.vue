@@ -15,6 +15,18 @@ const { t, te, locale } = useI18n()
 
 const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
 
+// The category chip row scrolls horizontally (touch/drag already works). Map a
+// vertical mouse wheel onto that horizontal scroll so desktop users can reach
+// the chips that fade off under the right-edge mask.
+const categoryFiltersEl = ref(null)
+const onCategoryWheel = (e) => {
+    const el = categoryFiltersEl.value
+    if (!el || el.scrollWidth <= el.clientWidth) return
+    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return // let real horizontal gestures pass through
+    el.scrollLeft += e.deltaY
+    e.preventDefault()
+}
+
 // Local inline placeholder (no external network dependency)
 const placeholderImg = (label = '') => {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#F9F5F0"/><text x="50" y="54" font-family="Work Sans, Arial, sans-serif" font-size="11" fill="#3D2B1F" text-anchor="middle">${label}</text></svg>`
@@ -514,7 +526,7 @@ const isProductInCart = (productId) => {
                         class="search-input" />
                 </div>
 
-                <div class="category-filters">
+                <div class="category-filters" ref="categoryFiltersEl" @wheel="onCategoryWheel">
                     <!-- <button class="category-btn" :class="{ active: selectedCategory === 'All' }" :key="'All'"
                         @click="selectedCategory = 'All'">
                         All
