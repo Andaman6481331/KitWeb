@@ -9,7 +9,7 @@ export const catalogGroups = [
   { key: 'ribbons',        slugs: ['ribbons'],            icon: null, svgSrc: '/icon/ribbons.svg' },
   { key: 'needles',        slugs: ['needles'],            icon: null, svgSrc: '/icon/needles.svg' },
   { key: 'scissorsKnifes', slugs: ['scissors', 'knifes'], icon: null, svgSrc: '/icon/scissors.svg' },
-  { key: 'tools',          slugs: ['tools'],              icon: null, svgSrc: '/icon/tools.svg' },
+  { key: 'tools',          slugs: ['tools', "embro"],              icon: null, svgSrc: '/icon/tools.svg' },
   { key: 'decorative',     slugs: ['decorative'],         icon: null, svgSrc: '/icon/decoratives.svg' },
   { key: 'colors',         slugs: ['colors'],             icon: null, svgSrc: '/icon/colors.svg' },
   { key: 'beads',          slugs: ['beads'],              icon: null, svgSrc: '/icon/beads.svg' },
