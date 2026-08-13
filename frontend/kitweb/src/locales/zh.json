@@ -18,7 +18,11 @@
     "b2bCatalog": "B2B 目录",
     "contactUsDesc": "联系我们的团队",
     "about": "关于我们",
-    "aboutDesc": "我们的故事，始于1984年"
+    "aboutDesc": "我们的故事，始于1984年",
+    "menu": "菜单",
+    "openMenu": "打开菜单",
+    "closeMenu": "关闭菜单",
+    "language": "语言"
   },
   "footer": {
     "companyName": "侨成发",
@@ -390,7 +394,8 @@
     "controls": {
       "restart": "重新开始",
       "seekBack": "-10秒",
-      "seekForward": "+10秒"
+      "seekForward": "+10秒",
+      "close": "关闭视频"
     },
     "videos": {
       "clip1": {
@@ -427,6 +432,8 @@
     "backToCatalog": "返回类别",
     "collection": "{category} 系列",
     "showing": "正在显示 {count} 个产品",
+    "showingOf": "正在显示 {total} 个产品中的 {shown} 个",
+    "loadMore": "加载更多",
     "sortBy": "排序方式：",
     "sortPopular": "最受欢迎",
     "sortPriceAsc": "价格：从低到高",
@@ -463,7 +470,9 @@
     "categoryDescriptions": {
       "Default": "我们为您的创意项目精心挑选的优质材料。"
     },
-    "customerGalleryTitle": "来自顾客的照片"
+    "customerGalleryTitle": "来自顾客的照片",
+    "allLetters": "全部",
+    "loading": "正在加载产品..."
   },
   "auth": {
     "since": "始于 1984 年",

@@ -2,7 +2,7 @@
 // The product grid for one category. Product detail used to open as a modal from
 // here; it is now its own page (views/ProductPage.vue), so this file is back to
 // doing one thing: list, sort and filter.
-import { ref, computed, onMounted, onServerPrefetch, watch } from 'vue';
+import { ref, computed, onMounted, onServerPrefetch, watch, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import { api } from '../services/api';
 import { useI18n } from 'vue-i18n';
@@ -10,7 +10,7 @@ import { useHead } from '@unhead/vue';
 import AddToOrderModal from '../components/add-to-order-modal.vue';
 import { defaultLang } from '@/utils/localeRoutes';
 import { resolveCategoryGroup } from '@/utils/catalogCategories';
-import { getProductImageUrl } from '@/utils/productImages';
+import { getProductImageUrl, getProductImageSrcset } from '@/utils/productImages';
 // Per-piece price maths is shared with the homepage's New Arrivals strip.
 import { getCheapestPricePerPiece } from '@/utils/productPricing';
 
@@ -201,6 +201,41 @@ const displayedProducts = computed(() => {
         getDisplayName(p).charAt(0).toUpperCase() === letterFilter.value
     );
 });
+
+// The backend has no pagination — /products returns the whole catalog in one
+// response — so the grid pages on the client. That is where the cost actually
+// was: 'all' is ~150 products, and rendering every card up front meant ~150
+// product images on first paint. The JSON itself is only ~57KB gzipped.
+// Crawlers are unaffected: every product URL is listed in dist/sitemap.xml by
+// scripts/append-sitemap.js, so discovery never depended on this grid.
+const PAGE_SIZE = 20;
+const visibleCount = ref(PAGE_SIZE);
+
+const pagedProducts = computed(() => displayedProducts.value.slice(0, visibleCount.value));
+const remainingCount = computed(() => displayedProducts.value.length - pagedProducts.value.length);
+
+const loadMore = () => {
+    visibleCount.value += PAGE_SIZE;
+};
+
+// Any change to what the list contains or how it is ordered starts a new list,
+// so it starts at page one. Sorting is included deliberately: keeping the old
+// offset after a re-sort would show page 3 of a list the user has never seen
+// page 1 of. `locale` is here because the 'name' sort is locale-collated.
+watch([currentCategory, letterFilter, activeSortBy, locale], () => {
+    visibleCount.value = PAGE_SIZE;
+});
+
+// The bar is a single scrolling row on phones, so the active letter can end up
+// off-screen — bring it back into view when it changes.
+const letterBarEl = ref(null);
+watch(letterFilter, (letter) => {
+    if (!letter || typeof window === 'undefined') return;
+    nextTick(() => {
+        const el = letterBarEl.value?.querySelector(`[data-letter="${CSS.escape(letter)}"]`);
+        el?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    });
+});
 </script>
 
 <template>
@@ -219,23 +254,30 @@ const displayedProducts = computed(() => {
                 </div>
             </div>
             <span class="product-count-badge">
-                {{ $t('catalog.showing', { count: displayedProducts.length }) }}
+                <!-- The grid pages, so the badge reports both numbers rather than
+                     implying the whole category is on screen. -->
+                {{ remainingCount > 0
+                    ? $t('catalog.showingOf', { shown: pagedProducts.length, total: displayedProducts.length })
+                    : $t('catalog.showing', { count: displayedProducts.length }) }}
                 <span v-if="letterFilter" class="letter-active-badge">{{ letterFilter }}</span>
             </span>
         </div>
 
-        <!-- Letter filter bar -->
-        <div v-if="availableLetters.length > 1" class="letter-filter-bar">
+        <!-- Letter filter bar. One scrolling row on phones rather than four
+             wrapped ones — and six under Thai, whose alphabet runs to ~44
+             initial consonants. -->
+        <div v-if="availableLetters.length > 1" class="letter-filter-bar" ref="letterBarEl">
             <button
                 class="letter-btn"
                 :class="{ active: letterFilter === null }"
                 @click="letterFilter = null"
-            >All</button>
+            >{{ $t('catalog.allLetters') }}</button>
             <button
                 v-for="letter in availableLetters"
                 :key="letter"
                 class="letter-btn"
                 :class="{ active: letterFilter === letter }"
+                :data-letter="letter"
                 @click="letterFilter = (letterFilter === letter ? null : letter)"
             >{{ letter }}</button>
         </div>
@@ -245,21 +287,33 @@ const displayedProducts = computed(() => {
             <div v-if="loading" class="loading-state"
                 style="grid-column: 1/-1; text-align: center; padding: 60px 0;">
                 <div class="loader"></div>
-                <p style="color: #6b5d54; font-weight: 600; margin-top: 15px;">Loading products...</p>
+                <p style="color: #6b5d54; font-weight: 600; margin-top: 15px;">{{ $t('catalog.loading') }}</p>
             </div>
             <template v-else>
                 <!-- Linked under the product's own category, not the grid's. The
                      grid can be a merged group ('threadString') or 'all', which
                      would otherwise give one product three indexable URLs. -->
                 <router-link
-                    v-for="item in displayedProducts"
+                    v-for="(item, index) in pagedProducts"
                     :key="item.id"
                     :to="{ name: 'catalog', params: { lang: currentLang, category: item.category, productSlug: item.slug } }"
                     class="product-card"
                 >
                     <div class="card-image">
                         <div class="badge" v-if="item.price_1">{{ $t('catalog.artisanChoice') }}</div>
-                        <img :src="getProductImageUrl(item.image_key)" :alt="tProduct(item, 'name')">
+                        <!-- Intrinsic size + a square box means the grid reserves
+                             the right space before the image lands, instead of
+                             reflowing as each one arrives. `sizes` tracks the
+                             grid ladder below, so the browser can settle for the
+                             250px thumb wherever the slot is small enough.
+                             The first row is above the fold on every layout, so
+                             it loads eagerly rather than waiting on the lazy pass. -->
+                        <img :src="getProductImageUrl(item.image_key)"
+                            :srcset="getProductImageSrcset(item.image_key)"
+                            sizes="(max-width: 768px) 46vw, (max-width: 1024px) 23vw, 230px"
+                            :alt="tProduct(item, 'name')"
+                            width="400" height="400"
+                            :loading="index < 4 ? 'eager' : 'lazy'" decoding="async">
                     </div>
                     <div class="card-content">
                         <h3 class="card-title">{{ tProduct(item, 'name') }}</h3>
@@ -282,6 +336,17 @@ const displayedProducts = computed(() => {
                     </div>
                 </router-link>
             </template>
+        </div>
+
+        <!-- Load more. A button, not an infinite scroller: this page has a DIY
+             section and a footer under it that auto-loading would keep pushing
+             out of reach. -->
+        <div v-if="!loading && remainingCount > 0" class="load-more-row">
+            <button class="load-more-btn" @click="loadMore">
+                <ion-icon name="chevron-down-outline"></ion-icon>
+                {{ $t('catalog.loadMore') }}
+                <span class="load-more-remaining">{{ remainingCount }}</span>
+            </button>
         </div>
 
         <!-- Add-to-order dialog, toast and variant lightbox all live here. -->
@@ -374,9 +439,11 @@ const displayedProducts = computed(() => {
     line-height: 1;
 }
 
-.letter-btn:hover:not(.active) {
-    background: #FDF3E6;
-    border-color: #d4b896;
+@media (hover: hover) {
+    .letter-btn:hover:not(.active) {
+        background: #FDF3E6;
+        border-color: #d4b896;
+    }
 }
 
 .letter-btn.active {
@@ -417,7 +484,7 @@ const displayedProducts = computed(() => {
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     margin: 0 auto;
     padding: 0 1rem;
-    gap: 2px;
+    gap: 12px;
 }
 
 /* Spinner Loader styling */
@@ -454,9 +521,11 @@ const displayedProducts = computed(() => {
     color: inherit;
 }
 
-.product-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+@media (hover: hover) {
+    .product-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+    }
 }
 
 .card-image {
@@ -586,18 +655,149 @@ const displayedProducts = computed(() => {
     cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24'%3E%3Cpath fill='%23ffffff' d='M11 9h2V6h3V4h-3V1h-2v3H8v2h3v3zm-4 9c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-1.99.9-1.99 2S15.9 22 17 22s2-.9 2-2-.9-2-2-2zm-9.83-3.25l.03-.12.9-1.63H15.55c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0019.88 4H5.21L4.27 2H1v2h2l3.6 7.59-1.35 2.44C5 14.62 5 15 5 15c0 1.1.9 2 2 2h12v-2H7.42a.25.25 0 01-.25-.25z'/%3E%3C/svg%3E") 2 2, pointer;
 }
 
+/* LOAD MORE */
+.load-more-row {
+    display: flex;
+    justify-content: center;
+    padding: 26px 1rem 6px;
+}
+
+.load-more-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 46px;
+    padding: 0 26px;
+    border: 1.5px solid #e4d5c6;
+    border-radius: 24px;
+    background: #fff;
+    color: #7a5c4a;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.18s, border-color 0.18s, color 0.18s;
+}
+
+.load-more-btn ion-icon {
+    font-size: 16px;
+}
+
+@media (hover: hover) {
+    .load-more-btn:hover {
+        background: #DD876E;
+        border-color: #DD876E;
+        color: #fff;
+    }
+
+    .load-more-btn:hover .load-more-remaining {
+        background: rgba(255, 255, 255, 0.24);
+        color: #fff;
+    }
+}
+
+.load-more-remaining {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: #FDF3E6;
+    color: #9e8272;
+    font-size: 11px;
+    font-weight: 700;
+    transition: background 0.18s, color 0.18s;
+}
+
 /* RESPONSIVE */
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
     .category-bar-desc {
         display: none;
     }
+
     .product-grid {
-        grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
+        grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+        gap: 10px;
+    }
+}
+
+@media (max-width: 768px) {
+    /* Two real columns. The old `repeat(3, 1fr)` was a hard floor with nothing
+       below it, which left ~97px columns at 375px carrying a two-line title, a
+       1.35rem price, an MOQ line and a pill button. */
+    .product-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        padding: 0 12px;
     }
 
-    .card-image {
-        height: 200px;
+    .card-content {
+        padding: 8px;
+    }
+
+    .card-title {
+        font-size: 0.8rem;
+    }
+
+    .price-value {
+        font-size: 1.05rem;
+    }
+
+    .badge {
+        top: 8px;
+        left: 8px;
+        padding: 3px 7px;
+        font-size: 9px;
+    }
+
+    /* One tap target, not a 26px sliver. */
+    .add-btn {
+        width: 100%;
+        min-height: 40px;
+        justify-content: center;
+    }
+
+    /* Full-width so it is unmissable at the end of a thumb-scroll. */
+    .load-more-row {
+        padding: 20px 12px 4px;
+    }
+
+    .load-more-btn {
+        width: 100%;
+        min-height: 48px;
+    }
+
+    /* One scrolling row instead of four wrapped ones, pinned under the header
+       so the letters stay reachable while the grid scrolls past. */
+    .letter-filter-bar {
+        position: sticky;
+        top: var(--nav-h, 64px);
+        z-index: 5;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scroll-snap-type: x proximity;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        gap: 6px;
+        padding: 10px 14px;
+        /* Hints that there is more to the right. */
+        -webkit-mask-image: linear-gradient(to right, #000 88%, transparent 100%);
+        mask-image: linear-gradient(to right, #000 88%, transparent 100%);
+    }
+
+    .letter-filter-bar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .letter-btn {
+        flex: 0 0 auto;
+        min-width: 40px;
+        height: 40px;
+        scroll-snap-align: center;
+        font-size: 14px;
     }
 }
 
@@ -618,5 +818,25 @@ const displayedProducts = computed(() => {
 
     .category-bar-title {
         font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 400px) {
+    .product-grid {
+        gap: 8px;
+        padding: 0 10px;
+    }
+
+    .card-title {
+        font-size: 0.78rem;
+    }
+
+    .price-value {
+        font-size: 0.98rem;
+    }
+
+    .add-btn {
+        font-size: 0.65rem;
+        padding: 8px 6px;
     }
 }</style>

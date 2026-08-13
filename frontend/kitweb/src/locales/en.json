@@ -18,7 +18,11 @@
     "b2bCatalog": "B2B Catalog",
     "contactUsDesc": "Get in touch with our team",
     "about": "About Us",
-    "aboutDesc": "Our story, since 1984"
+    "aboutDesc": "Our story, since 1984",
+    "menu": "Menu",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "language": "Language"
   },
   "footer": {
     "companyName": "Kitcharoen",
@@ -273,6 +277,8 @@
     "backToCatalog": "Back to Categories",
     "collection": "{category} Collection",
     "showing": "Showing {count} products",
+    "showingOf": "Showing {shown} of {total} products",
+    "loadMore": "Load More",
     "sortBy": "Sort by:",
     "sortPopular": "Most Popular",
     "sortPriceAsc": "Price: Low to High",
@@ -317,7 +323,9 @@
       "Tools": "Professional-grade shears, needles, and measuring tools for the serious craftsperson.",
       "Default": "Sourced directly from the vibrant heart of Sampeng Market, our curated selection represents four decades of excellence. Every item is hand-picked for quality and character."
     },
-    "customerGalleryTitle": "From our customers"
+    "customerGalleryTitle": "From our customers",
+    "allLetters": "All",
+    "loading": "Loading products..."
   },
   "videoSection": {
     "title": "Our Story In Motion",
@@ -325,7 +333,8 @@
     "controls": {
       "restart": "Restart",
       "seekBack": "-10s",
-      "seekForward": "+10s"
+      "seekForward": "+10s",
+      "close": "Close video"
     },
     "videos": {
       "clip1": {

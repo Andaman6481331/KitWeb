@@ -197,6 +197,24 @@ const filteredProducts = computed(() => {
     return filtered
 })
 
+// The desktop list is virtualised by RecycleScroller, so it only ever builds the
+// rows on screen. The mobile branch has no scroller and renders every row, so it
+// pages instead — same 20-at-a-time contract as the catalog grid.
+const PAGE_SIZE = 20;
+const visibleCount = ref(PAGE_SIZE);
+
+const pagedProducts = computed(() => filteredProducts.value.slice(0, visibleCount.value));
+const remainingCount = computed(() => filteredProducts.value.length - pagedProducts.value.length);
+
+const loadMore = () => {
+    visibleCount.value += PAGE_SIZE;
+};
+
+// Searching or switching category makes a new list, so it starts at page one.
+watch([selectedCategory, searchQuery], () => {
+    visibleCount.value = PAGE_SIZE;
+});
+
 // Cart calculations (no delivery fee — the total is the items subtotal; staff
 // arrange any shipping cost manually over LINE).
 const cartTotal = computed(() => cartStore.cartTotal)
@@ -625,7 +643,7 @@ const isProductInCart = (productId) => {
                                     </div>
                                 </RecycleScroller>
                                 <div v-else>
-                                    <div v-for="product in filteredProducts" :key="product.id" class="product-row" :class="{'out-of-stock': !product.inStock, 'in-cart': isProductInCart(product.id)}">
+                                    <div v-for="product in pagedProducts" :key="product.id" class="product-row" :class="{'out-of-stock': !product.inStock, 'in-cart': isProductInCart(product.id)}">
                                         <!-- Image -->
                                         <div class="td-image">
                                             <div class="image-wrapper">
@@ -685,6 +703,15 @@ const isProductInCart = (productId) => {
                                 </div>
                             </template>
                         </div>
+                    </div>
+
+                    <!-- Load more. Mobile only: the desktop scroller virtualises
+                         the list and has nothing to page. -->
+                    <div v-if="isMobile && !isLoading && remainingCount > 0" class="load-more-row">
+                        <button class="load-more-btn" @click="loadMore">
+                            {{ t('catalog.loadMore') }}
+                            <span class="load-more-remaining">{{ remainingCount }}</span>
+                        </button>
                     </div>
 
                     <!-- Empty State -->
@@ -1318,6 +1345,57 @@ const isProductInCart = (productId) => {
 }
 
 /* Empty State */
+/* Load more (mobile list only) */
+.load-more-row {
+    display: flex;
+    justify-content: center;
+    padding: 16px 0 4px;
+}
+
+.load-more-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 48px;
+    padding: 0 24px;
+    border: 1px solid #E6E0D9;
+    border-radius: 999px;
+    background: white;
+    color: #7A6A5C;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.load-more-btn:hover {
+    background: #3D2B1F;
+    border-color: #3D2B1F;
+    color: white;
+}
+
+.load-more-btn:hover .load-more-remaining {
+    background: rgba(255, 255, 255, 0.22);
+    color: white;
+}
+
+.load-more-remaining {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: #F9F5F0;
+    color: #8C7B6E;
+    font-size: 11px;
+    font-weight: 700;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
 .empty-state {
     padding: 60px 40px;
     text-align: center;

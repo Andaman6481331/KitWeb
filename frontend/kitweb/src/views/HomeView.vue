@@ -71,6 +71,12 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
     <!-- Info Banner -->
     <InfoBanner :badge="$t('home.bannerBadge')" :text="$t('home.bannerText')" />
 
+    <!-- The hero is this page's LCP but it is a CSS background, which the
+         preload scanner never sees. This hidden copy gets it fetched early, the
+         same trick EventPage and ContactUsPage already use. -->
+    <img :src="slides[0]" fetchpriority="high" aria-hidden="true" alt=""
+      style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">
+
     <!-- Hero Carousel -->
     <section
       class="hero-carousel"
@@ -433,14 +439,17 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
+  /* The floor matters: with only an aspect ratio, a narrow viewport shrinks the
+     section to width/1.78 (about 219px on a phone) while the content still asks
+     for its padding, heading, subtitle and buttons — which then overflow and get
+     clipped by the overflow:hidden above. */
+  min-height: 440px;
   max-height: 80vh;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   image-rendering: high-quality;
-  object-fit: cover;
-  object-position: top;
 }
 
 
@@ -734,31 +743,59 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
 }
 
 /* ===== RESPONSIVE ===== */
-@media (max-width: 992px) {
+@media (max-width: 1024px) {
   .hero-carousel { max-height: 70vh; }
   .feature-bar { grid-template-columns: repeat(2, 1fr); }
   .carousel-arrow { width: 40px; height: 40px; }
 }
 
 @media (max-width: 768px) {
-  .hero-carousel { max-height: 60vh; }
+  /* Height follows the viewport rather than the image ratio, the way the Events
+     hero already does it, so the section can never collapse under its content. */
+  .hero-carousel {
+    aspect-ratio: auto;
+    min-height: 68svh;
+    max-height: none;
+  }
 
-  .hero-content { padding: 60px 20px; text-align: center; }
+  /* The base overlay fades left-to-right, which suited left-aligned copy. The
+     text is centred at this width, so it would sit over the transparent half —
+     switch to the radial the Events hero uses. */
+  .carousel-overlay {
+    background: radial-gradient(
+      circle at center,
+      rgba(250, 244, 236, 0.84) 0%,
+      rgba(80, 60, 45, 0.18) 60%,
+      rgba(40, 28, 20, 0.34) 100%
+    );
+  }
+
+  .hero-content {
+    padding: 40px 20px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .hero-text { max-width: 100%; }
 
   .hero-eyebrow { justify-content: center; }
 
   .hero-title {
     font-size: clamp(1.9rem, 7vw, 2.6rem);
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
 
   .hero-subtitle {
     font-size: clamp(0.9rem, 3.2vw, 1.1rem);
     text-indent: 0;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
+    margin-left: auto;
+    margin-right: auto;
   }
 
-  .hero-buttons { justify-content: center; flex-wrap: wrap; }
+  .hero-buttons { justify-content: center; flex-wrap: wrap; gap: 12px; }
 
   .cta-primary,
   .cta-secondary { padding: 12px 28px; font-size: 15px; }
@@ -772,11 +809,20 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
 }
 
 @media (max-width: 480px) {
+  .hero-carousel { min-height: 72svh; }
+
+  .hero-content { padding: 32px 18px; }
+
   .hero-title { font-size: 1.85rem; }
 
   .hero-buttons { flex-direction: column; width: 100%; }
 
   .cta-primary,
   .cta-secondary { width: 100%; }
+}
+
+@media (hover: none) {
+  .cta-primary:hover,
+  .cta-secondary:hover { transform: none; }
 }
 </style>

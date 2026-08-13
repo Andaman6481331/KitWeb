@@ -18,7 +18,11 @@
     "b2bCatalog": "B2B カタログ",
     "contactUsDesc": "私たちのチームにお問い合わせください",
     "about": "私たちについて",
-    "aboutDesc": "1984年から続く私たちの歩み"
+    "aboutDesc": "1984年から続く私たちの歩み",
+    "menu": "メニュー",
+    "openMenu": "メニューを開く",
+    "closeMenu": "メニューを閉じる",
+    "language": "言語"
   },
   "footer": {
     "companyName": "キッチャルーン",
@@ -399,7 +403,8 @@
     "controls": {
       "restart": "最初から再生",
       "seekBack": "-10秒",
-      "seekForward": "+10秒"
+      "seekForward": "+10秒",
+      "close": "動画を閉じる"
     },
     "videos": {
       "clip1": {
@@ -436,6 +441,8 @@
     "backToCatalog": "カテゴリーに戻る",
     "collection": "{category} コレクション",
     "showing": "{count} 個の商品を表示中",
+    "showingOf": "{total} 個中 {shown} 個の商品を表示中",
+    "loadMore": "もっと見る",
     "sortBy": "並べ替え：",
     "sortPopular": "人気順",
     "sortPriceAsc": "価格：安い順",
@@ -472,7 +479,9 @@
     "categoryDescriptions": {
       "Default": "あなたの創造的なプロジェクトのために厳選された高品質の素材です。"
     },
-    "customerGalleryTitle": "お客さまの写真"
+    "customerGalleryTitle": "お客さまの写真",
+    "allLetters": "すべて",
+    "loading": "商品を読み込み中..."
   },
   "auth": {
     "since": "1984年創業",

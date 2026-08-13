@@ -54,13 +54,23 @@ export const scrollIntent = { toCategoryBar: false }
 // position where it was on the previous page, so a new page appears already
 // scrolled down. Back/forward restores the saved position; in-page hash links
 // scroll to their target (offset for the sticky navbar).
+// The navbar publishes its live height as --nav-h (App.vue), which differs
+// between the 64px mobile bar and the 80px desktop one. Reading it keeps anchor
+// scrolls from landing underneath the sticky header on either.
+function navOffset() {
+  if (typeof document === 'undefined') return 90
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--nav-h')
+  const parsed = parseInt(raw, 10)
+  return (Number.isFinite(parsed) ? parsed : 80) + 10
+}
+
 export function scrollBehavior(to, from, savedPosition) {
   if (scrollIntent.toCategoryBar) {
     scrollIntent.toCategoryBar = false
-    return { el: '#category-bar', top: 90, behavior: 'smooth' }
+    return { el: '#category-bar', top: navOffset(), behavior: 'smooth' }
   }
   if (savedPosition) return savedPosition
-  if (to.hash) return { el: to.hash, top: 90, behavior: 'smooth' }
+  if (to.hash) return { el: to.hash, top: navOffset(), behavior: 'smooth' }
   return { top: 0 }
 }
 

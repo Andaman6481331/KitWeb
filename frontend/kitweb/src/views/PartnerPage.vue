@@ -325,17 +325,27 @@ const handleLearnMoreClick = () => {
     box-sizing: border-box;
 }
 
+/* Same contract as the Events and Contact heroes. `contain` with no
+   background-repeat tiled the image down the page on narrow viewports. */
 .hero {
-    /* background: url('../assets/shop03.png'); */
-    background-size: contain;
+    background-size: cover;
+    background-repeat: no-repeat;
     background-position: center;
-    min-height: 600px;
+    min-height: 60svh;
     display: flex;
     justify-content: center;
     flex-direction: column;
     align-items: center;
     text-align: center;
     position: relative;
+    padding: 40px 20px;
+}
+
+@media (max-width: 768px) {
+    .hero {
+        min-height: 52svh;
+        padding: 32px 18px;
+    }
 }
 
 .hero::before {

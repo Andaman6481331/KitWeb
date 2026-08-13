@@ -1,6 +1,6 @@
 <script setup>
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { useHead } from '@unhead/vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale } from './i18n'
@@ -279,12 +279,24 @@ const cartItemName = (item) => (locale.value === 'th' && item.name_th) ? item.na
 // display groups (incl. merged groups like Thread & String / Scissors & Knives).
 const navCategories = catalogGroups
 
-const openCatalog  = () => { clearTimeout(catalogTimer); showCatalogMenu.value = true }
-const closeCatalog = () => { catalogTimer = setTimeout(() => { showCatalogMenu.value = false }, 130) }
+const openCatalog  = () => {
+  if (!canHover()) return
+  clearTimeout(catalogTimer); showCatalogMenu.value = true
+}
+const closeCatalog = () => {
+  if (!canHover()) return
+  catalogTimer = setTimeout(() => { showCatalogMenu.value = false }, 130)
+}
 const toggleCatalog = () => { showCatalogMenu.value = !showCatalogMenu.value; showCompanyMenu.value = false }
 
-const openCompany  = () => { clearTimeout(companyTimer); showCompanyMenu.value = true }
-const closeCompany = () => { companyTimer = setTimeout(() => { showCompanyMenu.value = false }, 130) }
+const openCompany  = () => {
+  if (!canHover()) return
+  clearTimeout(companyTimer); showCompanyMenu.value = true
+}
+const closeCompany = () => {
+  if (!canHover()) return
+  companyTimer = setTimeout(() => { showCompanyMenu.value = false }, 130)
+}
 const toggleCompany = () => { showCompanyMenu.value = !showCompanyMenu.value; showCatalogMenu.value = false }
 
 // Hover only where hover exists. On a touch device the pointer never leaves, so
@@ -303,11 +315,78 @@ const closeLanguage = () => {
   languageTimer = setTimeout(() => { showLanguageMenu.value = false }, 130)
 }
 
-const openCart  = () => { clearTimeout(cartTimer); showCartMenu.value = true }
-const closeCart = () => { cartTimer = setTimeout(() => { showCartMenu.value = false }, 130) }
+const openCart  = () => {
+  if (!canHover()) return
+  clearTimeout(cartTimer); showCartMenu.value = true
+}
+const closeCart = () => {
+  if (!canHover()) return
+  cartTimer = setTimeout(() => { showCartMenu.value = false }, 130)
+}
 
 const closeAllMenus = () => { showCatalogMenu.value = false; showCompanyMenu.value = false; showCartMenu.value = false; showLanguageMenu.value = false }
 const isCompanyActive = computed(() => ['about', 'partners', 'faq', 'contactus'].includes(String(route.name)))
+
+// ── Mobile drawer ─────────────────────────────
+// Below 1024px the navbar is a single 64px bar and everything else lives in a
+// slide-in panel. The desktop dropdowns are display:none there, so the drawer
+// re-uses their data (navCategories, languages) rather than a second source.
+const showMobileNav = ref(false)
+const drawerCatalogOpen = ref(false)
+const drawerEl = ref(null)
+const burgerEl = ref(null)
+
+const openMobileNav = () => {
+  closeAllMenus()
+  showMobileNav.value = true
+}
+const closeMobileNav = () => {
+  showMobileNav.value = false
+  drawerCatalogOpen.value = false
+}
+const toggleMobileNav = () => {
+  showMobileNav.value ? closeMobileNav() : openMobileNav()
+}
+
+// Language rows inside the drawer: switch, then dismiss the whole panel.
+const changeLanguageMobile = (code) => {
+  changeLanguage(code)
+  closeMobileNav()
+}
+
+// Any navigation closes the drawer, including taps on the route we are already on.
+watch(() => route.fullPath, closeMobileNav)
+
+// Lock the page behind the drawer. Storing the scroll position and restoring it
+// avoids the jump-to-top that a bare `overflow: hidden` on body causes on iOS.
+let lockedScrollY = 0
+watch(showMobileNav, (open) => {
+  if (typeof document === 'undefined') return
+  const body = document.body
+  if (open) {
+    lockedScrollY = window.scrollY
+    body.style.position = 'fixed'
+    body.style.top = `-${lockedScrollY}px`
+    body.style.left = '0'
+    body.style.right = '0'
+    body.style.overflow = 'hidden'
+    nextTick(() => {
+      drawerEl.value?.querySelector('a, button')?.focus()
+    })
+  } else {
+    body.style.position = ''
+    body.style.top = ''
+    body.style.left = ''
+    body.style.right = ''
+    body.style.overflow = ''
+    window.scrollTo(0, lockedScrollY)
+    burgerEl.value?.focus()
+  }
+})
+
+const handleNavKeydown = (e) => {
+  if (e.key === 'Escape' && showMobileNav.value) closeMobileNav()
+}
 
 // Publish the navbar's live height as a global --nav-h CSS variable. The navbar
 // wraps to a taller, variable height on mobile (and shifts with language), so
@@ -322,6 +401,7 @@ const syncNavHeight = () => {
 
 onMounted(() => {
   document.addEventListener('click', closeAllMenus)
+  document.addEventListener('keydown', handleNavKeydown)
   syncNavHeight()
   if (navBarEl.value && 'ResizeObserver' in window) {
     navResizeObserver = new ResizeObserver(syncNavHeight)
@@ -331,7 +411,14 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('click', closeAllMenus)
+  document.removeEventListener('keydown', handleNavKeydown)
   navResizeObserver?.disconnect()
+  // The drawer locks body scroll; unmounting with it open would strand the page.
+  document.body.style.position = ''
+  document.body.style.top = ''
+  document.body.style.left = ''
+  document.body.style.right = ''
+  document.body.style.overflow = ''
 })
 </script>
 
@@ -578,7 +665,164 @@ onUnmounted(() => {
           <!-- </template> -->
         </div>
       </div>
+
+      <!-- Mobile: cart and hamburger. Its own row so .nav-right (which carries
+           the desktop dropdowns) can be hidden wholesale below 1024px. -->
+      <div class="nav-mobile-actions">
+        <router-link
+          class="cart-trigger mobile-cart"
+          :to="{ name: 'orderpage', params: { lang: currentLang } }"
+          :aria-label="$t('nav.shoppingCart')"
+          @click="closeMobileNav()"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0" />
+          </svg>
+          <span v-if="cartCount > 0" class="cart-count-badge">{{ cartCount }}</span>
+        </router-link>
+
+        <button
+          ref="burgerEl"
+          class="nav-burger"
+          type="button"
+          :class="{ open: showMobileNav }"
+          :aria-expanded="showMobileNav ? 'true' : 'false'"
+          aria-controls="mobile-drawer"
+          :aria-label="showMobileNav ? $t('nav.closeMenu') : $t('nav.openMenu')"
+          @click.stop="toggleMobileNav"
+        >
+          <span class="burger-line"></span>
+          <span class="burger-line"></span>
+          <span class="burger-line"></span>
+        </button>
+      </div>
     </div>
+
+    <!-- Scrim -->
+    <Transition name="drawer-fade">
+      <div v-if="showMobileNav" class="drawer-scrim" aria-hidden="true" @click="closeMobileNav"></div>
+    </Transition>
+
+    <!-- Mobile drawer -->
+    <Transition name="drawer-slide">
+      <nav
+        v-if="showMobileNav"
+        id="mobile-drawer"
+        ref="drawerEl"
+        class="mobile-drawer"
+        :aria-label="$t('nav.menu')"
+        @click.stop
+      >
+        <router-link
+          :to="{ name: 'home', params: { lang: currentLang } }"
+          class="drawer-link"
+          active-class="drawer-link-active"
+          exact-active-class="drawer-link-active"
+          @click="closeMobileNav"
+        >
+          <span class="dd-page-icon"><ion-icon name="home-outline"></ion-icon></span>
+          <span class="dd-page-title">{{ $t('nav.home') }}</span>
+        </router-link>
+
+        <!-- Products: accordion over the same 12 groups as the desktop dropdown -->
+        <button
+          type="button"
+          class="drawer-link drawer-accordion-trigger"
+          :aria-expanded="drawerCatalogOpen ? 'true' : 'false'"
+          @click="drawerCatalogOpen = !drawerCatalogOpen"
+        >
+          <span class="dd-page-icon"><ion-icon name="grid-outline"></ion-icon></span>
+          <span class="dd-page-title">{{ $t('nav.products') }}</span>
+          <svg class="drawer-chevron" :class="{ open: drawerCatalogOpen }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        <div v-show="drawerCatalogOpen" class="drawer-sublist">
+          <router-link
+            v-for="cat in navCategories"
+            :key="cat.key"
+            :to="{ name: 'catalog', params: { lang: currentLang, category: cat.key } }"
+            class="drawer-sublink"
+            @click="closeMobileNav"
+          >
+            <ion-icon v-if="cat.svgSrc" :src="cat.svgSrc"></ion-icon>
+            <ion-icon v-else-if="cat.icon" :name="cat.icon"></ion-icon>
+            <span>{{ $t(`categories.${cat.key}`) }}</span>
+          </router-link>
+          <router-link
+            :to="{ name: 'catalog', params: { lang: currentLang, category: 'all' } }"
+            class="drawer-sublink drawer-sublink-all"
+            @click="closeMobileNav"
+          >
+            {{ $t('nav.viewAll') }}
+            <ion-icon name="arrow-forward-outline"></ion-icon>
+          </router-link>
+        </div>
+
+        <router-link :to="{ name: 'event', params: { lang: currentLang } }" class="drawer-link" active-class="drawer-link-active" @click="closeMobileNav">
+          <span class="dd-page-icon"><ion-icon name="calendar-outline"></ion-icon></span>
+          <span class="dd-page-title">{{ $t('nav.events') }}</span>
+        </router-link>
+
+        <router-link :to="{ name: 'institutional-catalog', params: { lang: currentLang } }" class="drawer-link" active-class="drawer-link-active" @click="closeMobileNav">
+          <span class="dd-page-icon"><ion-icon name="business-outline"></ion-icon></span>
+          <span class="dd-page-title">{{ $t('nav.b2bCatalog') }}</span>
+        </router-link>
+
+        <div class="drawer-divider"></div>
+
+        <router-link :to="{ name: 'about', params: { lang: currentLang } }" class="drawer-link" active-class="drawer-link-active" @click="closeMobileNav">
+          <span class="dd-page-icon"><ion-icon name="storefront-outline"></ion-icon></span>
+          <span class="dd-page-title">{{ $t('nav.about') }}</span>
+        </router-link>
+        <router-link :to="{ name: 'partners', params: { lang: currentLang } }" class="drawer-link" active-class="drawer-link-active" @click="closeMobileNav">
+          <span class="dd-page-icon"><ion-icon name="people-outline"></ion-icon></span>
+          <span class="dd-page-title">{{ $t('nav.partners') }}</span>
+        </router-link>
+        <router-link :to="{ name: 'faq', params: { lang: currentLang } }" class="drawer-link" active-class="drawer-link-active" @click="closeMobileNav">
+          <span class="dd-page-icon"><ion-icon name="help-circle-outline"></ion-icon></span>
+          <span class="dd-page-title">{{ $t('nav.faq') }}</span>
+        </router-link>
+        <router-link :to="{ name: 'contactus', params: { lang: currentLang } }" class="drawer-link" active-class="drawer-link-active" @click="closeMobileNav">
+          <span class="dd-page-icon"><ion-icon name="mail-outline"></ion-icon></span>
+          <span class="dd-page-title">{{ $t('nav.contactUs') }}</span>
+        </router-link>
+
+        <div class="drawer-divider"></div>
+
+        <!-- Language: same rows as the desktop .lang-dd, same handler -->
+        <div class="drawer-section-label">{{ $t('nav.language') }}</div>
+        <div class="drawer-langs">
+          <button
+            v-for="lang in languages"
+            :key="lang.code"
+            type="button"
+            class="drawer-lang"
+            :class="{ 'drawer-lang-active': currentLanguage === lang.code }"
+            :aria-current="currentLanguage === lang.code ? 'true' : undefined"
+            @click="changeLanguageMobile(lang.code)"
+          >
+            <span class="drawer-lang-code">{{ lang.flag }}</span>
+            <span>{{ lang.label }}</span>
+          </button>
+        </div>
+
+        <div class="drawer-divider"></div>
+
+        <router-link
+          v-if="!authStore.isAuthenticated"
+          :to="{ name: 'login', params: { lang: currentLang } }"
+          class="drawer-login"
+          @click="closeMobileNav"
+        >
+          {{ $t('nav.login') }}
+        </router-link>
+        <button v-else type="button" class="drawer-login drawer-logout" @click="closeMobileNav(); handleLogout()">
+          {{ $t('order.logout') }}
+        </button>
+      </nav>
+    </Transition>
 
     <RouterView />
 
@@ -730,39 +974,13 @@ onUnmounted(() => {
   font-display: swap;
 }
 
-/* The Seasons — display face for English headings.
-   A licensed font, so the files are not committed: drop them into public/fonts/
-   and these rules pick them up. Two naming conventions are listed per weight
-   because the family ships under both; the browser walks the src list and uses
-   the first that loads, so whichever pair you have will work.
-   Until the files exist, every heading falls through to Crimson Pro — nothing
-   breaks, the type just stays as it is now. */
-@font-face {
-  font-family: 'The Seasons';
-  src: url('/fonts/TheSeasons-Light.otf') format('opentype'),
-       url('/fonts/theseasons-lt.otf') format('opentype');
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'The Seasons';
-  src: url('/fonts/TheSeasons-Regular.otf') format('opentype'),
-       url('/fonts/theseasons-reg.otf') format('opentype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'The Seasons';
-  src: url('/fonts/TheSeasons-Bold.otf') format('opentype'),
-       url('/fonts/theseasons-bd.otf') format('opentype');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
+/* 'The Seasons' was declared here as the English display face, but it is a
+   licensed family and the .otf files were never committed. Every request fell
+   through to the SPA's index.html, which the browser then failed to parse as a
+   font — six discarded downloads and a console error per page, while headings
+   rendered in Crimson Pro regardless. Removed; Crimson Pro is now stated
+   directly. To reinstate it, add the files under public/fonts/ and restore the
+   @font-face blocks plus the family in the heading stack below. */
 
 html, body {
   width: 100%;
@@ -820,14 +1038,13 @@ html[lang="en"][lang="en"] *::after {
   font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
 }
 
-/* Headings get the display face; body copy stays Work Sans. The Seasons is a
-   high-contrast display serif — it is built for large type and gets thin and
-   hard to read at paragraph sizes, which is why it is scoped to h1-h4. */
+/* Headings get the serif; body copy stays Work Sans. Scoped to h1-h4 because a
+   high-contrast serif is built for large type and goes thin at paragraph sizes. */
 html[lang="en"][lang="en"] h1,
 html[lang="en"][lang="en"] h2,
 html[lang="en"][lang="en"] h3,
 html[lang="en"][lang="en"] h4 {
-  font-family: 'The Seasons', 'Crimson Pro', 'Georgia', serif !important;
+  font-family: 'Crimson Pro', 'Georgia', serif !important;
 }
 
 body {
@@ -927,11 +1144,20 @@ body {
   font-size: 16px;
 }
 
+/* The Catalog trigger is a router-link, so hover opens the menu on a mouse. Where
+   there is no hover — a tablet wide enough to still get the desktop nav — this
+   overlay makes the first tap open the menu instead of navigating away. */
 .dd-trigger-area {
   position: absolute;
   inset: 0;
   cursor: pointer;
   display: none;
+}
+
+@media (hover: none) {
+  .dd-trigger-area {
+    display: block;
+  }
 }
 
 .dd-chevron {
@@ -1546,6 +1772,15 @@ body {
   opacity: 0.6;
 }
 
+/* ── Mobile bar actions ───────────────────────── */
+/* Declared before the responsive block below, so the media query that flips it
+   to flex is the later rule and wins. */
+.nav-mobile-actions {
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+
 /* Responsive Design */
 @media (max-width: 1280px) {
   .NavBar {
@@ -1581,55 +1816,310 @@ body {
   }
 }
 
-@media (max-width: 992px) {
+/* Below 1024px the desktop nav (links + hover dropdowns) is replaced wholesale by
+   a single 64px bar plus the slide-in drawer. The fixed height matters beyond
+   looks: pages offset themselves by --nav-h, and the old wrapped layout made that
+   150-180px and dependent on the active language. */
+@media (max-width: 1024px) {
   .NavBar {
-    height: auto;
-    padding: 15px 3%;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.1rem;
+    height: 64px;
+    padding: 0 16px;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: 0;
   }
 
   .nav-left {
-    width: 100%;
-    justify-content: center;
-    height: 50px;
+    flex: 0 0 auto;
   }
+
   .main-logo {
-    height: 40px;
+    height: 38px;
   }
 
-  .nav-center {
-    width: 100%;
-    justify-content: center;
-    order: 3;
-    gap: 25px;
-  }
-
+  .nav-center,
   .nav-right {
-    width: 100%;
-    justify-content: center;
-    order: 2;
+    display: none;
+  }
+
+  .nav-mobile-actions {
+    display: flex;
   }
 }
 
-@media (max-width: 640px) {
-  .nav-center {
-    gap: 15px;
+@media (max-width: 380px) {
+  .NavBar {
+    padding: 0 12px;
   }
 
-  .nav-link {
-    font-size: 13px;
+  .main-logo {
+    height: 32px;
   }
 
-  .action-icons {
-    gap: 10px;
+  .nav-mobile-actions {
+    gap: 4px;
   }
+}
 
-  .login-capsule,
-  .order-capsule {
-    padding: 8px 16px;
-    font-size: 12px;
+.mobile-cart {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  color: #5d4037;
+  text-decoration: none;
+}
+
+.nav-burger {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.burger-line {
+  display: block;
+  width: 22px;
+  height: 2px;
+  border-radius: 2px;
+  background: #5d4037;
+  transition: transform 0.24s ease, opacity 0.18s ease;
+}
+
+.nav-burger.open .burger-line:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.nav-burger.open .burger-line:nth-child(2) {
+  opacity: 0;
+}
+
+.nav-burger.open .burger-line:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* ── Mobile drawer ────────────────────────────── */
+.drawer-scrim {
+  position: fixed;
+  inset: 0;
+  top: var(--nav-h, 64px);
+  background: rgba(45, 30, 20, 0.42);
+  z-index: 900;
+}
+
+.mobile-drawer {
+  position: fixed;
+  top: var(--nav-h, 64px);
+  right: 0;
+  width: min(86vw, 360px);
+  height: calc(100dvh - var(--nav-h, 64px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 12px calc(24px + env(safe-area-inset-bottom, 0px)) 12px;
+  background: #fff;
+  box-shadow: -8px 0 32px rgba(60, 35, 15, 0.18);
+  z-index: 950;
+}
+
+/* Rows borrow the dropdown contract (.dd-page-icon / .dd-page-title) so the
+   drawer reads as the same design language as the desktop menus. */
+.drawer-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: #5d4037;
+  font-size: 15px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+
+.drawer-link .dd-page-title {
+  font-size: 15px;
+}
+
+.drawer-link-active {
+  background: #FDF3E6;
+}
+
+.drawer-link-active .dd-page-icon {
+  background: #DD876E;
+  color: #fff;
+}
+
+.drawer-link-active .dd-page-icon ion-icon {
+  color: #fff;
+}
+
+.drawer-accordion-trigger .drawer-chevron {
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.drawer-accordion-trigger .drawer-chevron.open {
+  transform: rotate(180deg);
+}
+
+.drawer-sublist {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 4px 4px 10px 4px;
+}
+
+.drawer-sublink {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: #5d4037;
+  font-size: 13px;
+  line-height: 1.25;
+  text-decoration: none;
+}
+
+.drawer-sublink ion-icon {
+  flex-shrink: 0;
+  font-size: 17px;
+  color: #DD876E;
+}
+
+.drawer-sublink-all {
+  grid-column: 1 / -1;
+  justify-content: center;
+  background: #FDF3E6;
+  font-weight: 600;
+}
+
+.drawer-divider {
+  height: 1px;
+  margin: 10px 4px;
+  background: rgba(220, 195, 165, 0.5);
+}
+
+.drawer-section-label {
+  padding: 0 12px 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #9e8272;
+}
+
+.drawer-langs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 0 4px;
+}
+
+.drawer-lang {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1.5px solid #e4d5c6;
+  border-radius: 10px;
+  background: #fff;
+  color: #5d4037;
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.drawer-lang-code {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  color: #DD876E;
+}
+
+.drawer-lang-active {
+  background: #DD876E;
+  border-color: #DD876E;
+  color: #fff;
+}
+
+.drawer-lang-active .drawer-lang-code {
+  color: #fff;
+}
+
+.drawer-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 4px;
+  border: none;
+  border-radius: 50px;
+  background: #DD876E;
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.drawer-logout {
+  background: #fff;
+  border: 1.5px solid #e4d5c6;
+  color: #5d4037;
+}
+
+/* Transitions */
+.drawer-slide-enter-active,
+.drawer-slide-leave-active {
+  transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.drawer-slide-enter-from,
+.drawer-slide-leave-to {
+  transform: translateX(100%);
+}
+
+.drawer-fade-enter-active,
+.drawer-fade-leave-active {
+  transition: opacity 0.26s ease;
+}
+
+.drawer-fade-enter-from,
+.drawer-fade-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer-slide-enter-active,
+  .drawer-slide-leave-active,
+  .drawer-fade-enter-active,
+  .drawer-fade-leave-active,
+  .burger-line {
+    transition: none;
   }
 }
 </style>
