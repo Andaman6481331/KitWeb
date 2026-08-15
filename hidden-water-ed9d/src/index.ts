@@ -123,6 +123,100 @@ function mapGalleryRow(row: any) {
 	};
 }
 
+/** Slug for a business set. Mirrors generateProjectSlug's non-Latin fallback. */
+function generateSetSlug(name: string, id?: number | string): string {
+	const ascii = (name || "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+	if (ascii) return id ? `${ascii}-${id}` : ascii;
+	return `set-${id ?? Date.now()}`;
+}
+
+/**
+ * Load sets with their lines, denormalizing each component's name, MOQ and box
+ * prices so the client can roll up a price without fetching the whole catalog.
+ * Two queries and an in-memory join, never N+1.
+ *
+ * A line is `missing` when its product was deleted or hidden; a set with any
+ * missing line is `is_incomplete` and has no correct price.
+ */
+async function loadSets(env: any, opts: { slug?: string; includeUnpublished?: boolean } = {}) {
+	const conditions: string[] = [];
+	const binds: any[] = [];
+	if (opts.slug) {
+		conditions.push("slug = ?");
+		binds.push(opts.slug);
+	}
+	if (!opts.includeUnpublished) {
+		conditions.push("(is_published IS NULL OR is_published = 1)");
+	}
+
+	let query = "SELECT * FROM product_sets";
+	if (conditions.length) query += " WHERE " + conditions.join(" AND ");
+	query += " ORDER BY sort_order ASC, id ASC";
+
+	const { results: setRows } = await env.DB.prepare(query).bind(...binds).all();
+	const sets = (setRows || []) as any[];
+	if (!sets.length) return [];
+
+	const placeholders = sets.map(() => "?").join(",");
+	const { results: itemRows } = await env.DB.prepare(
+		`SELECT i.id, i.set_id, i.product_id, i.variant_id, i.quantity, i.sort_order,
+		        p.id AS p_id, p.name, p.name_th, p.moq, p.image_key AS p_image_key, p.is_visible,
+		        p.price_1 AS p_price_1, p.price_2 AS p_price_2, p.price_3 AS p_price_3,
+		        v.id AS v_id, v.variant_name, v.image_key AS v_image_key,
+		        v.price_1 AS v_price_1, v.price_2 AS v_price_2, v.price_3 AS v_price_3
+		 FROM product_set_items i
+		 LEFT JOIN products p ON p.id = i.product_id
+		 LEFT JOIN product_variants v ON v.id = i.variant_id
+		 WHERE i.set_id IN (${placeholders})
+		 ORDER BY i.sort_order ASC, i.id ASC`
+	).bind(...sets.map((s) => s.id)).all();
+
+	const bySet = new Map<number, any[]>();
+	for (const r of (itemRows || []) as any[]) {
+		// Deleted product -> no join row; hidden product -> is_visible 0.
+		const missing = r.p_id === null || Number(r.is_visible) === 0;
+		const useVariant = r.v_id !== null;
+		const line = {
+			id: Number(r.id),
+			product_id: Number(r.product_id),
+			variant_id: r.variant_id === null ? null : Number(r.variant_id),
+			quantity: Number(r.quantity),
+			sort_order: Number(r.sort_order) || 0,
+			// Variant name is appended so a set line reads "Crochet Hook (4 inches)".
+			name: useVariant && r.name ? `${r.name} (${r.variant_name})` : r.name,
+			name_th: r.name_th,
+			// MOQ is the box size and always lives on the parent product.
+			moq: r.moq,
+			price_1: Number(useVariant ? r.v_price_1 : r.p_price_1) || 0,
+			price_2: Number(useVariant ? r.v_price_2 : r.p_price_2) || 0,
+			price_3: Number(useVariant ? r.v_price_3 : r.p_price_3) || 0,
+			image_key: (useVariant ? r.v_image_key : r.p_image_key) || null,
+			missing
+		};
+		const list = bySet.get(Number(r.set_id)) || [];
+		list.push(line);
+		bySet.set(Number(r.set_id), list);
+	}
+
+	return sets.map((s) => {
+		const items = bySet.get(Number(s.id)) || [];
+		return {
+			...s,
+			price_tier: Number(s.price_tier) || 1,
+			discount_pct: Number(s.discount_pct) || 0,
+			is_published: s.is_published === null || s.is_published === undefined
+				? true
+				: Number(s.is_published) === 1,
+			sort_order: Number(s.sort_order) || 0,
+			is_incomplete: items.some((i) => i.missing),
+			items
+		};
+	});
+}
+
 /**
  * Parse the events.gallery JSON column into a media array, dropping anything that
  * is not a usable {type, src} pair rather than letting it reach the template.
@@ -562,6 +656,25 @@ export default {
 				if (!row) return corsResponse({ error: "Not found" }, { status: 404 });
 
 				return corsResponse(mapProjectRow(row));
+			}
+
+			// ── Business Sets ─────────────────────────────────────────────
+			// Fixed wholesale bundles. Incomplete sets (a component was deleted or
+			// hidden) are suppressed here rather than by each page, so every consumer
+			// behaves the same and no page can render a set with no correct price.
+			if (url.pathname === "/business-sets" && request.method === "GET") {
+				const sets = await loadSets(env);
+				return corsResponse(sets.filter((s: any) => !s.is_incomplete));
+			}
+
+			if (url.pathname.startsWith("/business-sets/") && request.method === "GET") {
+				const slug = decodeURIComponent(url.pathname.slice("/business-sets/".length));
+				if (!slug) return corsResponse({ error: "Slug required" }, { status: 400 });
+
+				const [set] = await loadSets(env, { slug });
+				if (!set || set.is_incomplete) return corsResponse({ error: "Not found" }, { status: 404 });
+
+				return corsResponse(set);
 			}
 
 			// ── Color of the Month ────────────────────────────────────────
