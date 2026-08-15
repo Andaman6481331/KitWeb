@@ -184,6 +184,37 @@ export const api = {
     return await response.json();
   },
 
+  // ── Business Sets (fixed wholesale bundles) ───────────────────
+  async getBusinessSets({ includeUnpublished = false } = {}) {
+    const qs = includeUnpublished ? '?include_unpublished=1' : '';
+    return getJson(`${API_URL}/business-sets${qs}`, 'Failed to fetch business sets');
+  },
+
+  async getBusinessSet(slug) {
+    return getJson(`${API_URL}/business-sets/${encodeURIComponent(slug)}`, 'Failed to fetch business set');
+  },
+
+  // Create when payload has no id, update when it does.
+  async saveBusinessSet(payload) {
+    const response = await fetch(`${API_URL}/business-sets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(await parseApiError(response, 'Failed to save business set'));
+    return await response.json();
+  },
+
+  async deleteBusinessSet(id) {
+    const response = await fetch(`${API_URL}/business-sets/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
+      body: JSON.stringify({ id })
+    });
+    if (!response.ok) throw new Error(await parseApiError(response, 'Failed to delete business set'));
+    return await response.json();
+  },
+
   // ── Color of the Month ────────────────────────────────────────
   // active: true -> just the current color; false -> the full list for admin.
   async getSpotlights({ active = false } = {}) {
