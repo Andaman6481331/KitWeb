@@ -192,8 +192,11 @@ roll-up while editing, so the number is visible before publishing.
   These two stale tests are to be deleted, not fixed — they assert behaviour the
   worker never had.
 - **The frontend has no test runner at all** — `frontend/kitweb/package.json` has no
-  test script and no vitest dependency. Adding roll-up unit tests requires adding
-  vitest to the frontend. This is real, previously unflagged scope.
+  test script and no vitest dependency. **Decision: adding vitest to the frontend is
+  in scope for this change.** The roll-up is where a wrong number becomes a wrong
+  wholesale quote, so `productPricing.js` must be covered directly rather than
+  inferred from the worker's output. This brings a `test` script, a vitest dev
+  dependency, and the first `*.spec.js` files under `frontend/kitweb/`.
 - Worker tests need the schema applied to the test D1. `vitest.config.mts` already
   uses `defineWorkersConfig` with `wrangler.jsonc`, so the `DB` binding resolves, but
   migrations are not applied automatically — a setup step must apply them.
