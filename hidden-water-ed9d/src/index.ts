@@ -663,8 +663,11 @@ export default {
 			// hidden) are suppressed here rather than by each page, so every consumer
 			// behaves the same and no page can render a set with no correct price.
 			if (url.pathname === "/business-sets" && request.method === "GET") {
-				const sets = await loadSets(env);
-				return corsResponse(sets.filter((s: any) => !s.is_incomplete));
+				// Admin lists need drafts and broken sets so they can be fixed; the
+				// storefront must never see either. Read-only, so it is safe to expose.
+				const includeUnpublished = url.searchParams.get("include_unpublished") === "1";
+				const sets = await loadSets(env, { includeUnpublished });
+				return corsResponse(includeUnpublished ? sets : sets.filter((s: any) => !s.is_incomplete));
 			}
 
 			if (url.pathname.startsWith("/business-sets/") && request.method === "GET") {
@@ -1456,6 +1459,95 @@ export default {
 				const body = await request.json() as any;
 				if (!body.id) return corsResponse({ error: "id is required" }, { status: 400 });
 				await env.DB.prepare("DELETE FROM projects WHERE id = ?").bind(body.id).run();
+				return corsResponse({ success: true });
+			}
+
+			// ── Business Sets: create / update ────────────────────────────
+			// Sending an id updates that row; omitting it inserts a new one. The item
+			// list is replaced wholesale rather than diffed -- a set is small and always
+			// edited as a whole.
+			if (url.pathname === "/business-sets" && request.method === "POST") {
+				const body = await request.json() as any;
+
+				const name = (body.name || "").trim();
+				if (!name) return corsResponse({ error: "name is required" }, { status: 400 });
+
+				const priceTier = body.price_tier === undefined ? 1 : Number(body.price_tier);
+				if (!Number.isInteger(priceTier) || priceTier < 1 || priceTier > 3) {
+					return corsResponse({ error: "price_tier must be 1, 2 or 3" }, { status: 400 });
+				}
+
+				const discountPct = body.discount_pct === undefined ? 0 : Number(body.discount_pct);
+				if (!Number.isFinite(discountPct) || discountPct < 0 || discountPct > 100) {
+					return corsResponse({ error: "discount_pct must be between 0 and 100" }, { status: 400 });
+				}
+
+				const rawItems = Array.isArray(body.items) ? body.items : [];
+				const items = rawItems.map((it: any) => ({
+					product_id: Number(it.product_id),
+					variant_id: it.variant_id === null || it.variant_id === undefined ? null : Number(it.variant_id),
+					quantity: Number(it.quantity)
+				}));
+				for (const it of items) {
+					if (!Number.isInteger(it.product_id) || it.product_id <= 0) {
+						return corsResponse({ error: "each item needs a product_id" }, { status: 400 });
+					}
+					if (!Number.isInteger(it.quantity) || it.quantity <= 0) {
+						return corsResponse({ error: "each item quantity must be a positive integer" }, { status: 400 });
+					}
+				}
+
+				// A set with no lines has nothing to quote, so it cannot go live.
+				const isPublished = items.length === 0 ? 0 : (body.is_published === false ? 0 : 1);
+				const sortOrder = Number(body.sort_order) || 0;
+
+				let setId: number;
+				if (body.id) {
+					setId = Number(body.id);
+					await env.DB.prepare(
+						`UPDATE product_sets SET name = ?, name_th = ?, cover_image_key = ?, description = ?,
+						 description_th = ?, price_tier = ?, discount_pct = ?, is_published = ?, sort_order = ?
+						 WHERE id = ?`
+					).bind(
+						name, body.name_th || null, body.cover_image_key || null, body.description || null,
+						body.description_th || null, priceTier, discountPct, isPublished, sortOrder, setId
+					).run();
+				} else {
+					const res = await env.DB.prepare(
+						`INSERT INTO product_sets (name, name_th, slug, cover_image_key, description,
+						 description_th, price_tier, discount_pct, is_published, sort_order)
+						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+					).bind(
+						name, body.name_th || null, `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+						body.cover_image_key || null, body.description || null, body.description_th || null,
+						priceTier, discountPct, isPublished, sortOrder
+					).run();
+					setId = Number(res.meta.last_row_id);
+					// Slug needs the id, so it is written once the row exists -- same order
+					// as /projects.
+					await env.DB.prepare("UPDATE product_sets SET slug = ? WHERE id = ?")
+						.bind(generateSetSlug(name, setId), setId).run();
+				}
+
+				await env.DB.prepare("DELETE FROM product_set_items WHERE set_id = ?").bind(setId).run();
+				for (let i = 0; i < items.length; i++) {
+					const it = items[i];
+					await env.DB.prepare(
+						`INSERT INTO product_set_items (set_id, product_id, variant_id, quantity, sort_order)
+						 VALUES (?, ?, ?, ?, ?)`
+					).bind(setId, it.product_id, it.variant_id, it.quantity, i).run();
+				}
+
+				const row = (await loadSets(env, { includeUnpublished: true }))
+					.find((s: any) => Number(s.id) === setId);
+				return corsResponse(row);
+			}
+
+			if (url.pathname === "/business-sets/delete" && request.method === "POST") {
+				const body = await request.json() as any;
+				if (!body.id) return corsResponse({ error: "id is required" }, { status: 400 });
+				await env.DB.prepare("DELETE FROM product_set_items WHERE set_id = ?").bind(body.id).run();
+				await env.DB.prepare("DELETE FROM product_sets WHERE id = ?").bind(body.id).run();
 				return corsResponse({ success: true });
 			}
 
