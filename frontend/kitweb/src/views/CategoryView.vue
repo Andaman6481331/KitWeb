@@ -387,8 +387,9 @@ watch(letterFilter, (letter) => {
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    justify-content: center;
-    border: 3px solid black;
+    justify-content: center;    
+    border: 3px solid rgb(240, 228, 212);
+    /* background: rgb(251, 247, 242); */
 }
 
 .category-bar-image ion-icon {

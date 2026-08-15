@@ -148,8 +148,8 @@ const sections = computed(() => [
                             :class="{ active: currentCategory === group.key }"
                             @click="selectCategory(group.key); sidebarOpen = false"
                         >
-                            <ion-icon v-if="group.svgSrc" :src="group.svgSrc"></ion-icon>
-                            <ion-icon v-else-if="group.icon" :name="group.icon"></ion-icon>
+                            <ion-icon class="sidebar-cat-icon" v-if="group.svgSrc" :src="group.svgSrc"></ion-icon>
+                            <ion-icon class="sidebar-cat-icon" v-else-if="group.icon" :name="group.icon"></ion-icon>
                             <span>{{ $t(`categories.${group.key}`) }}</span>
                             <ion-icon name="chevron-forward-outline" class="arrow-icon"></ion-icon>
                         </button>
@@ -391,6 +391,26 @@ const sections = computed(() => [
     background: #DD876E;
     color: #fff;
     font-weight: 600;
+}
+
+.sidebar-cat-item.active:hover {
+    background: #DD876E;
+    color: #fff;
+}
+
+/* The category icons are external SVGs with #eb4034 baked in (floras strokes it
+   rather than filling), and ion-icon injects them into its shadow DOM — so
+   neither `color` nor a `fill` rule from out here can reach them. A filter can:
+   it works on the rendered pixels, so it flattens fill- and stroke-drawn icons
+   alike. Red on the terracotta active row reads as almost the same tone, so the
+   icon goes white to match its label. */
+.sidebar-cat-icon {
+    flex-shrink: 0;
+    transition: filter 0.18s;
+}
+
+.sidebar-cat-item.active .sidebar-cat-icon {
+    filter: brightness(0) invert(1);
 }
 
 .cat-icon {
