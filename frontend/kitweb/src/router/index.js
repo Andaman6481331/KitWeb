@@ -23,6 +23,8 @@ export const routes = [
       { path: '', name: 'home', component: Home },
       { path: 'catalog/:category?/:productSlug?', name: 'catalog', component: Catalog },
       { path: 'institutional-catalog', name: 'institutional-catalog', component: () => import('../views/InstitutionalCatalogPage.vue') },
+      { path: 'business-sets', name: 'business-sets', component: () => import('../views/BusinessSetsPage.vue') },
+      { path: 'business-sets/:slug', name: 'business-set', component: () => import('../views/BusinessSetPage.vue') },
       { path: 'orderpage', name: 'orderpage', component: OrderPage },
       { path: 'ordertracking', name: 'ordertracking', component: () => import('../views/OrderTrackingPage.vue'), meta: { requiresAuth: true } },
       { path: 'about', name: 'about', component: () => import('../views/AboutPage.vue') },
