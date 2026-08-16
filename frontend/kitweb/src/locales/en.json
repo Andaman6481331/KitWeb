@@ -435,7 +435,24 @@
     "address": "376 Wanich 1 Chakkrawat Samphantawong Bangkok",
     "name": "Kitcharoen"
   },
+  "businessSets": {
+    "title": "Business Sets",
+    "subtitle": "Ready-to-sell craft material bundles at fixed quantities.",
+    "loading": "Loading sets...",
+    "empty": "No sets are available right now.",
+    "notFound": "That set could not be found.",
+    "itemCount": "{count} items",
+    "item": "Item",
+    "quantity": "Qty",
+    "perPiece": "Per piece",
+    "lineTotal": "Total",
+    "subtotal": "Subtotal",
+    "discount": "Set discount ({pct}%)",
+    "total": "Set price",
+    "requestSet": "Request this set"
+  },
   "admin": {
+    "businessSets": "Business Sets",
     "loginTitle": "Admin Login",
     "passwordPlaceholder": "Password",
     "signIn": "Sign In",

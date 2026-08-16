@@ -252,7 +252,24 @@
       "contact": "立即合作"
     }
   },
+  "businessSets": {
+    "title": "Business Sets",
+    "subtitle": "Ready-to-sell craft material bundles at fixed quantities.",
+    "loading": "Loading sets...",
+    "empty": "No sets are available right now.",
+    "notFound": "That set could not be found.",
+    "itemCount": "{count} items",
+    "item": "Item",
+    "quantity": "Qty",
+    "perPiece": "Per piece",
+    "lineTotal": "Total",
+    "subtotal": "Subtotal",
+    "discount": "Set discount ({pct}%)",
+    "total": "Set price",
+    "requestSet": "Request this set"
+  },
   "admin": {
+    "businessSets": "Business Sets",
     "loginTitle": "管理员登录",
     "passwordPlaceholder": "密码",
     "signIn": "登录",
