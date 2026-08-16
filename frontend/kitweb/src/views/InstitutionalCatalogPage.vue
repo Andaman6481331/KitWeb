@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { api, API_URL} from '../services/api';
 import { groupByDisplayGroup } from '@/utils/catalogCategories';
+import { rollUpSet } from '@/utils/setPricing';
 import RfqModal from '../components/rfq-modal.vue';
 
 const { t, locale } = useI18n();
@@ -47,6 +48,18 @@ const getImageUrl = (key, variant = 'large') => {
 const groupLabel = (key) => {
   if (!key) return '';
   return t(`categories.${key}`, key.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
+};
+
+const businessSets = ref([]);
+
+const loadBusinessSets = async () => {
+  try {
+    const sets = await api.getBusinessSets();
+    businessSets.value = sets.map(s => ({ ...s, rollUp: rollUpSet(s) }));
+  } catch {
+    // The band is supplementary; a failure here must not blank the catalog.
+    businessSets.value = [];
+  }
 };
 
 // Fetch data
@@ -115,7 +128,8 @@ onBeforeUnmount(() => {
 
 onMounted(() => {
   fetchCatalog();
-  
+  loadBusinessSets();
+
   // Set B2B SEO metadata
   document.title = locale.value === 'th' 
     ? 'รายการแคตตาล็อกสถาบันและองค์กร | KitCraft B2B' 
@@ -613,6 +627,24 @@ const handleDocxDownload = async () => {
 
       <!-- Catalog Main Content -->
       <div v-else class="catalog-grid-wrapper">
+        <!-- Ready-made bundles, offered before the shop starts picking SKUs. -->
+        <section v-if="businessSets.length" class="sets-band">
+          <h2>{{ t('businessSets.title') }}</h2>
+          <p class="sets-band-sub">{{ t('businessSets.subtitle') }}</p>
+          <div class="sets-band-grid">
+            <router-link
+              v-for="s in businessSets"
+              :key="s.id"
+              :to="{ name: 'business-set', params: { lang: $route.params.lang, slug: s.slug } }"
+              class="sets-band-card"
+            >
+              <span class="sets-band-name">{{ locale === 'th' && s.name_th ? s.name_th : s.name }}</span>
+              <span class="sets-band-count">{{ t('businessSets.itemCount', { count: s.items.length }) }}</span>
+              <span class="sets-band-price">฿{{ s.rollUp.total.toFixed(2) }}</span>
+            </router-link>
+          </div>
+        </section>
+
         <div
           v-for="(groupProducts, groupName) in categoriesGrouped"
           :key="groupName"
@@ -881,6 +913,16 @@ const handleDocxDownload = async () => {
 }
 
 /* Category Block */
+/* Business Sets band */
+.sets-band { margin: 0 0 40px; padding: 24px; background: #faf7f2; border-radius: 12px; }
+.sets-band h2 { margin: 0 0 4px; font-size: 1.4rem; }
+.sets-band-sub { margin: 0 0 16px; color: #666; }
+.sets-band-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.sets-band-card { display: flex; flex-direction: column; gap: 4px; padding: 14px; background: #fff; border: 1px solid #e8e2d8; border-radius: 10px; text-decoration: none; color: inherit; }
+.sets-band-name { font-weight: 600; }
+.sets-band-count { font-size: 0.85rem; color: #777; }
+.sets-band-price { font-weight: 700; }
+
 .category-block {
   margin-bottom: 50px;
   scroll-margin-top: 90px; /* Keep heading clear of any fixed header when scrolled to */
