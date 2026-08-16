@@ -9,6 +9,7 @@ import AdminProjects from '../components/admin-projects.vue';
 import AdminSpotlights from '../components/admin-spotlights.vue';
 import AdminGallery from '../components/admin-gallery.vue';
 import AdminEvents from '../components/admin-events.vue';
+import AdminBusinessSets from '../components/admin-business-sets.vue';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -777,6 +778,9 @@ const deleteDiyProduct = async (id) => {
         <button type="button" :class="{ active: activeAdminSection === 'events' }" @click="activeAdminSection = 'events'; resetForm();">
           <ion-icon name="calendar-outline"></ion-icon> Workshops &amp; Events
         </button>
+        <button type="button" :class="{ active: activeAdminSection === 'sets' }" @click="activeAdminSection = 'sets'; resetForm();">
+          <ion-icon name="cube-outline"></ion-icon> {{ $t('admin.businessSets') }}
+        </button>
       </div>
 
       <!-- Editorial content lives in its own component; it shares nothing with the
@@ -785,6 +789,7 @@ const deleteDiyProduct = async (id) => {
       <AdminSpotlights v-if="activeAdminSection === 'colors'" />
       <AdminGallery v-if="activeAdminSection === 'gallery'" />
       <AdminEvents v-if="activeAdminSection === 'events'" />
+      <AdminBusinessSets v-if="activeAdminSection === 'sets'" />
 
       <!-- Category Manager Section (Togglable) -->
       <transition name="slide-fade">
