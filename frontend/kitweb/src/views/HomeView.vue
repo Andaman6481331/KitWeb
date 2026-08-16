@@ -11,6 +11,7 @@ import FeaturedProject from '../components/featured-project.vue';
 import NewArrivals from '../components/new-arrivals.vue';
 import LatestProjects from '../components/latest-projects.vue';
 import ColorSpotlight from '../components/color-spotlight.vue';
+import HomeBusinessSets from '../components/home-business-sets.vue';
 import CreatorGallery from '../components/creator-gallery.vue';
 import { getUtilsUrl } from '../services/api';
 import { defaultLang } from '../utils/localeRoutes';
@@ -19,12 +20,17 @@ const { t } = useI18n();
 const route = useRoute();
 const currentLang = computed(() => route.params.lang || defaultLang);
 
+// The sets band hides itself when the shop has published none, so its rail entry
+// only appears once we know there is something to scroll to.
+const hasBusinessSets = ref(false);
+
 // Section navigator (right-side mini-map rail)
 const sections = computed(() => [
   { id: 'home-featured',   label: t('home.nav.featured') },
   { id: 'home-new',        label: t('home.nav.newArrivals') },
   { id: 'home-categories', label: t('home.nav.categories') },
   { id: 'home-color',      label: t('home.nav.color') },
+  ...(hasBusinessSets.value ? [{ id: 'home-sets', label: t('home.nav.sets') }] : []),
   { id: 'home-articles',   label: t('home.nav.articles') },
   { id: 'home-reviews',    label: t('home.nav.makers') },
   { id: 'home-promo',      label: t('home.nav.promo') },
@@ -157,6 +163,13 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
          itself from the chosen hex, so the change is visible at a glance. -->
     <div id="home-color" class="home-anchor">
       <ColorSpotlight />
+    </div>
+
+    <!-- Business Sets: fixed wholesale bundles. Sits with the product bands
+         rather than beside the wholesale CTA at the foot of the page, because
+         these are priced goods a visitor can act on, not a pitch. -->
+    <div id="home-sets" class="home-anchor">
+      <HomeBusinessSets @loaded="count => hasBusinessSets = count > 0" />
     </div>
 
       <div class="feature-bar">
