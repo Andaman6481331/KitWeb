@@ -6,7 +6,7 @@ import { ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { cartStore } from '../stores/cartStore';
 import { getProductImageUrl } from '../utils/productImages';
-import { parseMoq, roundHalfUp, toPerPiece } from '../utils/productPricing';
+import { parseMoq, roundHalfUp, toPerPiece, clampTypedQty, stepQty, MAX_ORDER_QTY } from '../utils/productPricing';
 import { isPriced } from '../utils/cartPricing';
 
 const props = defineProps({
@@ -135,29 +135,36 @@ const close = () => {
 };
 
 const incrementRowQty = (rowKey) => {
-    variantQuantities.value[rowKey] = (variantQuantities.value[rowKey] ?? 0) + moqNumber.value;
+    variantQuantities.value[rowKey] = stepQty(variantQuantities.value[rowKey] ?? 0, 1, moqNumber.value);
     variantQtyWarnings.value[rowKey] = null;
 };
 
 const decrementRowQty = (rowKey) => {
-    variantQuantities.value[rowKey] = Math.max(0, (variantQuantities.value[rowKey] ?? 0) - moqNumber.value);
+    variantQuantities.value[rowKey] = stepQty(variantQuantities.value[rowKey] ?? 0, -1, moqNumber.value);
     variantQtyWarnings.value[rowKey] = null;
 };
 
 const handleRowQtyBlur = (rowKey) => {
     const moq = moqNumber.value;
-    const clamped = Math.max(0, Math.floor(Number(variantQuantities.value[rowKey]) || 0));
-    if (clamped === 0) {
-        variantQuantities.value[rowKey] = 0;
-        variantQtyWarnings.value[rowKey] = null;
-    } else if (clamped % moq !== 0) {
-        const rounded = Math.ceil(clamped / moq) * moq;
-        variantQuantities.value[rowKey] = rounded;
-        variantQtyWarnings.value[rowKey] = t('catalog.qtyRoundedToBox', { moq });
-    } else {
-        variantQuantities.value[rowKey] = clamped;
-        variantQtyWarnings.value[rowKey] = null;
-    }
+    const { qty, reason } = clampTypedQty(variantQuantities.value[rowKey], moq);
+    variantQuantities.value[rowKey] = qty;
+    variantQtyWarnings.value[rowKey] =
+        reason === 'capped' ? t('catalog.qtyCappedAtMax', { max: MAX_ORDER_QTY })
+            : reason === 'rounded' ? t('catalog.qtyRoundedToBox', { moq })
+                : null;
+};
+
+// type="number" still accepts "e", "+", "-" and "." as keystrokes; none of them
+// mean anything for a piece count, so refuse them rather than repairing the mess
+// on blur.
+const blockNonDigitKeys = (event) => {
+    if (['e', 'E', '+', '-', '.'].includes(event.key)) event.preventDefault();
+};
+
+// A number input under the cursor swallows the page scroll and silently changes
+// the quantity with it. Let the dialog scroll instead.
+const releaseWheel = (event) => {
+    if (document.activeElement === event.target) event.target.blur();
 };
 
 // Prefer a real image_key (which can be served at full size); fall back to whatever
@@ -235,8 +242,11 @@ const confirmAddToCart = () => {
                         </div>
                         <div class="variant-qty-stepper qty-entry">
                             <button class="qty-btn" type="button" @click="decrementRowQty(row.rowKey)">−</button>
-                            <input class="qty-num" type="number" min="0" :step="moqNumber"
+                            <input class="qty-num" type="number" min="0" :max="MAX_ORDER_QTY"
+                                :step="moqNumber" inputmode="numeric"
                                 v-model.number="variantQuantities[row.rowKey]"
+                                @keydown="blockNonDigitKeys"
+                                @wheel="releaseWheel"
                                 @input="variantQtyWarnings[row.rowKey] = null"
                                 @blur="handleRowQtyBlur(row.rowKey)">
                             <button class="qty-btn" type="button" @click="incrementRowQty(row.rowKey)">+</button>

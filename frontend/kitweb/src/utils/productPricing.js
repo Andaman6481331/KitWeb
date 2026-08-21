@@ -22,6 +22,49 @@ export const toPerPiece = (boxPrice, moq) => {
     return p ? roundHalfUp(p / (moq || 1), 2) : 0;
 };
 
+// ---- Quantity bounds ---------------------------------------------------------
+// Quantities are sold by the box, so every quantity the customer can reach — typed
+// into the dialog or stepped in the cart — has to land on a multiple of the box
+// size. Keeping both paths here stops the cart from undoing what the dialog
+// enforced (a 20-piece box quietly becoming 21).
+
+// Well above any real order (tier 3 starts at 50 pieces), low enough that a
+// mistyped 999999999 is caught rather than sent to staff as a quote.
+export const MAX_ORDER_QTY = 10000;
+
+// The largest whole number of boxes that fits under the cap. Never less than one
+// box: a product whose box is bigger than the cap can still be ordered once.
+const maxWholeBoxes = (moq) => Math.max(moq, Math.floor(MAX_ORDER_QTY / moq) * moq);
+
+// Normalises a typed quantity to a whole number of boxes within the bounds.
+// Returns the reason so the caller can explain the change instead of silently
+// overwriting what the customer typed.
+export const clampTypedQty = (raw, moq = 1) => {
+    const box = parseMoq(moq);
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value <= 0) return { qty: 0, reason: null };
+
+    // Round UP: a partial box has to become the box that covers it, since a
+    // fraction of a box is not something the customer can be sold.
+    const boxed = Math.ceil(value / box) * box;
+    if (boxed > MAX_ORDER_QTY) {
+        // Cap DOWN to a whole box — rounding up here would breach the cap.
+        return { qty: maxWholeBoxes(box), reason: 'capped' };
+    }
+    return { qty: boxed, reason: boxed !== value ? 'rounded' : null };
+};
+
+// One box up or down. Off-grid quantities (carts saved before the stepper
+// respected MOQ) are realigned onto the box grid rather than carried forward.
+export const stepQty = (current, direction, moq = 1) => {
+    const box = parseMoq(moq);
+    const cur = Math.max(0, Number(current) || 0);
+    const next = direction > 0
+        ? Math.floor(cur / box) * box + box
+        : Math.ceil(cur / box) * box - box;
+    return Math.min(Math.max(0, next), maxWholeBoxes(box));
+};
+
 // Lowest available per-piece price across the three customer-facing tiers
 // (L1-L3; L4/L5 are staff-only and never shown on the storefront).
 export const getCheapestPricePerPiece = (item) => {

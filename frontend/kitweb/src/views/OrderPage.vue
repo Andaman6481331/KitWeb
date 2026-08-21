@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { api, API_URL, getDiyImageUrl } from '../services/api'
@@ -8,8 +8,9 @@ import { cartStore } from '../stores/cartStore';
 import { authStore } from '../stores/authStore';
 import { codeToPath, defaultLang } from '@/utils/localeRoutes';
 import { cartHasUnpriced, isUnpricedItem, isPriced } from '../utils/cartPricing';
-import { parseMoq, toPerPiece } from '../utils/productPricing';
+import { parseMoq, toPerPiece, stepQty } from '../utils/productPricing';
 import AddToOrderModal from '../components/add-to-order-modal.vue';
+import LineConnectPanel from '../components/line-connect-panel.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -221,12 +222,17 @@ const openAddModal = (product) => {
 const variantCount = (product) =>
     (product.images || []).filter(img => img.attribute_type === 'variant_link').length
 
-// Update quantity
-const updateQuantity = (cartItemKey, delta) => {
+// Step the quantity by a whole box, not by one piece. Products are sold by the
+// box and the add-to-order dialog enforces that; stepping by 1 here would let a
+// 20-piece box become 21 the moment it reached the cart. `moq` rides along on the
+// cart item (addToCart spreads the product), and DIY kits have none, so they step
+// by 1 — which is their real box size.
+const updateQuantity = (cartItemKey, direction) => {
     const item = cart.value.find(i => i.cartItemKey === cartItemKey)
-    if (item) {
-        cartStore.updateQuantity(cartItemKey, delta);
-    }
+    if (!item) return
+    const next = stepQty(item.quantity, direction, parseMoq(item.moq))
+    // cartStore takes a delta and drops the line once it hits zero.
+    cartStore.updateQuantity(cartItemKey, next - item.quantity)
 }
 
 // Remove from cart
@@ -256,6 +262,27 @@ const tt = (key, fallback) => (te(key) ? t(key) : fallback)
 // Checkout — swap the left column into the checkout form in place.
 // The right-hand cart summary stays put so the flow feels continuous.
 const isCheckoutView = ref(false)
+
+// The LINE panel sits beside the name/phone fields on a wide screen and drops to
+// its own card at the bottom below 1100px — the same breakpoint the cart sidebar
+// unpins at. It has to move parents, which CSS cannot do, so the width drives a
+// v-if instead. Safe under vite-ssg: the checkout form is behind isCheckoutView,
+// which starts false, so none of this renders during static generation.
+const LINE_PANEL_BREAKPOINT = '(min-width: 1101px)'
+const isWideLayout = ref(false)
+let lineLayoutQuery = null
+const syncLineLayout = (event) => { isWideLayout.value = event.matches }
+
+onMounted(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    lineLayoutQuery = window.matchMedia(LINE_PANEL_BREAKPOINT)
+    isWideLayout.value = lineLayoutQuery.matches
+    lineLayoutQuery.addEventListener('change', syncLineLayout)
+})
+
+onUnmounted(() => {
+    lineLayoutQuery?.removeEventListener('change', syncLineLayout)
+})
 
 // Swapping the left column changes the page height dramatically, so the scroll has
 // to wait for the new DOM. Scrolling first starts an animation against the tall
@@ -763,23 +790,38 @@ const isProductInCart = (productId) => {
                     <div class="form-card">
                         <h2 class="card-title">{{ tt('order.shippingInformation', 'Shipping Information') }}</h2>
 
-                        <div class="form-group">
-                            <label>{{ t('order.fullName') }} <span class="required-star">*</span></label>
-                            <input v-model="customerName" type="text" :placeholder="t('order.fullNamePlaceholder')"
-                                class="form-input" :class="{ 'has-error': fieldErrors.customerName }"
-                                data-field="customerName" required />
-                            <p class="field-error" v-if="fieldErrors.customerName">{{ t('order.fieldRequired') }}</p>
+                        <!-- Contact fields and the LINE panel share one row on a wide
+                             screen; below 1100px the panel is rendered further down
+                             instead and this collapses back to a plain stack. -->
+                        <div class="identity-row">
+                            <div class="identity-fields">
+                                <div class="form-group">
+                                    <label>{{ t('order.fullName') }} <span class="required-star">*</span></label>
+                                    <input v-model="customerName" type="text"
+                                        :placeholder="t('order.fullNamePlaceholder')" class="form-input"
+                                        :class="{ 'has-error': fieldErrors.customerName }" data-field="customerName"
+                                        required />
+                                    <p class="field-error" v-if="fieldErrors.customerName">{{ t('order.fieldRequired')
+                                        }}</p>
+                                </div>
+
+                                <div class="form-group no-margin">
+                                    <label>{{ t('order.phoneNumber') }} <span class="required-star">*</span></label>
+                                    <input v-model="phoneNumber" type="tel"
+                                        :placeholder="t('order.phoneNumberPlaceholder')" class="form-input"
+                                        :class="{ 'has-error': fieldErrors.phoneNumber }" data-field="phoneNumber"
+                                        required />
+                                    <p class="field-error" v-if="fieldErrors.phoneNumber">{{ t('order.fieldRequired')
+                                        }}</p>
+                                </div>
+                            </div>
+
+                            <LineConnectPanel v-if="isWideLayout" v-model="lineLoginEnabled" compact
+                                :is-quote="isQuoteCart" :line-user-id="lineUserId" :line-display-name="lineDisplayName"
+                                :connecting="lineConnecting" @connect="triggerLineLogin" />
                         </div>
 
-                        <div class="form-group">
-                            <label>{{ t('order.phoneNumber') }} <span class="required-star">*</span></label>
-                            <input v-model="phoneNumber" type="tel" :placeholder="t('order.phoneNumberPlaceholder')"
-                                class="form-input" :class="{ 'has-error': fieldErrors.phoneNumber }"
-                                data-field="phoneNumber" required />
-                            <p class="field-error" v-if="fieldErrors.phoneNumber">{{ t('order.fieldRequired') }}</p>
-                        </div>
-
-                        <div class="form-group">
+                        <div class="form-group identity-row-gap">
                             <label>{{ t('order.shippingAddress') }} <span class="required-star">*</span></label>
                             <textarea v-model="shippingAddress" :placeholder="t('order.shippingAddressPlaceholder')"
                                 class="form-textarea" :class="{ 'has-error': fieldErrors.shippingAddress }"
@@ -830,33 +872,11 @@ const isProductInCart = (productId) => {
 
                     <!-- Optional LINE connect. On a quote this is the reply channel —
                          staff have to come back with a price — so say why, and lift it
-                         visually rather than leaving it as the last afterthought card. -->
-                    <div class="form-card line-connect-section" :class="{ 'line-highlight': isQuoteCart }">
-                        <label class="line-toggle-label">
-                            <input type="checkbox" v-model="lineLoginEnabled" class="line-toggle-checkbox" />
-                            <span class="line-toggle-text">{{ t('order.lineConnectPrompt') }}</span>
-                        </label>
-                        <p class="line-reason" v-if="isQuoteCart">{{ t('order.lineQuoteReason') }}</p>
-                        <div v-if="lineLoginEnabled" class="line-connect-action">
-                            <button v-if="!lineUserId" type="button" class="line-connect-btn"
-                                @click="triggerLineLogin" :disabled="lineConnecting">
-                                <svg width="18" height="18" viewBox="0 0 40 40" fill="none">
-                                    <rect width="40" height="40" rx="8" fill="#06C755" />
-                                    <path
-                                        d="M20 8C13.4 8 8 12.5 8 18c0 3.7 2.4 6.9 6 8.8l-.8 3.9 4.5-2.4c.7.1 1.5.2 2.3.2 6.6 0 12-4.5 12-10S26.6 8 20 8z"
-                                        fill="white" />
-                                </svg>
-                                {{ lineConnecting ? tt('order.lineConnecting', 'Connecting…') : t('order.connectLine') }}
-                            </button>
-                            <div v-else class="line-connected-badge">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#06C755"
-                                    stroke-width="2.5">
-                                    <polyline points="20 6 9 17 4 12" />
-                                </svg>
-                                {{ t('order.lineConnected') }}: {{ lineDisplayName }}
-                            </div>
-                        </div>
-                    </div>
+                         visually rather than leaving it as the last afterthought card.
+                         Above 1100px it is rendered beside the name/phone fields instead. -->
+                    <LineConnectPanel v-if="!isWideLayout" v-model="lineLoginEnabled" :is-quote="isQuoteCart"
+                        :line-user-id="lineUserId" :line-display-name="lineDisplayName" :connecting="lineConnecting"
+                        @connect="triggerLineLogin" />
                 </div>
 
                 <!-- Shopping Cart Sidebar -->
@@ -1992,16 +2012,27 @@ const isProductInCart = (productId) => {
     color: #d63031;
 }
 
-.line-highlight {
-    border: 1px solid #06C755;
-    box-shadow: 0 0 0 3px rgba(6, 199, 85, 0.08);
+/* Name + phone beside the LINE panel. Below 1100px the panel is rendered
+   elsewhere, so this collapses to the plain stacked form it used to be. */
+.identity-row {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
 }
 
-.line-reason {
-    margin: 8px 0 0;
-    font-size: 13px;
-    line-height: 1.5;
-    color: #6B584A;
+.identity-fields {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.identity-row>:deep(.line-connect-section) {
+    flex: 0 0 300px;
+    align-self: stretch;
+}
+
+/* The row replaces two form-groups, so it owes the same bottom margin. */
+.identity-row-gap {
+    margin-top: 16px;
 }
 
 .ship-recap {
@@ -2109,71 +2140,8 @@ const isProductInCart = (productId) => {
     object-fit: contain;
 }
 
-/* LINE connect */
-.line-connect-section {
-    background: #F0FFF6;
-    border: 1px solid #C3EFD4;
-}
-
-.line-toggle-label {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    cursor: pointer;
-    font-weight: 500;
-    font-size: 14px;
-    color: #2d6a4f;
-    user-select: none;
-}
-
-.line-toggle-checkbox {
-    width: auto;
-    margin-top: 2px;
-    flex-shrink: 0;
-}
-
-.line-toggle-text {
-    line-height: 1.4;
-}
-
-.line-connect-action {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid #C3EFD4;
-}
-
-.line-connect-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: #06C755;
-    color: white;
-    border: none;
-    padding: 10px 18px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-.line-connect-btn:hover {
-    background: #05a847;
-}
-
-.line-connect-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.line-connected-badge {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 14px;
-    font-weight: 600;
-    color: #2d6a4f;
-}
+/* LINE connect styles live in components/line-connect-panel.vue — scoped styles
+   do not reach into a child component. */
 
 /* Secondary Navbar */
 .secondary-navbar {
