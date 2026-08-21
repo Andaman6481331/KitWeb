@@ -13,6 +13,9 @@ const customerName = computed(
   () => route.query.name || authStore.user?.businessName || authStore.user?.ownerName || ''
 )
 const currentLang = computed(() => route.params.lang || 'th')
+// Set by OrderPage from the server's own answer — a quote has no agreed total,
+// so it must not be confirmed with the usual "we'll ship shortly" copy.
+const isQuote = computed(() => route.query.quote === '1')
 
 const LINE_OA_URL = 'https://line.me/R/ti/p/@oar4837p'
 
@@ -33,14 +36,14 @@ const goShop = () => {
         </svg>
       </div>
 
-      <h1>{{ t('thankYou.title') }}</h1>
-      <p class="subtitle">{{ t('thankYou.subtitle') }}</p>
+      <h1>{{ isQuote ? t('thankYou.quoteTitle') : t('thankYou.title') }}</h1>
+      <p class="subtitle">{{ isQuote ? t('thankYou.quoteSubtitle') : t('thankYou.subtitle') }}</p>
 
       <div class="order-info" v-if="orderId">
         <span class="order-id-label">{{ t('thankYou.received', { orderId }) }}</span>
       </div>
 
-      <p class="processing">{{ t('thankYou.processing') }}</p>
+      <p class="processing">{{ isQuote ? t('thankYou.quoteProcessing') : t('thankYou.processing') }}</p>
 
       <!-- LINE OA CTA -->
       <a :href="LINE_OA_URL" target="_blank" rel="noopener" class="line-cta-btn">

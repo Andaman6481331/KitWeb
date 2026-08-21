@@ -27,6 +27,10 @@ const formatDate = (value) => {
   return d.toLocaleString();
 };
 
+// An order still waiting on staff to fill in prices. Set by the Worker when the
+// cart contained a product whose catalog price hadn't been uploaded yet.
+const isQuote = (o) => o.payment_method === 'QUOTE';
+
 // Reachability of the customer on LINE OA, used for the indicator badge.
 const lineState = (o) => {
   if (!o.line_user_id) return 'none';
@@ -127,8 +131,9 @@ const saveFullOrder = async (o) => {
   if (!d) return;
   d.savingEdit = true;
   d.error = false;
+  d.message = '';
   try {
-    await api.updateOrder({
+    const res = await api.updateOrder({
       orderId: o.id,
       customerName: d.customerName,
       phoneNumber: d.phoneNumber,
@@ -146,8 +151,16 @@ const saveFullOrder = async (o) => {
         price: Number(it.price) || 0,
       })),
     });
+    // Only set when pricing up a quote actually reached the customer on LINE.
+    const notified = res?.customerNotified;
     // Reload to reflect the server-recomputed total and saved items.
     await loadOrders();
+    // loadOrders() rebuilds drafts, so the message has to be set after it.
+    if (drafts[o.id]) {
+      drafts[o.id].message = notified
+        ? t('manageOrders.savedNotified')
+        : t('manageOrders.saved');
+    }
   } catch (e) {
     d.error = true;
     d.message = e?.message || t('manageOrders.saveFailed');
@@ -196,14 +209,18 @@ onMounted(() => {
               <span class="order-id">{{ o.id }}</span>
               <span class="order-date">{{ formatDate(o.created_at) }}</span>
             </div>
-            <span class="status-badge" :class="'status-' + (o.status || 'PENDING')">
-              {{ statusLabel(o.status) }}
-            </span>
+            <div class="badge-group">
+              <span v-if="isQuote(o)" class="quote-badge">{{ t('manageOrders.awaitingPricing', 'Awaiting pricing') }}</span>
+              <span class="status-badge" :class="'status-' + (o.status || 'PENDING')">
+                {{ statusLabel(o.status) }}
+              </span>
+            </div>
           </div>
 
           <div class="order-meta">
             <span class="customer">{{ o.customer_name || '—' }}</span>
-            <span class="total">฿{{ Number(o.total_amount || 0).toFixed(2) }}</span>
+            <span class="total total-quote" v-if="isQuote(o)">{{ t('manageOrders.awaitingPricing', 'Awaiting pricing') }}</span>
+            <span class="total" v-else>฿{{ Number(o.total_amount || 0).toFixed(2) }}</span>
           </div>
 
           <!-- LINE reachability -->
@@ -257,7 +274,8 @@ onMounted(() => {
                 <input v-model="it.selectedSize" type="text" class="ei-sm" placeholder="Size" />
                 <input v-model="it.selectedColor" type="text" class="ei-sm" placeholder="Color" />
                 <input v-model.number="it.quantity" type="number" min="0" class="ei-qty" title="Qty" />
-                <input v-model.number="it.price" type="number" min="0" class="ei-price" title="Unit ฿ (custom lines only)" />
+                <input v-model.number="it.price" type="number" min="0" class="ei-price"
+                  title="Unit ฿ — used for custom lines and for products with no catalog price yet" />
                 <button class="ei-remove" @click="removeItem(o, idx)" title="Remove">✕</button>
               </div>
               <button class="add-item-btn" @click="addItem(o)">+ Add item</button>
@@ -266,7 +284,7 @@ onMounted(() => {
             <button class="save-edit-btn" :disabled="drafts[o.id].savingEdit" @click="saveFullOrder(o)">
               {{ drafts[o.id].savingEdit ? t('manageOrders.saving') : 'Save changes' }}
             </button>
-            <p class="edit-hint">Prices for catalog products are recalculated on save; the ฿ field only applies to custom lines.</p>
+            <p class="edit-hint">Prices for catalog products are recalculated on save. The ฿ field is used for custom lines and for products whose catalog price isn't uploaded yet — filling in every line turns a quote into a normal order.</p>
           </div>
 
           <p
@@ -374,6 +392,23 @@ onMounted(() => {
 .status-DELIVERED { background: #d8efe0; color: #1f7a45; }
 .status-CANCELLED { background: #f7e2e2; color: #b03a3a; }
 
+.badge-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.quote-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: #fbe9df;
+  color: #b5652f;
+}
+
 .order-meta {
   display: flex;
   justify-content: space-between;
@@ -381,6 +416,11 @@ onMounted(() => {
 }
 .customer { color: #4a3728; font-weight: 600; }
 .total { color: #DD876E; font-weight: 700; }
+.total-quote {
+  font-style: italic;
+  font-weight: 600;
+  color: #b5652f;
+}
 
 .line-state { font-size: 0.82rem; margin-bottom: 10px; }
 .line-unreachable { color: #b03a3a; }

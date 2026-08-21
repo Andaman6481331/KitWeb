@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { api, API_URL, getDiyImageUrl } from '../services/api'
@@ -7,6 +7,9 @@ import { useProducts } from '../composables/useProducts';
 import { cartStore } from '../stores/cartStore';
 import { authStore } from '../stores/authStore';
 import { codeToPath, defaultLang } from '@/utils/localeRoutes';
+import { cartHasUnpriced, isUnpricedItem, isPriced } from '../utils/cartPricing';
+import { parseMoq, toPerPiece } from '../utils/productPricing';
+import AddToOrderModal from '../components/add-to-order-modal.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -46,21 +49,20 @@ const tProduct = (item, field) => {
     return item[field] || '';
 };
 
-// Helper to translate product arrays
-const tArray = (item, field) => {
-    const text = tProduct(item, field);
-    if (!text) return [];
-    return typeof text === 'string' ? text.split(',').map(x => x.trim()) : (Array.isArray(text) ? text : []);
-};
-
 
 // Sample product data with size and color options
 const { products: rawProducts, isLoading, fetchProducts: revalidateProducts } = useProducts()
 const rawDiyProducts = ref([])
 
+// The list price is the tier-1 box price over the box size — the same per-piece
+// number the Worker charges at the default quantity. products.price is a legacy
+// box-price column and must not be shown or used: it billed box prices per piece.
+const listPricePerPiece = (p, moq) => toPerPiece(Number(p.price_1) || 0, moq);
+
 const products = computed(() => {
     const regularMapped = rawProducts.value.map(p => ({
         ...p,
+        price: listPricePerPiece(p, parseMoq(p.moq)),
         sizes: p.sizes ? (typeof p.sizes === 'string' ? p.sizes.split(',').map(s => s.trim()) : p.sizes) : ['Standard'],
         sizes_th: p.sizes_th ? (typeof p.sizes_th === 'string' ? p.sizes_th.split(',').map(s => s.trim()) : p.sizes_th) : null,
         colors: p.colors ? (typeof p.colors === 'string' ? p.colors.split(',').map(c => c.trim()) : p.colors) : ['Default'],
@@ -81,27 +83,14 @@ const products = computed(() => {
         varieties: null,
         varieties_th: null,
         inStock: true,
-        price: p.price_1 || 0,
+        // DIY kits are sold as single units, so the box size is 1.
+        price: listPricePerPiece(p, 1),
         category: 'DIY Kit',
         image: getDiyImageUrl(p.images && p.images.length > 0 ? p.images[0] : '', 'thumb')
     }))
 
     return [...regularMapped, ...diyMapped]
 })
-
-// Watch products to pre-initialize selections immediately when products are available reactively
-watch(products, (newProducts) => {
-    if (newProducts && newProducts.length > 0) {
-        newProducts.forEach(product => {
-            if (product && product.id && !productSelections.value[product.id]) {
-                productSelections.value[product.id] = {
-                    size: product.sizes ? product.sizes[0] : 'Standard',
-                    color: product.colors ? product.colors[0] : 'Default'
-                }
-            }
-        })
-    }
-}, { immediate: true })
 
 const fetchProducts = async () => {
     await revalidateProducts()
@@ -123,10 +112,9 @@ const showNotification = ref(false)
 const notificationMessage = ref('')
 const showClearConfirm = ref(false)
 
-// Track selected size and color for each product
-const productSelections = ref({})
-
-// Selections are initialized in fetchProducts
+// Adding goes through the shared add-to-order dialog, so the tier/MOQ maths is the
+// same here as on the catalog and the product page. Set a product to open it.
+const productForCart = ref(null)
 
 // Categories
 const getProductCategoryPaths = (product) => {
@@ -219,23 +207,19 @@ watch([selectedCategory, searchQuery], () => {
 // arrange any shipping cost manually over LINE).
 const cartTotal = computed(() => cartStore.cartTotal)
 const cartItemCount = computed(() => cartStore.cartItemCount)
+// One item whose price hasn't been uploaded turns the whole submission into a
+// quote: staff confirm the final price and payment before anything is charged.
+// Display only — the Worker re-derives this from the DB at /order/submit.
+const isQuoteCart = computed(() => cartHasUnpriced(cart.value))
 
-// Add to cart with selected size and color
-const addToCart = (product) => {
-    const selection = productSelections.value[product.id]
-    cartStore.addToCart(product, selection);
-    showNotificationMsg(t('order.addedToCart', { name: product.name }))
+// The dialog owns quantity, variants, tier pricing and its own confirmation toast.
+const openAddModal = (product) => {
+    productForCart.value = product
 }
 
-// Update size selection
-const updateSize = (productId, size) => {
-    productSelections.value[productId].size = size
-}
-
-// Update color selection
-const updateColor = (productId, color) => {
-    productSelections.value[productId].color = color
-}
+// Real variants come from variant-link images — the same source the dialog reads.
+const variantCount = (product) =>
+    (product.images || []).filter(img => img.attribute_type === 'variant_link').length
 
 // Update quantity
 const updateQuantity = (cartItemKey, delta) => {
@@ -273,19 +257,31 @@ const tt = (key, fallback) => (te(key) ? t(key) : fallback)
 // The right-hand cart summary stays put so the flow feels continuous.
 const isCheckoutView = ref(false)
 
-const checkout = () => {
-    if (cart.value.length === 0) {
-        showNotificationMsg(t('order.cartEmptyError'))
-        return
-    }
-    isCheckoutView.value = true
+// Swapping the left column changes the page height dramatically, so the scroll has
+// to wait for the new DOM. Scrolling first starts an animation against the tall
+// product-browser layout; Vue then drops the product list, the page shrinks, the
+// browser clamps scrollTop to the new maximum, and that clamp cancels the in-flight
+// smooth scroll — leaving the customer at the BOTTOM of the checkout form. Jumping
+// after nextTick avoids both the clamp and the animation (and prefers-reduced-motion).
+const jumpToTop = async () => {
+    await nextTick()
     if (typeof window !== 'undefined') {
-        window.scrollTo({ top: 0, behavior: 'smooth' })
+        window.scrollTo({ top: 0, behavior: 'auto' })
     }
 }
 
-const exitCheckout = () => {
+const checkout = async () => {
+    if (cart.value.length === 0) {
+        showNotificationMsg(t('order.cartEmptyError'), 'error')
+        return
+    }
+    isCheckoutView.value = true
+    await jumpToTop()
+}
+
+const exitCheckout = async () => {
     isCheckoutView.value = false
+    await jumpToTop()
 }
 
 // If the cart empties while checking out (e.g. user removes the last item),
@@ -316,7 +312,9 @@ const slipRequired = import.meta.env.VITE_SLIP_VERIFICATION_ENABLED === 'true'
 // optional one-tap Connect (OAuth) that also yields a real userId for auto messages.
 const lineUserId = ref(acct.lineUserId || '')
 const lineDisplayName = ref(acct.lineDisplayName || '')
-const lineLoginEnabled = ref(false)
+// A quote needs a reply channel — staff must come back with the price — so the
+// LINE opt-in starts checked for those carts. It stays optional either way.
+const lineLoginEnabled = ref(isQuoteCart.value)
 const lineConnecting = ref(false)
 
 const handleSlipUpload = (event) => {
@@ -395,14 +393,35 @@ const triggerLineLogin = () => {
     }, 600)
 }
 
+// Which required fields are currently blank. A corner toast alone left the customer
+// hunting for the offending field, so the field itself is marked and scrolled to.
+const fieldErrors = ref({ customerName: false, phoneNumber: false, shippingAddress: false })
+
+// Clear a field's error as soon as it's being fixed, rather than making the customer
+// re-submit to find out whether they've satisfied it.
+watch(customerName, () => { fieldErrors.value.customerName = false })
+watch(phoneNumber, () => { fieldErrors.value.phoneNumber = false })
+watch(shippingAddress, () => { fieldErrors.value.shippingAddress = false })
+
 const submitOrder = async () => {
     // Name, phone and address are required; the LINE display name is optional.
-    if (!customerName.value.trim() || !phoneNumber.value.trim() || !shippingAddress.value.trim()) {
-        showNotificationMsg(tt('order.pleaseFillRequired', 'Please fill in your name, phone and address.'))
+    fieldErrors.value = {
+        customerName: !customerName.value.trim(),
+        phoneNumber: !phoneNumber.value.trim(),
+        shippingAddress: !shippingAddress.value.trim()
+    }
+    const firstInvalid = Object.keys(fieldErrors.value).find(k => fieldErrors.value[k])
+    if (firstInvalid) {
+        showNotificationMsg(tt('order.pleaseFillRequired', 'Please fill in your name, phone and address.'), 'error')
+        await nextTick()
+        document.querySelector(`[data-field="${firstInvalid}"]`)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
         return
     }
-    if (slipRequired && !slipImage.value) {
-        showNotificationMsg(t('order.pleaseUploadSlip'))
+    // A quote has no agreed total to pay against, so the slip requirement only
+    // applies once every line is priced. Mirrors the Worker.
+    if (slipRequired && !isQuoteCart.value && !slipImage.value) {
+        showNotificationMsg(t('order.pleaseUploadSlip'), 'error')
         return
     }
     isSubmittingOrder.value = true
@@ -444,7 +463,8 @@ const submitOrder = async () => {
             router.push({
                 name: 'thank-you',
                 params: { lang: currentLang.value },
-                query: { orderId: result.orderId }
+                // The server decides whether this was a quote; trust its answer, not the cart.
+                query: { orderId: result.orderId, ...(result.isQuote ? { quote: '1' } : {}) }
             })
         } else {
             // Log the raw backend response so unmapped errors are diagnosable in the console.
@@ -456,11 +476,11 @@ const submitOrder = async () => {
                 DUPLICATE: t('order.duplicateSlip'),
                 PRODUCT_UNAVAILABLE: tt('order.productUnavailable', 'A product in your cart is no longer available.'),
             }
-            showNotificationMsg(errMap[result.error] || t('order.orderFailed'))
+            showNotificationMsg(errMap[result.error] || t('order.orderFailed'), 'error')
         }
     } catch (error) {
         console.error('Error submitting order:', error)
-        showNotificationMsg(t('order.orderFailed'))
+        showNotificationMsg(t('order.orderFailed'), 'error')
     } finally {
         isSubmittingOrder.value = false
     }
@@ -482,17 +502,24 @@ const saveProfile = async (silent = false) => {
         if (!silent) showNotificationMsg(tt('order.profileSaved', 'Saved to your account.'))
     } catch (e) {
         console.error('Failed to save profile:', e)
-        if (!silent) showNotificationMsg(t('order.orderFailed'))
+        if (!silent) showNotificationMsg(t('order.orderFailed'), 'error')
     }
 }
 
 // Show notification
-const showNotificationMsg = (msg) => {
+// An error needs long enough to actually be read; "added to cart" should get out of
+// the way. One shared timer, so a new message cleanly replaces the one on screen
+// instead of being cut short by the previous message's timeout.
+const notificationKind = ref('success')
+let notificationTimer = null
+const showNotificationMsg = (msg, kind = 'success') => {
     notificationMessage.value = msg
+    notificationKind.value = kind
     showNotification.value = true
-    setTimeout(() => {
+    if (notificationTimer) clearTimeout(notificationTimer)
+    notificationTimer = setTimeout(() => {
         showNotification.value = false
-    }, 1500)
+    }, kind === 'error' ? 5000 : 1500)
 }
 
 // Scroll to the cart (mobile sticky bar)
@@ -602,40 +629,32 @@ const isProductInCart = (productId) => {
                                             <p class="product-desc">{{ tProduct(product, 'description') }}</p>
                                         </div>
 
-                                        <!-- Variations -->
-                                        <div class="td-variations" v-if="productSelections[product.id]">
-                                            <template v-if="product.category === 'DIY Kit'">
-                                                <span class="standard-spec-badge">{{ t('order.standard') || 'Standard' }}</span>
-                                            </template>
-                                            <template v-else>
-                                                <select v-model="productSelections[product.id].size"
-                                                    @change="updateSize(product.id, $event.target.value)"
-                                                    class="variation-select" :disabled="!product.inStock">
-                                                    <option v-for="(size, idx) in product.sizes" :key="size" :value="size">
-                                                        {{ tArray(product, 'sizes')[idx] || size }}
-                                                    </option>
-                                                </select>
-                                                <select v-model="productSelections[product.id].color"
-                                                    @change="updateColor(product.id, $event.target.value)"
-                                                    class="variation-select" :disabled="!product.inStock">
-                                                    <option v-for="(color, idx) in product.colors" :key="color"
-                                                        :value="color">
-                                                        {{ tArray(product, 'colors')[idx] || color }}
-                                                    </option>
-                                                </select>
-                                            </template>
+                                        <!-- Variations. The sizes/colors columns are unused
+                                             across the whole catalog; real variants come from
+                                             variant-link images and are picked in the dialog. -->
+                                        <div class="td-variations">
+                                            <span class="standard-spec-badge" v-if="variantCount(product) > 1">
+                                                {{ t('order.optionCount', { count: variantCount(product) }) }}
+                                            </span>
+                                            <span class="standard-spec-badge" v-else>{{ t('order.standard') || 'Standard' }}</span>
                                         </div>
 
-                                        <!-- Price -->
+                                        <!-- Price. A product row can exist before its price is
+                                             uploaded; "฿0" would read as free, so it says so instead. -->
                                         <div class="td-price">
-                                            <span class="price-currency">฿</span>
-                                            <span class="price-amount">{{ product.price }}</span>
+                                            <span class="price-tbc" v-if="!isPriced(product.price)">
+                                                {{ t('catalog.priceToBeConfirmed') }}
+                                            </span>
+                                            <template v-else>
+                                                <span class="price-currency">฿</span>
+                                                <span class="price-amount">{{ product.price }}</span>
+                                            </template>
                                         </div>
 
                                         <!-- Action Button -->
                                         <div class="td-action">
                                             <button class="add-to-cart-btn" :disabled="!product.inStock"
-                                                @click="addToCart(product)">
+                                                @click="openAddModal(product)">
                                                 <span class="btn-icon">+</span>
                                                 {{ t('order.add') }}
                                             </button>
@@ -661,40 +680,32 @@ const isProductInCart = (productId) => {
                                             <p class="product-desc">{{ tProduct(product, 'description') }}</p>
                                         </div>
 
-                                        <!-- Variations -->
-                                        <div class="td-variations" v-if="productSelections[product.id]">
-                                            <template v-if="product.category === 'DIY Kit'">
-                                                <span class="standard-spec-badge">{{ t('order.standard') || 'Standard' }}</span>
-                                            </template>
-                                            <template v-else>
-                                                <select v-model="productSelections[product.id].size"
-                                                    @change="updateSize(product.id, $event.target.value)"
-                                                    class="variation-select" :disabled="!product.inStock">
-                                                    <option v-for="(size, idx) in product.sizes" :key="size" :value="size">
-                                                        {{ tArray(product, 'sizes')[idx] || size }}
-                                                    </option>
-                                                </select>
-                                                <select v-model="productSelections[product.id].color"
-                                                    @change="updateColor(product.id, $event.target.value)"
-                                                    class="variation-select" :disabled="!product.inStock">
-                                                    <option v-for="(color, idx) in product.colors" :key="color"
-                                                        :value="color">
-                                                        {{ tArray(product, 'colors')[idx] || color }}
-                                                    </option>
-                                                </select>
-                                            </template>
+                                        <!-- Variations. The sizes/colors columns are unused
+                                             across the whole catalog; real variants come from
+                                             variant-link images and are picked in the dialog. -->
+                                        <div class="td-variations">
+                                            <span class="standard-spec-badge" v-if="variantCount(product) > 1">
+                                                {{ t('order.optionCount', { count: variantCount(product) }) }}
+                                            </span>
+                                            <span class="standard-spec-badge" v-else>{{ t('order.standard') || 'Standard' }}</span>
                                         </div>
 
-                                        <!-- Price -->
+                                        <!-- Price. A product row can exist before its price is
+                                             uploaded; "฿0" would read as free, so it says so instead. -->
                                         <div class="td-price">
-                                            <span class="price-currency">฿</span>
-                                            <span class="price-amount">{{ product.price }}</span>
+                                            <span class="price-tbc" v-if="!isPriced(product.price)">
+                                                {{ t('catalog.priceToBeConfirmed') }}
+                                            </span>
+                                            <template v-else>
+                                                <span class="price-currency">฿</span>
+                                                <span class="price-amount">{{ product.price }}</span>
+                                            </template>
                                         </div>
 
                                         <!-- Action Button -->
                                         <div class="td-action">
                                             <button class="add-to-cart-btn" :disabled="!product.inStock"
-                                                @click="addToCart(product)">
+                                                @click="openAddModal(product)">
                                                 <span class="btn-icon">+</span>
                                                 {{ t('order.add') }}
                                             </button>
@@ -732,6 +743,22 @@ const isProductInCart = (productId) => {
                         {{ tt('order.backToShopping', 'Back to shopping') }}
                     </button>
 
+                    <!-- The left column silently becomes a form, so name the steps to
+                         show what just happened and what is left. -->
+                    <ol class="checkout-steps">
+                        <li class="step done">{{ t('order.stepItems') }}</li>
+                        <li class="step current">{{ t('order.stepDetails') }}</li>
+                        <li class="step">{{ t('order.stepConfirm') }}</li>
+                    </ol>
+
+                    <!-- The cart's quote notice sits below the whole form under 1100px,
+                         so repeat it here: nobody should fill this in without knowing
+                         they aren't being charged yet. -->
+                    <div class="quote-banner" v-if="isQuoteCart">
+                        <span class="quote-banner-icon">📝</span>
+                        <span>{{ t('order.quoteNotice') }}</span>
+                    </div>
+
                     <!-- Shipping information -->
                     <div class="form-card">
                         <h2 class="card-title">{{ tt('order.shippingInformation', 'Shipping Information') }}</h2>
@@ -739,19 +766,25 @@ const isProductInCart = (productId) => {
                         <div class="form-group">
                             <label>{{ t('order.fullName') }} <span class="required-star">*</span></label>
                             <input v-model="customerName" type="text" :placeholder="t('order.fullNamePlaceholder')"
-                                class="form-input" required />
+                                class="form-input" :class="{ 'has-error': fieldErrors.customerName }"
+                                data-field="customerName" required />
+                            <p class="field-error" v-if="fieldErrors.customerName">{{ t('order.fieldRequired') }}</p>
                         </div>
 
                         <div class="form-group">
                             <label>{{ t('order.phoneNumber') }} <span class="required-star">*</span></label>
                             <input v-model="phoneNumber" type="tel" :placeholder="t('order.phoneNumberPlaceholder')"
-                                class="form-input" required />
+                                class="form-input" :class="{ 'has-error': fieldErrors.phoneNumber }"
+                                data-field="phoneNumber" required />
+                            <p class="field-error" v-if="fieldErrors.phoneNumber">{{ t('order.fieldRequired') }}</p>
                         </div>
 
                         <div class="form-group">
                             <label>{{ t('order.shippingAddress') }} <span class="required-star">*</span></label>
                             <textarea v-model="shippingAddress" :placeholder="t('order.shippingAddressPlaceholder')"
-                                class="form-textarea" rows="3" required></textarea>
+                                class="form-textarea" :class="{ 'has-error': fieldErrors.shippingAddress }"
+                                data-field="shippingAddress" rows="3" required></textarea>
+                            <p class="field-error" v-if="fieldErrors.shippingAddress">{{ t('order.fieldRequired') }}</p>
                         </div>
 
                         <div class="form-group">
@@ -795,12 +828,15 @@ const isProductInCart = (productId) => {
                         </div>
                     </div>
 
-                    <!-- Optional LINE connect -->
-                    <div class="form-card line-connect-section">
+                    <!-- Optional LINE connect. On a quote this is the reply channel —
+                         staff have to come back with a price — so say why, and lift it
+                         visually rather than leaving it as the last afterthought card. -->
+                    <div class="form-card line-connect-section" :class="{ 'line-highlight': isQuoteCart }">
                         <label class="line-toggle-label">
                             <input type="checkbox" v-model="lineLoginEnabled" class="line-toggle-checkbox" />
                             <span class="line-toggle-text">{{ t('order.lineConnectPrompt') }}</span>
                         </label>
+                        <p class="line-reason" v-if="isQuoteCart">{{ t('order.lineQuoteReason') }}</p>
                         <div v-if="lineLoginEnabled" class="line-connect-action">
                             <button v-if="!lineUserId" type="button" class="line-connect-btn"
                                 @click="triggerLineLogin" :disabled="lineConnecting">
@@ -855,7 +891,10 @@ const isProductInCart = (productId) => {
                                     <button @click="removeFromCart(item.cartItemKey)" class="remove-btn-modern">✕</button>
                                 </div>
                                 <div class="cart-item-bottom">
-                                    <span class="cart-item-price">฿{{ item.price }}</span>
+                                    <span class="cart-item-price cart-item-price-tbc" v-if="isUnpricedItem(item)">
+                                        {{ t('order.quoteTotalPending') }}
+                                    </span>
+                                    <span class="cart-item-price" v-else>฿{{ item.price }}</span>
                                     <div class="quantity-controls-modern">
                                         <button @click="updateQuantity(item.cartItemKey, -1)" class="qty-btn">−</button>
                                         <span class="quantity">{{ item.quantity }}</span>
@@ -888,8 +927,19 @@ const isProductInCart = (productId) => {
                         <div class="cart-summary-modern">
                             <div class="summary-row total">
                                 <span>{{ t('order.total') }}</span>
-                                <span>฿{{ cartTotal }}</span>
+                                <span v-if="isQuoteCart" class="total-tbc">{{ t('order.quoteTotalPending') }}</span>
+                                <span v-else>฿{{ cartTotal }}</span>
                             </div>
+                        </div>
+
+                        <p class="quote-notice" v-if="isQuoteCart">{{ t('order.quoteNotice') }}</p>
+
+                        <!-- Confirm what's about to be submitted at the point it's
+                             committed: under 1100px the form is far above this button. -->
+                        <div class="ship-recap" v-if="isCheckoutView && customerName.trim()">
+                            <span class="ship-recap-label">{{ t('order.shipTo') }}</span>
+                            <span class="ship-recap-name">{{ customerName }}</span>
+                            <span class="ship-recap-addr" v-if="shippingAddress.trim()">{{ shippingAddress }}</span>
                         </div>
 
                         <div class="cart-actions-modern">
@@ -898,8 +948,9 @@ const isProductInCart = (productId) => {
                             </button>
                             <button v-else @click="submitOrder" class="checkout-btn-modern"
                                 :disabled="isSubmittingOrder">
-                                <span v-if="!isSubmittingOrder">{{ slipRequired ? t('order.verifyAndOrder') : tt('order.placeOrder', 'Place Order') }}</span>
-                                <span v-else>{{ t('order.sending') }}</span>
+                                <span v-if="isSubmittingOrder">{{ t('order.sending') }}</span>
+                                <span v-else-if="isQuoteCart">{{ t('order.requestQuote') }}</span>
+                                <span v-else>{{ slipRequired ? t('order.verifyAndOrder') : tt('order.placeOrder', 'Place Order') }}</span>
                             </button>
                         </div>
                     </div>
@@ -929,7 +980,7 @@ const isProductInCart = (productId) => {
 
     <!-- Notification Toast -->
     <transition name="slide-up">
-        <div v-if="showNotification" class="notification">
+        <div v-if="showNotification" class="notification" :class="`notification-${notificationKind}`">
             <div class="notification-content">
                 <div class="notification-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -942,11 +993,15 @@ const isProductInCart = (productId) => {
         </div>
     </transition>
 
+    <!-- Shared add-to-order dialog: same tier/MOQ maths as the catalog and product page. -->
+    <AddToOrderModal :product="productForCart" @close="productForCart = null" />
+
     <!-- Mobile sticky "view cart" bar -->
     <button v-if="cart.length > 0" class="mobile-cart-bar" @click="scrollToCart">
         <span class="mcb-count">{{ cartItemCount }}</span>
         <span class="mcb-label">{{ t('order.yourCart') }}</span>
-        <span class="mcb-total">฿{{ cartTotal }}</span>
+        <span class="mcb-total" v-if="isQuoteCart">{{ t('order.quoteTotalPending') }}</span>
+        <span class="mcb-total" v-else>฿{{ cartTotal }}</span>
     </button>
 
     <!-- Clear Cart Confirmation Modal -->
@@ -1248,21 +1303,6 @@ const isProductInCart = (productId) => {
     display: flex;
     flex-direction: column;
     gap: 6px;
-}
-
-.variation-select {
-    width: 120px;
-    padding: 6px 10px;
-    border: 1px solid #E6E0D9;
-    border-radius: 8px;
-    font-size: 13px;
-    color: #3D2B1F;
-    background: white;
-    cursor: pointer;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238C7B6E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
 }
 
 .td-price {
@@ -1643,6 +1683,28 @@ const isProductInCart = (productId) => {
     align-items: center;
 }
 
+.cart-item-price-tbc {
+    font-style: italic;
+    font-weight: 600 !important;
+    color: #8C7B6E !important;
+}
+
+.quote-notice {
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    background: #FBF3EE;
+    border-left: 3px solid #DD876E;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #6B584A;
+}
+
+.total-tbc {
+    font-style: italic;
+    color: #8C7B6E;
+}
+
 .cart-item-price {
     font-weight: 700;
     font-size: 14px;
@@ -1831,6 +1893,165 @@ const isProductInCart = (productId) => {
     color: #8C7B6E;
     line-height: 1.4;
     margin: -2px 0 12px;
+}
+
+/* ---- Checkout legibility: step rail, quote banner, field errors, recap ---- */
+
+.checkout-steps {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex-wrap: wrap;
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #B5A99D;
+    counter-increment: checkout-step;
+}
+
+.step::before {
+    content: counter(checkout-step);
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #F1EAE3;
+    color: #8C7B6E;
+    font-size: 12px;
+}
+
+.step+.step::after {
+    /* Separator drawn on the gap between chips, not inside them. */
+    content: '';
+    order: -1;
+    width: 18px;
+    height: 1px;
+    background: #E6E0D9;
+}
+
+.checkout-steps {
+    counter-reset: checkout-step;
+}
+
+.step.done {
+    color: #8C7B6E;
+}
+
+.step.done::before {
+    content: '✓';
+    background: #DD876E;
+    color: white;
+}
+
+.step.current {
+    color: #3D2B1F;
+}
+
+.step.current::before {
+    background: #3D2B1F;
+    color: white;
+}
+
+.quote-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 16px;
+    background: #FBF3EE;
+    border-left: 3px solid #DD876E;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: #6B584A;
+}
+
+.quote-banner-icon {
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.form-input.has-error,
+.form-textarea.has-error {
+    border-color: #d63031;
+    background: #FFF7F7;
+}
+
+.field-error {
+    margin: 6px 0 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #d63031;
+}
+
+.line-highlight {
+    border: 1px solid #06C755;
+    box-shadow: 0 0 0 3px rgba(6, 199, 85, 0.08);
+}
+
+.line-reason {
+    margin: 8px 0 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #6B584A;
+}
+
+.ship-recap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    background: white;
+    border: 1px solid #EFE7DF;
+    border-radius: 8px;
+}
+
+.ship-recap-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: #B5A99D;
+}
+
+.ship-recap-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #3D2B1F;
+}
+
+.ship-recap-addr {
+    font-size: 12px;
+    line-height: 1.45;
+    color: #8C7B6E;
+    /* Long addresses shouldn't push the submit button off screen. */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Unpriced products in the browse table — "฿0" would read as free. */
+.price-tbc {
+    font-size: 12px;
+    font-style: italic;
+    font-weight: 600;
+    line-height: 1.35;
+    color: #8C7B6E;
+}
+
+.notification.notification-error {
+    border-color: #d63031;
+    color: #B02525;
 }
 
 .save-account-label {
@@ -2067,12 +2288,10 @@ const isProductInCart = (productId) => {
         /* font-size: 6px !important; */
     }
 
-    /* Fix 3: stack variations vertically, full width selects */
     .td-variations {
         flex-direction: row;
     }
 
-    .variation-select,
     .standard-spec-badge {
         width: 100%;
         font-size: 12px !important;
@@ -2098,7 +2317,6 @@ const isProductInCart = (productId) => {
         flex: 1 1 100%;
     }
 
-    .variation-select,
     .standard-spec-badge {
         max-width: 130px;
     }

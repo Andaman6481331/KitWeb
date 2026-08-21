@@ -7,6 +7,7 @@ import { useI18n } from 'vue-i18n';
 import { cartStore } from '../stores/cartStore';
 import { getProductImageUrl } from '../utils/productImages';
 import { parseMoq, roundHalfUp, toPerPiece } from '../utils/productPricing';
+import { isPriced } from '../utils/cartPricing';
 
 const props = defineProps({
     product: {
@@ -43,6 +44,9 @@ const variantsForCart = computed(() => {
         return [{
             rowKey: 'base',
             imageKey: product.image_key,
+            // DIY kits live in their own bucket and carry no image_key, so callers can
+            // hand us an already-resolved URL to use instead.
+            imageUrl: product.image || null,
             label: null,
             price_1: product.price_1,
             price_2: product.price_2,
@@ -54,6 +58,7 @@ const variantsForCart = computed(() => {
         return {
             rowKey: img.id,
             imageKey: img.image_key,
+            imageUrl: null,
             label: img.attribute_value || null,
             price_1: hasOverride ? img.price_1 : product.price_1,
             price_2: hasOverride ? img.price_2 : product.price_2,
@@ -91,18 +96,26 @@ const cartRowsView = computed(() =>
         const qty = variantQuantities.value[row.rowKey] ?? 0;
         const boxPrice = tierBoxPriceForRow(row);
         const perPiecePrice = toPerPiece(boxPrice, moqNumber.value);
+        // No tier populated means the price hasn't been uploaded yet. Showing ฿0.00
+        // would read as free, so the row is marked and priced by staff later.
+        const unpriced = !isPriced(perPiecePrice);
         return {
             ...row,
             qty,
             boxPrice,
             perPiecePrice,
-            rowTotal: roundHalfUp(perPiecePrice * qty, 2),
+            unpriced,
+            rowTotal: unpriced ? 0 : roundHalfUp(perPiecePrice * qty, 2),
             warning: variantQtyWarnings.value[row.rowKey] || null
         };
     })
 );
 
 const cartGrandTotal = computed(() => cartRowsView.value.reduce((sum, r) => sum + r.rowTotal, 0));
+// Any unpriced row selected means there is no total to quote yet.
+const hasUnpricedSelection = computed(() =>
+    cartRowsView.value.some(row => row.unpriced && (row.qty ?? 0) > 0)
+);
 const isConfirmDisabled = computed(() => cartRowsView.value.every(row => (row.qty ?? 0) === 0));
 
 // Seed one MOQ per row each time a product is opened, so the common case is a
@@ -147,14 +160,23 @@ const handleRowQtyBlur = (rowKey) => {
     }
 };
 
+// Prefer a real image_key (which can be served at full size); fall back to whatever
+// URL the caller pre-resolved for us.
+const rowImage = (row, variant = 'thumb') =>
+    row.imageKey ? getProductImageUrl(row.imageKey, variant) : (row.imageUrl || '');
+
+const lightboxImageUrl = ref('');
+
 const openImageLightbox = (row) => {
     lightboxImageKey.value = row.imageKey;
+    lightboxImageUrl.value = rowImage(row, 'large');
     showImageLightbox.value = true;
 };
 
 const closeImageLightbox = () => {
     showImageLightbox.value = false;
     lightboxImageKey.value = null;
+    lightboxImageUrl.value = '';
 };
 
 const confirmAddToCart = () => {
@@ -198,11 +220,14 @@ const confirmAddToCart = () => {
                 <div class="variant-rows">
                     <div class="variant-row" v-for="row in cartRowsView" :key="row.rowKey">
                         <button class="variant-thumb thumb" type="button" @click="openImageLightbox(row)">
-                            <img :src="getProductImageUrl(row.imageKey, 'thumb')" :alt="row.label || productName">
+                            <img :src="rowImage(row)" :alt="row.label || productName">
                         </button>
                         <div class="variant-row-info">
                             <span class="variant-label">{{ row.label || $t('catalog.standardVariant') }}</span>
-                            <span class="variant-unit-price">
+                            <span class="variant-unit-price variant-unit-price-tbc" v-if="row.unpriced">
+                                {{ $t('catalog.priceToBeConfirmed') }}
+                            </span>
+                            <span class="variant-unit-price" v-else>
                                 ฿{{ row.perPiecePrice.toFixed(2) }} / {{ $t('catalog.piece') }}
                                 <span class="variant-box-price">(฿{{ row.boxPrice.toFixed(2) }} / box)</span>
                             </span>
@@ -216,10 +241,14 @@ const confirmAddToCart = () => {
                                 @blur="handleRowQtyBlur(row.rowKey)">
                             <button class="qty-btn" type="button" @click="incrementRowQty(row.rowKey)">+</button>
                         </div>
-                        <div class="variant-row-total">฿{{ row.rowTotal.toFixed(2) }}</div>
+                        <div class="variant-row-total" v-if="row.unpriced">—</div>
+                        <div class="variant-row-total" v-else>฿{{ row.rowTotal.toFixed(2) }}</div>
                     </div>
                 </div>
-                <div class="confirm-grand-total">{{ $t('catalog.grandTotal') }}: ฿{{ cartGrandTotal.toFixed(2) }}</div>
+                <div class="confirm-grand-total" v-if="hasUnpricedSelection">
+                    {{ $t('catalog.grandTotal') }}: {{ $t('order.quoteTotalPending') }}
+                </div>
+                <div class="confirm-grand-total" v-else>{{ $t('catalog.grandTotal') }}: ฿{{ cartGrandTotal.toFixed(2) }}</div>
             </div>
             <div class="confirm-footer">
                 <button class="btn-cancel" @click="close">{{ $t('catalog.cancel') }}</button>
@@ -235,7 +264,7 @@ const confirmAddToCart = () => {
         <button class="lightbox-close" @click="closeImageLightbox">
             <ion-icon name="close-outline"></ion-icon>
         </button>
-        <img class="lightbox-image" :src="getProductImageUrl(lightboxImageKey)" alt="" @click.stop>
+        <img class="lightbox-image" :src="lightboxImageUrl" alt="" @click.stop>
     </div>
 
     <!-- Notification toast. Lives here rather than in the caller so the message
@@ -386,6 +415,11 @@ const confirmAddToCart = () => {
     font-size: 16px;
     color: #008080;
     font-weight: 600;
+}
+
+.variant-unit-price-tbc {
+    font-style: italic;
+    color: #8C7B6E;
 }
 
 .variant-box-price {

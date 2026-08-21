@@ -292,6 +292,142 @@ function generateDiySKU(count: number): string {
 	return `${prefix}${suffix}`;
 }
 
+// A product row can exist before its price has been uploaded. Treat a missing or
+// non-positive price as "not priced yet" (null) rather than free (0) — an order
+// containing one becomes a quote instead of silently charging nothing.
+function usablePrice(raw: unknown): number | null {
+	const n = Number(raw);
+	return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+// ---- Tier / MOQ pricing -------------------------------------------------------
+// The storefront never shows a raw box price: it divides the reached tier's box
+// price by the MOQ to get a per-piece figure. The Worker has to land on the same
+// number, or a customer is quoted one price and billed another. These mirror
+// frontend/kitweb/src/utils/productPricing.js and add-to-order-modal.vue.
+
+// MOQ doubles as the box size and is stored as free text ("20 pcs"), so take the
+// leading integer; no usable number means no box grouping.
+function parseMoq(raw: unknown): number {
+	const match = String(raw ?? "").match(/\d+/);
+	const n = match ? parseInt(match[0], 10) : NaN;
+	return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+function roundHalfUp(value: number, decimals = 2): number {
+	const factor = 10 ** decimals;
+	return Math.floor(value * factor + 0.5 + Number.EPSILON * factor) / factor;
+}
+
+// Only L1-L3 are customer-facing; L4/L5 are staff-only and never billed from here.
+function tierForQuantity(totalQty: number): 1 | 2 | 3 {
+	return totalQty >= 50 ? 3 : totalQty >= 20 ? 2 : 1;
+}
+
+// The reached tier's box price, falling back to a LOWER tier when that tier has no
+// price set — never upward, so an unfilled tier can't cost a customer their discount.
+function tierBoxPrice(row: any, tier: number): number {
+	const p1 = Number(row?.price_1) || 0;
+	const p2 = Number(row?.price_2) || 0;
+	const p3 = Number(row?.price_3) || 0;
+	if (tier === 3) return p3 > 0 ? p3 : (p2 > 0 ? p2 : p1);
+	if (tier === 2) return p2 > 0 ? p2 : p1;
+	return p1;
+}
+
+// The per-piece price for one line, given how many pieces of that product the whole
+// order carries. Null means no tier is populated — "not priced yet", never free.
+function perPiecePrice(row: any, totalQty: number, moqRaw: unknown): number | null {
+	const box = tierBoxPrice(row, tierForQuantity(totalQty));
+	return box > 0 ? usablePrice(roundHalfUp(box / parseMoq(moqRaw))) : null;
+}
+
+// Tiers are volume-based, so every cart line for the same product counts toward one
+// volume — two variants of a product are one quantity as far as the tier goes.
+function quantityByProduct(items: any[]): Map<string, number> {
+	const totals = new Map<string, number>();
+	for (const item of items) {
+		const key = String(item?.id);
+		totals.set(key, (totals.get(key) || 0) + Math.max(0, Number(item?.quantity) || 0));
+	}
+	return totals;
+}
+
+// Tells a customer the price staff just confirmed on their quote. Returns whether
+// we reached them; mirrors /orders/status, including the line_push_failed flag so
+// unreachable customers stay visible in Manage Orders.
+async function pushQuotePriced(
+	env: Env,
+	order: { id: string; line_user_id: string | null },
+	totalAmount: number,
+	lines: { item: any; unitPrice: number | null }[]
+): Promise<boolean> {
+	const token = env.LINE_CHANNEL_ACCESS_TOKEN || env.LINE_NOTIFY_TOKEN;
+	if (!order.line_user_id || !token) return false;
+
+	const itemRows = lines.map(({ item, unitPrice }) => ({
+		type: "box",
+		layout: "horizontal",
+		margin: "md",
+		contents: [
+			{
+				type: "text",
+				text: `${item.name_th || item.name || ""}\n${item.selectedSize || ""} / ${item.selectedColor || ""} ×${item.quantity}`,
+				size: "sm", color: "#555555", flex: 5, wrap: true
+			},
+			{
+				type: "text",
+				text: `฿${((unitPrice ?? 0) * (Number(item.quantity) || 0)).toFixed(2)}`,
+				size: "sm", color: "#111111", align: "end", flex: 2
+			}
+		]
+	}));
+
+	const flexMessage = {
+		type: "flex",
+		altText: `ยืนยันราคาคำสั่งซื้อ ${order.id}`,
+		contents: {
+			type: "bubble",
+			body: {
+				type: "box",
+				layout: "vertical",
+				contents: [
+					{ type: "text", text: "Kitcharoen", weight: "bold", color: "#DD876E", size: "sm" },
+					{ type: "text", text: "ยืนยันราคาแล้ว", weight: "bold", size: "xl", margin: "md" },
+					{ type: "text", text: `รหัส: ${order.id}`, size: "sm", color: "#888888", margin: "sm" },
+					{ type: "separator", margin: "lg" },
+					{ type: "box", layout: "vertical", margin: "lg", spacing: "sm", contents: itemRows },
+					{ type: "separator", margin: "lg" },
+					{
+						type: "box",
+						layout: "horizontal",
+						margin: "lg",
+						contents: [
+							{ type: "text", text: "รวมทั้งหมด", size: "md", weight: "bold", flex: 3 },
+							{ type: "text", text: `฿${totalAmount.toFixed(2)}`, size: "md", weight: "bold", color: "#DD876E", align: "end", flex: 2 }
+						]
+					},
+					{ type: "text", text: "เจ้าหน้าที่จะติดต่อเรื่องการชำระเงินค่ะ ขอบคุณค่ะ 🧵", size: "xs", color: "#888888", margin: "lg", wrap: true }
+				]
+			}
+		}
+	};
+
+	try {
+		const pushResp = await fetch("https://api.line.me/v2/bot/message/push", {
+			method: "POST",
+			headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+			body: JSON.stringify({ to: order.line_user_id, messages: [flexMessage] })
+		});
+		if (pushResp.ok) return true;
+		console.error(`LINE quote-priced push failed for order ${order.id} (user ${order.line_user_id}): ${pushResp.status} ${await pushResp.text()}`);
+	} catch (err) {
+		console.error(`LINE quote-priced push error for order ${order.id} (user ${order.line_user_id}):`, err);
+	}
+	await env.DB.prepare("UPDATE orders SET line_push_failed = 1 WHERE id = ?").bind(order.id).run();
+	return false;
+}
+
 function parseRange(encoded: string | null, size: number) {
 	if (encoded === null) return null;
 	const parts = encoded.split("bytes=")[1]?.split("-");
@@ -944,8 +1080,9 @@ export default {
 					? (slipFileRaw as File)
 					: null;
 
-				// Name, phone and address are required; a slip is required only when verification is on.
-				if (!customerName || !phoneNumber || !shippingAddress || (slipVerificationEnabled && !slipFile)) {
+				// Name, phone and address are required. The slip requirement depends on whether
+				// the cart turns out to be a quote, so it is checked after pricing below.
+				if (!customerName || !phoneNumber || !shippingAddress) {
 					return corsResponse({ error: "Missing required fields" }, { status: 400 });
 				}
 
@@ -955,34 +1092,51 @@ export default {
 				}
 
 				// Price every line from the DB — client-sent prices/total are NOT trusted.
-				// Regular products: products.price; DIY kits (id "diy-N"): diy_products.price_1.
-				const pricedItems: { item: any; unitPrice: number; orderItemProductId: any }[] = [];
+				// Both product kinds price from their tier columns divided by the box size,
+				// which is what the storefront displays. A null unitPrice means the product
+				// exists but isn't priced yet; a missing product row is a different failure
+				// (PRODUCT_UNAVAILABLE).
+				const cartQtyByProduct = quantityByProduct(cartItems);
+				const pricedItems: { item: any; unitPrice: number | null; orderItemProductId: any }[] = [];
 				let totalAmount = 0;
 				for (const item of cartItems) {
 					const isDiy = typeof item.id === "string" && item.id.startsWith("diy-");
+					const productQty = cartQtyByProduct.get(String(item.id)) || 0;
 					let unitPrice: number | null = null;
 					let orderItemProductId: any = null;
+					let found = false;
 					if (isDiy) {
 						const diyId = parseInt((item.id as string).substring(4), 10);
-						const p = await env.DB.prepare("SELECT price_1 FROM diy_products WHERE id = ?").bind(diyId).first() as any;
-						if (p) unitPrice = Number(p.price_1) || 0;
+						const p = await env.DB.prepare("SELECT price_1, price_2, price_3 FROM diy_products WHERE id = ?").bind(diyId).first() as any;
+						// DIY kits are sold as single units — no box, so the box size is 1.
+						if (p) { found = true; unitPrice = perPiecePrice(p, productQty, 1); }
 					} else {
-						const p = await env.DB.prepare("SELECT price FROM products WHERE id = ?").bind(item.id).first() as any;
-						if (p) { unitPrice = Number(p.price) || 0; orderItemProductId = item.id; }
+						const p = await env.DB.prepare("SELECT price_1, price_2, price_3, moq FROM products WHERE id = ?").bind(item.id).first() as any;
+						if (p) { found = true; unitPrice = perPiecePrice(p, productQty, p.moq); orderItemProductId = item.id; }
 					}
-					if (unitPrice === null) {
+					if (!found) {
 						return corsResponse({ error: "PRODUCT_UNAVAILABLE", detail: item.name || String(item.id) }, { status: 400 });
 					}
 					const qty = Math.max(0, Number(item.quantity) || 0);
-					totalAmount += unitPrice * qty;
+					if (unitPrice !== null) totalAmount += unitPrice * qty;
 					pricedItems.push({ item, unitPrice, orderItemProductId });
+				}
+
+				// One unpriced line turns the whole submission into a quote: staff confirm the
+				// final price and payment with the customer before anything is charged.
+				const isQuote = pricedItems.some(p => p.unitPrice === null);
+
+				// A quote has no agreed total to check a slip against, so verification (and the
+				// slip requirement) only applies once every line is priced.
+				if (slipVerificationEnabled && !isQuote && !slipFile) {
+					return corsResponse({ error: "Missing required fields" }, { status: 400 });
 				}
 
 				// Read the uploaded slip bytes once (used by verification and/or storage).
 				const arrayBuffer = slipFile ? await slipFile.arrayBuffer() : null;
 				let transRef = crypto.randomUUID();
 
-				if (slipVerificationEnabled) {
+				if (slipVerificationEnabled && !isQuote) {
 					// Convert slip to base64 (stack-safe reduce — do NOT spread Uint8Array)
 					const base64String = btoa(
 						new Uint8Array(arrayBuffer!).reduce((data, byte) => data + String.fromCharCode(byte), "")
@@ -1047,10 +1201,15 @@ export default {
 					slipUrl = `slips/${slipKey}`;
 				}
 
+				// A quote carries no total — the priced lines alone would read as a final price.
+				const paymentMethod = isQuote
+					? "QUOTE"
+					: (slipVerificationEnabled ? "PromptPay" : "PromptPay (manual)");
+
 				// Persist order to D1 (server-computed total; linked to the account when logged in)
 				await env.DB.prepare(
 					"INSERT INTO orders (id, customer_name, total_amount, payment_method, note, customer_id, phone_number, shipping_address, slip_url, line_user_id, line_display_name, slip_transaction_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-				).bind(orderId, customerName, totalAmount, slipVerificationEnabled ? "PromptPay" : "PromptPay (manual)", orderNote, customerId, phoneNumber, shippingAddress, slipUrl, lineUserId || null, lineDisplayName || null, transRef).run();
+				).bind(orderId, customerName, isQuote ? 0 : totalAmount, paymentMethod, orderNote, customerId, phoneNumber, shippingAddress, slipUrl, lineUserId || null, lineDisplayName || null, transRef).run();
 
 				// Persist order items with server-side prices
 				for (const { item, unitPrice, orderItemProductId } of pricedItems) {
@@ -1061,7 +1220,9 @@ export default {
 				}
 
 				// Build staff LINE notification (use name_th)
-				let lineMsg = `🧾 คำสั่งซื้อใหม่ (เว็บไซต์)\n`;
+				let lineMsg = isQuote
+					? `📝 ขอใบเสนอราคา (เว็บไซต์) — รอใส่ราคา\n`
+					: `🧾 คำสั่งซื้อใหม่ (เว็บไซต์)\n`;
 				lineMsg += `รหัส: ${orderId}\n`;
 				lineMsg += `ชื่อ: ${customerName}  โทร: ${phoneNumber}\n`;
 				if (lineDisplayName) lineMsg += `LINE: ${lineDisplayName}\n`;
@@ -1070,10 +1231,16 @@ export default {
 					const name = item.name_th || item.name;
 					lineMsg += `${i + 1}) ${name}\n`;
 					lineMsg += `   ขนาด: ${item.selectedSize} | สี: ${item.selectedColor}\n`;
-					lineMsg += `   จำนวน: ${item.quantity} ชิ้น × ${unitPrice} บาท\n`;
-					lineMsg += `   รวม: ${(unitPrice * item.quantity).toFixed(2)} บาท\n\n`;
+					if (unitPrice === null) {
+						lineMsg += `   จำนวน: ${item.quantity} ชิ้น — รอใส่ราคา\n\n`;
+					} else {
+						lineMsg += `   จำนวน: ${item.quantity} ชิ้น × ${unitPrice} บาท\n`;
+						lineMsg += `   รวม: ${(unitPrice * item.quantity).toFixed(2)} บาท\n\n`;
+					}
 				});
-				lineMsg += `รวมทั้งหมด: ${totalAmount.toFixed(2)} บาท\n`;
+				lineMsg += isQuote
+					? `รวมทั้งหมด: รอยืนยันราคากับลูกค้า\n`
+					: `รวมทั้งหมด: ${totalAmount.toFixed(2)} บาท\n`;
 				if (orderNote) lineMsg += `หมายเหตุ: ${orderNote}\n`;
 				lineMsg += slipUrl
 					? `หลักฐานการโอน: ${slipUrl}`
@@ -1097,12 +1264,13 @@ export default {
 					console.error(`Staff LINE push failed for order ${orderId}:`, err);
 				}
 
-				// Push an order-confirmation Flex Message to the customer.
-				// This opens a 1:1 chat with them in the OA console and delivers their receipt.
+				// Push a confirmation to the customer. This opens a 1:1 chat with them in the
+				// OA console. A quote gets a plain acknowledgement instead of the Flex receipt:
+				// there is no agreed total yet, and a receipt showing one would be a promise.
 				if (lineUserId) {
-					const itemRows = pricedItems.map(({ item, unitPrice }) => {
+					const itemRows = isQuote ? [] : pricedItems.map(({ item, unitPrice }) => {
 						const name = item.name_th || item.name;
-						const lineTotal = (unitPrice * item.quantity).toFixed(2);
+						const lineTotal = (unitPrice! * item.quantity).toFixed(2);
 						return {
 							type: "box",
 							layout: "horizontal",
@@ -1165,6 +1333,15 @@ export default {
 						}
 					};
 
+					const quoteMessage = {
+						type: "text",
+						text: `Kitcharoen\nเราได้รับคำขอของคุณแล้ว (รหัส: ${orderId})\n\n`
+							+ `มีสินค้าบางรายการที่ยังไม่ได้ระบุราคา เจ้าหน้าที่จะติดต่อกลับ`
+							+ `เพื่อยืนยันราคาและวิธีชำระเงินก่อนจัดส่งค่ะ ขอบคุณค่ะ 🧵`
+					};
+
+					const customerMessage = isQuote ? quoteMessage : flexMessage;
+
 					// Flag-and-log if the push fails (e.g. customer connected LINE Login but
 					// never added the OA as a friend, so they're unreachable). The order still
 					// succeeds; line_push_failed lets staff see who can't be contacted on LINE.
@@ -1177,7 +1354,7 @@ export default {
 							},
 							body: JSON.stringify({
 								to: lineUserId,
-								messages: [flexMessage]
+								messages: [customerMessage]
 							})
 						});
 						if (!pushResp.ok) {
@@ -1191,7 +1368,7 @@ export default {
 					}
 				}
 
-				return corsResponse({ success: true, orderId });
+				return corsResponse({ success: true, orderId, isQuote });
 			}
 
 			if (url.pathname === "/rfq/submit" && request.method === "POST") {
@@ -1841,7 +2018,9 @@ export default {
 				if (!orderId) {
 					return corsResponse({ error: "orderId is required" }, { status: 400 });
 				}
-				const existing = await env.DB.prepare("SELECT id FROM orders WHERE id = ?").bind(orderId).first();
+				const existing = await env.DB.prepare(
+					"SELECT id, payment_method, line_user_id FROM orders WHERE id = ?"
+				).bind(orderId).first() as any;
 				if (!existing) {
 					return corsResponse({ error: "Order not found" }, { status: 404 });
 				}
@@ -1861,25 +2040,33 @@ export default {
 				).run();
 
 				// If an items array is supplied, replace the line items and recompute the total.
+				let customerNotified = false;
 				if (Array.isArray(body.items)) {
 					let newTotal = 0;
-					const priced: { item: any; unitPrice: number; orderItemProductId: any }[] = [];
+					// Same tier/MOQ maths as /order/submit, so a staff edit re-prices a line
+					// exactly as the storefront would — including re-tiering it when the
+					// quantity changes.
+					const editQtyByProduct = quantityByProduct(body.items);
+					const priced: { item: any; unitPrice: number | null; orderItemProductId: any }[] = [];
 					for (const item of body.items) {
 						const isDiy = typeof item.id === "string" && item.id.startsWith("diy-");
+						const productQty = editQtyByProduct.get(String(item.id)) || 0;
 						let unitPrice: number | null = null;
 						let orderItemProductId: any = null;
 						if (isDiy) {
 							const diyId = parseInt((item.id as string).substring(4), 10);
-							const p = await env.DB.prepare("SELECT price_1 FROM diy_products WHERE id = ?").bind(diyId).first() as any;
-							if (p) unitPrice = Number(p.price_1) || 0;
+							const p = await env.DB.prepare("SELECT price_1, price_2, price_3 FROM diy_products WHERE id = ?").bind(diyId).first() as any;
+							if (p) unitPrice = perPiecePrice(p, productQty, 1);
 						} else if (item.id !== null && item.id !== undefined && item.id !== "") {
-							const p = await env.DB.prepare("SELECT price FROM products WHERE id = ?").bind(item.id).first() as any;
-							if (p) { unitPrice = Number(p.price) || 0; orderItemProductId = item.id; }
+							const p = await env.DB.prepare("SELECT price_1, price_2, price_3, moq FROM products WHERE id = ?").bind(item.id).first() as any;
+							if (p) { unitPrice = perPiecePrice(p, productQty, p.moq); orderItemProductId = item.id; }
 						}
-						// Custom/manual line (no resolvable product): fall back to the staff-entered price.
-						if (unitPrice === null) unitPrice = Number(item.price) || 0;
+						// No catalog price to use — either a custom/manual line with no product,
+						// or a product still awaiting its price. Either way the staff-entered
+						// price is what we have, and it is how a quote gets priced up.
+						if (unitPrice === null) unitPrice = usablePrice(item.price);
 						const qty = Math.max(0, Number(item.quantity) || 0);
-						newTotal += unitPrice * qty;
+						if (unitPrice !== null) newTotal += unitPrice * qty;
 						priced.push({ item, unitPrice, orderItemProductId });
 					}
 
@@ -1889,10 +2076,29 @@ export default {
 							"INSERT INTO order_items (order_id, product_id, product_name, size, color, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?)"
 						).bind(orderId, orderItemProductId, item.name_th || item.name || "", item.selectedSize || null, item.selectedColor || null, item.quantity, unitPrice).run();
 					}
-					await env.DB.prepare("UPDATE orders SET total_amount = ? WHERE id = ?").bind(newTotal, orderId).run();
+
+					// A quote that is now fully priced becomes an ordinary order. One that still
+					// has a gap keeps its zero total, so a partial sum never reads as a final
+					// price. Ordinary orders are never turned into quotes here — that stays a
+					// staff decision, not a side effect of editing lines.
+					const stillUnpriced = priced.some(p => p.unitPrice === null);
+					if (existing.payment_method === "QUOTE" && stillUnpriced) {
+						await env.DB.prepare("UPDATE orders SET total_amount = 0 WHERE id = ?").bind(orderId).run();
+					} else if (existing.payment_method === "QUOTE") {
+						const settled = env.SLIP_VERIFICATION_ENABLED === "true" ? "PromptPay" : "PromptPay (manual)";
+						await env.DB.prepare(
+							"UPDATE orders SET total_amount = ?, payment_method = ? WHERE id = ?"
+						).bind(newTotal, settled, orderId).run();
+						// The pricing is already saved — a push failure must not undo it.
+						customerNotified = await pushQuotePriced(
+							env, { id: orderId, line_user_id: existing.line_user_id }, newTotal, priced
+						);
+					} else {
+						await env.DB.prepare("UPDATE orders SET total_amount = ? WHERE id = ?").bind(newTotal, orderId).run();
+					}
 				}
 
-				return corsResponse({ success: true });
+				return corsResponse({ success: true, customerNotified });
 			}
 
 			// POS in-store cash sale: records a walk-in sale into pos_orders / pos_order_items

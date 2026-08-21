@@ -34,10 +34,35 @@ const DDL = [
 		set_id INTEGER NOT NULL, product_id INTEGER NOT NULL, variant_id INTEGER,
 		quantity INTEGER NOT NULL, sort_order INTEGER DEFAULT 0,
 		FOREIGN KEY (set_id) REFERENCES product_sets(id) ON DELETE CASCADE
+	)`,
+	`CREATE TABLE IF NOT EXISTS diy_products (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL, name_th TEXT,
+		price_1 REAL DEFAULT 0.0, price_2 REAL DEFAULT 0.0, price_3 REAL DEFAULT 0.0,
+		description TEXT, images TEXT, stock INTEGER DEFAULT 0, sku TEXT UNIQUE,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	)`,
+	`CREATE TABLE IF NOT EXISTS orders (
+		id TEXT PRIMARY KEY,
+		customer_name TEXT, total_amount REAL, status TEXT DEFAULT 'PENDING',
+		payment_method TEXT, note TEXT, tracking_number TEXT,
+		line_push_failed INTEGER DEFAULT 0, customer_id TEXT, phone_number TEXT,
+		shipping_address TEXT, slip_url TEXT, line_user_id TEXT,
+		line_display_name TEXT, slip_transaction_ref TEXT,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	)`,
+	`CREATE TABLE IF NOT EXISTS order_items (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		order_id TEXT, product_id INTEGER, product_name TEXT,
+		size TEXT, color TEXT, quantity INTEGER, price REAL,
+		FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 	)`
 ];
 
-const TABLES = ["product_set_items", "product_sets", "product_variants", "products"];
+const TABLES = [
+	"order_items", "orders", "diy_products",
+	"product_set_items", "product_sets", "product_variants", "products"
+];
 
 export async function resetDb(): Promise<void> {
 	for (const table of TABLES) {
@@ -66,4 +91,28 @@ export async function seedProduct(p: Partial<ProductSeed> = {}): Promise<number>
 	).bind(row.name, row.name_th, row.sku, row.moq, row.price_1, row.price_2, row.price_3,
 		row.is_visible, row.image_key).run();
 	return Number(res.meta.last_row_id);
+}
+
+// /order/submit prices from the tier columns (price_1..3) divided by MOQ — the same
+// per-piece maths the storefront displays. This helper takes the price a customer
+// actually sees per piece and derives the stored box price from it. Pass null to
+// model a product whose price hasn't been uploaded yet.
+export async function seedOrderableProduct(perPiece: number | null, moq = 1): Promise<number> {
+	return await seedProduct({
+		moq: String(moq),
+		price_1: perPiece === null ? 0 : perPiece * moq,
+		price_2: 0,
+		price_3: 0
+	});
+}
+
+export async function getOrder(orderId: string): Promise<any> {
+	return await env.DB.prepare("SELECT * FROM orders WHERE id = ?").bind(orderId).first();
+}
+
+export async function getOrderItems(orderId: string): Promise<any[]> {
+	const res = await env.DB.prepare(
+		"SELECT * FROM order_items WHERE order_id = ? ORDER BY id"
+	).bind(orderId).all();
+	return res.results as any[];
 }
