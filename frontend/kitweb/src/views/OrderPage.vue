@@ -805,7 +805,7 @@ const isProductInCart = (productId) => {
                                         }}</p>
                                 </div>
 
-                                <div class="form-group no-margin">
+                                <div class="form-group">
                                     <label>{{ t('order.phoneNumber') }} <span class="required-star">*</span></label>
                                     <input v-model="phoneNumber" type="tel"
                                         :placeholder="t('order.phoneNumberPlaceholder')" class="form-input"
@@ -813,6 +813,18 @@ const isProductInCart = (productId) => {
                                         required />
                                     <p class="field-error" v-if="fieldErrors.phoneNumber">{{ t('order.fieldRequired')
                                         }}</p>
+                                </div>
+
+                                <!-- Contact details belong together: name, phone and the
+                                     LINE handle are all "how staff reach you", and the
+                                     address below is where the parcel goes. Grouping them
+                                     also gives the column enough height to sit level with
+                                     the LINE panel instead of trailing whitespace. -->
+                                <div class="form-group no-margin">
+                                    <label>{{ tt('order.lineDisplayName', 'LINE display name') }}</label>
+                                    <input v-model="lineDisplayName" type="text"
+                                        :placeholder="tt('order.lineDisplayNamePlaceholder', 'So staff can reach you on LINE (optional)')"
+                                        class="form-input" />
                                 </div>
                             </div>
 
@@ -827,13 +839,6 @@ const isProductInCart = (productId) => {
                                 class="form-textarea" :class="{ 'has-error': fieldErrors.shippingAddress }"
                                 data-field="shippingAddress" rows="3" required></textarea>
                             <p class="field-error" v-if="fieldErrors.shippingAddress">{{ t('order.fieldRequired') }}</p>
-                        </div>
-
-                        <div class="form-group">
-                            <label>{{ tt('order.lineDisplayName', 'LINE display name') }}</label>
-                            <input v-model="lineDisplayName" type="text"
-                                :placeholder="tt('order.lineDisplayNamePlaceholder', 'So staff can reach you on LINE (optional)')"
-                                class="form-input" />
                         </div>
 
                         <div class="form-group" :class="{ 'no-margin': !isLoggedIn }">
