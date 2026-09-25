@@ -263,19 +263,21 @@ async function allocateProductSku(env: Env, category: string, preferredSku?: str
 		"SELECT sku FROM products WHERE sku GLOB ?"
 	).bind(`${prefix}[0-9][0-9][0-9]`).all();
 
-	let maxSequence = 0;
+	// This single query already returns every SKU in the prefix's range, so the
+	// used sequences and the first free one can both be derived in memory —
+	// no need to re-query D1 once per candidate (worst case was up to 1000
+	// round-trips). products.sku has a UNIQUE index, so a genuine race with a
+	// concurrent allocation still fails safely at INSERT time.
+	const usedSequences = new Set<number>();
 	const pattern = new RegExp(`^${prefix}(\\d{3})$`);
 	for (const row of results) {
 		const match = String(row.sku).match(pattern);
-		if (match) {
-			maxSequence = Math.max(maxSequence, parseInt(match[1], 10));
-		}
+		if (match) usedSequences.add(parseInt(match[1], 10));
 	}
+	const maxSequence = usedSequences.size ? Math.max(...usedSequences) : 0;
 
 	for (let seq = maxSequence + 1; seq <= maxSequence + 1000; seq++) {
-		const candidate = formatProductSku(prefix, seq);
-		const taken = await env.DB.prepare("SELECT id FROM products WHERE sku = ?").bind(candidate).first();
-		if (!taken) return candidate;
+		if (!usedSequences.has(seq)) return formatProductSku(prefix, seq);
 	}
 
 	throw new Error("Unable to allocate a unique SKU");
@@ -528,12 +530,13 @@ function isValidImageKey(value: unknown): value is string {
 }
 
 async function saveProductCategories(env: Env, productId: number, categories: string[]) {
-	await env.DB.prepare("DELETE FROM product_categories WHERE product_id = ?").bind(productId).run();
-	for (const path of categories) {
-		await env.DB.prepare(
-			"INSERT OR IGNORE INTO product_categories (product_id, category_path) VALUES (?, ?)"
-		).bind(productId, path).run();
-	}
+	const insert = env.DB.prepare(
+		"INSERT OR IGNORE INTO product_categories (product_id, category_path) VALUES (?, ?)"
+	);
+	await env.DB.batch([
+		env.DB.prepare("DELETE FROM product_categories WHERE product_id = ?").bind(productId),
+		...categories.map(path => insert.bind(productId, path))
+	]);
 }
 
 async function handleR2Request(
@@ -738,7 +741,12 @@ export default {
 					};
 				});
 
-				return corsResponse(parsedProducts);
+				// Storefront calls (no include_hidden) are safe to cache briefly in the
+				// browser: several components on the same page independently call
+				// getProducts(), so a short TTL collapses those into one D1 hit instead
+				// of one per component. Admin calls always need fresh data after an edit.
+				const cacheHeaders: Record<string, string> = includeHidden ? {} : { "Cache-Control": "public, max-age=30" };
+				return corsResponse(parsedProducts, { headers: cacheHeaders });
 			}
 
 			// ── Projects (editorial content) ──────────────────────────────
@@ -834,15 +842,24 @@ export default {
 				}
 
 				// products.colors is empty for the whole catalog right now, so
-				// curated product_ids is the real source. This fallback costs one
-				// query per unlinked row and makes the section fill itself in as
-				// soon as staff start recording colors on products.
-				for (const row of rows as any[]) {
-					if (row.product_ids.length) continue;
-					const { results: matched } = await env.DB.prepare(
-						"SELECT id FROM products WHERE is_visible = 1 AND colors LIKE ? LIMIT 8"
-					).bind(`%${row.color_name}%`).all();
-					row.product_ids = (matched || []).map((p: any) => Number(p.id));
+				// curated product_ids is the real source. This fallback used to run
+				// one LIKE '%...%' query per unlinked row (unindexable, since a
+				// leading wildcard can't use a b-tree index); now it's a single
+				// query, matched in memory, however many rows need it. The fallback
+				// makes the section fill itself in as soon as staff start recording
+				// colors on products.
+				const unlinked = (rows as any[]).filter(r => !r.product_ids.length);
+				if (unlinked.length) {
+					const { results: candidates } = await env.DB.prepare(
+						"SELECT id, colors FROM products WHERE is_visible = 1 AND colors IS NOT NULL AND colors != ''"
+					).all();
+					for (const row of unlinked) {
+						const needle = String(row.color_name).toLowerCase();
+						row.product_ids = (candidates || [])
+							.filter((p: any) => typeof p.colors === "string" && p.colors.toLowerCase().includes(needle))
+							.slice(0, 8)
+							.map((p: any) => Number(p.id));
+					}
 				}
 
 				return corsResponse(rows);
@@ -915,72 +932,41 @@ export default {
 			}
 
 			if (url.pathname === "/institutional/catalog" && request.method === "GET") {
-				try {
-					// 1. Try querying the exact requested schema (product and product_img)
-					const query = `
-						SELECT 
-							p.id, 
-							p.sku, 
-							p.title, 
-							p.description, 
-							p.category_id,
-							img.image_key AS image_url
-						FROM product p
-						LEFT JOIN product_img img ON p.id = img.product_id
-					`;
-					const { results } = await env.DB.prepare(query).all();
-					
-					// Perform grouping by category_id
-					const grouped: { [key: string]: any[] } = {};
-					results.forEach((p: any) => {
-						const cat = p.category_id || "Other";
-						if (!grouped[cat]) {
-							grouped[cat] = [];
-						}
-						grouped[cat].push(p);
-					});
+				// There is no product/product_img table in this schema (only
+				// products/product_images) — this used to try that schema first on
+				// every call, always fail, and fall back here, wasting one guaranteed
+				// D1 query per request. Query the real tables directly instead.
+				// Fetch from products mapping name -> title, category -> category_id, image_key -> image_url
+				const query = `
+					SELECT
+						p.id,
+						p.sku,
+						p.name AS title,
+						p.name_th,
+						p.description,
+						p.description_th,
+						p.category AS category_id,
+						p.image_key AS image_url
+					FROM products p
+					WHERE p.is_visible = 1 OR p.is_visible IS NULL
+				`;
+				const { results } = await env.DB.prepare(query).all();
 
-					return corsResponse({
-						success: true,
-						grouped,
-						products: results
-					});
-				} catch (err: any) {
-					console.warn("D1 query on product/product_img failed, falling back to products/product_images: ", err.message);
-					
-					// 2. Fallback to existing products / product_images tables
-					// Fetch from products mapping name -> title, category -> category_id, image_key -> image_url
-					const query = `
-						SELECT
-							p.id,
-							p.sku,
-							p.name AS title,
-							p.name_th,
-							p.description,
-							p.description_th,
-							p.category AS category_id,
-							p.image_key AS image_url
-						FROM products p
-						WHERE p.is_visible = 1 OR p.is_visible IS NULL
-					`;
-					const { results } = await env.DB.prepare(query).all();
-					
-					// Perform grouping by category_id
-					const grouped: { [key: string]: any[] } = {};
-					results.forEach((p: any) => {
-						const cat = p.category_id || "Other";
-						if (!grouped[cat]) {
-							grouped[cat] = [];
-						}
-						grouped[cat].push(p);
-					});
+				// Perform grouping by category_id
+				const grouped: { [key: string]: any[] } = {};
+				results.forEach((p: any) => {
+					const cat = p.category_id || "Other";
+					if (!grouped[cat]) {
+						grouped[cat] = [];
+					}
+					grouped[cat].push(p);
+				});
 
-					return corsResponse({
-						success: true,
-						grouped,
-						products: results
-					});
-				}
+				return corsResponse({
+					success: true,
+					grouped,
+					products: results
+				});
 			}
 
 			if (url.pathname.startsWith("/images/") && (request.method === "GET" || request.method === "HEAD")) {
@@ -1097,6 +1083,29 @@ export default {
 				// exists but isn't priced yet; a missing product row is a different failure
 				// (PRODUCT_UNAVAILABLE).
 				const cartQtyByProduct = quantityByProduct(cartItems);
+
+				// Batch-fetch every distinct product/diy id referenced in the cart in two
+				// queries instead of one round-trip per cart line.
+				const diyIds = [...new Set(
+					cartItems.filter(i => typeof i.id === "string" && i.id.startsWith("diy-"))
+						.map(i => parseInt((i.id as string).substring(4), 10))
+				)];
+				const productIds = [...new Set(
+					cartItems.filter(i => !(typeof i.id === "string" && i.id.startsWith("diy-"))).map(i => i.id)
+				)];
+				const diyRows = diyIds.length
+					? (await env.DB.prepare(
+						`SELECT id, price_1, price_2, price_3 FROM diy_products WHERE id IN (${diyIds.map(() => "?").join(",")})`
+					).bind(...diyIds).all()).results as any[]
+					: [];
+				const productRows = productIds.length
+					? (await env.DB.prepare(
+						`SELECT id, price_1, price_2, price_3, moq FROM products WHERE id IN (${productIds.map(() => "?").join(",")})`
+					).bind(...productIds).all()).results as any[]
+					: [];
+				const diyById = new Map(diyRows.map(r => [String(r.id), r]));
+				const productById = new Map(productRows.map(r => [String(r.id), r]));
+
 				const pricedItems: { item: any; unitPrice: number | null; orderItemProductId: any }[] = [];
 				let totalAmount = 0;
 				for (const item of cartItems) {
@@ -1107,11 +1116,11 @@ export default {
 					let found = false;
 					if (isDiy) {
 						const diyId = parseInt((item.id as string).substring(4), 10);
-						const p = await env.DB.prepare("SELECT price_1, price_2, price_3 FROM diy_products WHERE id = ?").bind(diyId).first() as any;
+						const p = diyById.get(String(diyId));
 						// DIY kits are sold as single units — no box, so the box size is 1.
 						if (p) { found = true; unitPrice = perPiecePrice(p, productQty, 1); }
 					} else {
-						const p = await env.DB.prepare("SELECT price_1, price_2, price_3, moq FROM products WHERE id = ?").bind(item.id).first() as any;
+						const p = productById.get(String(item.id));
 						if (p) { found = true; unitPrice = perPiecePrice(p, productQty, p.moq); orderItemProductId = item.id; }
 					}
 					if (!found) {
@@ -1206,18 +1215,21 @@ export default {
 					? "QUOTE"
 					: (slipVerificationEnabled ? "PromptPay" : "PromptPay (manual)");
 
-				// Persist order to D1 (server-computed total; linked to the account when logged in)
-				await env.DB.prepare(
+				// Persist order + items in one batch (server-computed total; linked to the
+				// account when logged in). Batching also makes the write atomic — a failed
+				// item insert can no longer leave an order with zero items behind.
+				const orderInsert = env.DB.prepare(
 					"INSERT INTO orders (id, customer_name, total_amount, payment_method, note, customer_id, phone_number, shipping_address, slip_url, line_user_id, line_display_name, slip_transaction_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-				).bind(orderId, customerName, isQuote ? 0 : totalAmount, paymentMethod, orderNote, customerId, phoneNumber, shippingAddress, slipUrl, lineUserId || null, lineDisplayName || null, transRef).run();
+				).bind(orderId, customerName, isQuote ? 0 : totalAmount, paymentMethod, orderNote, customerId, phoneNumber, shippingAddress, slipUrl, lineUserId || null, lineDisplayName || null, transRef);
 
-				// Persist order items with server-side prices
-				for (const { item, unitPrice, orderItemProductId } of pricedItems) {
-					const productName = item.name_th || item.name;
-					await env.DB.prepare(
-						"INSERT INTO order_items (order_id, product_id, product_name, size, color, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?)"
-					).bind(orderId, orderItemProductId, productName, item.selectedSize, item.selectedColor, item.quantity, unitPrice).run();
-				}
+				const itemInsert = env.DB.prepare(
+					"INSERT INTO order_items (order_id, product_id, product_name, size, color, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?)"
+				);
+				const itemStatements = pricedItems.map(({ item, unitPrice, orderItemProductId }) =>
+					itemInsert.bind(orderId, orderItemProductId, item.name_th || item.name, item.selectedSize, item.selectedColor, item.quantity, unitPrice)
+				);
+
+				await env.DB.batch([orderInsert, ...itemStatements]);
 
 				// Build staff LINE notification (use name_th)
 				let lineMsg = isQuote
@@ -2047,6 +2059,32 @@ export default {
 					// exactly as the storefront would — including re-tiering it when the
 					// quantity changes.
 					const editQtyByProduct = quantityByProduct(body.items);
+
+					// Batch-fetch every distinct product/diy id in the edited lines instead of
+					// one round-trip per line (same pattern as /order/submit).
+					const diyIds = [...new Set(
+						body.items.filter((i: any) => typeof i.id === "string" && i.id.startsWith("diy-"))
+							.map((i: any) => parseInt((i.id as string).substring(4), 10))
+					)];
+					const productIds = [...new Set(
+						body.items.filter((i: any) =>
+							!(typeof i.id === "string" && i.id.startsWith("diy-")) &&
+							i.id !== null && i.id !== undefined && i.id !== ""
+						).map((i: any) => i.id)
+					)];
+					const diyRows = diyIds.length
+						? (await env.DB.prepare(
+							`SELECT id, price_1, price_2, price_3 FROM diy_products WHERE id IN (${diyIds.map(() => "?").join(",")})`
+						).bind(...diyIds).all()).results as any[]
+						: [];
+					const productRows = productIds.length
+						? (await env.DB.prepare(
+							`SELECT id, price_1, price_2, price_3, moq FROM products WHERE id IN (${productIds.map(() => "?").join(",")})`
+						).bind(...productIds).all()).results as any[]
+						: [];
+					const diyById = new Map(diyRows.map(r => [String(r.id), r]));
+					const productById = new Map(productRows.map(r => [String(r.id), r]));
+
 					const priced: { item: any; unitPrice: number | null; orderItemProductId: any }[] = [];
 					for (const item of body.items) {
 						const isDiy = typeof item.id === "string" && item.id.startsWith("diy-");
@@ -2055,10 +2093,10 @@ export default {
 						let orderItemProductId: any = null;
 						if (isDiy) {
 							const diyId = parseInt((item.id as string).substring(4), 10);
-							const p = await env.DB.prepare("SELECT price_1, price_2, price_3 FROM diy_products WHERE id = ?").bind(diyId).first() as any;
+							const p = diyById.get(String(diyId));
 							if (p) unitPrice = perPiecePrice(p, productQty, 1);
 						} else if (item.id !== null && item.id !== undefined && item.id !== "") {
-							const p = await env.DB.prepare("SELECT price_1, price_2, price_3, moq FROM products WHERE id = ?").bind(item.id).first() as any;
+							const p = productById.get(String(item.id));
 							if (p) { unitPrice = perPiecePrice(p, productQty, p.moq); orderItemProductId = item.id; }
 						}
 						// No catalog price to use — either a custom/manual line with no product,
@@ -2070,12 +2108,15 @@ export default {
 						priced.push({ item, unitPrice, orderItemProductId });
 					}
 
-					await env.DB.prepare("DELETE FROM order_items WHERE order_id = ?").bind(orderId).run();
-					for (const { item, unitPrice, orderItemProductId } of priced) {
-						await env.DB.prepare(
-							"INSERT INTO order_items (order_id, product_id, product_name, size, color, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?)"
-						).bind(orderId, orderItemProductId, item.name_th || item.name || "", item.selectedSize || null, item.selectedColor || null, item.quantity, unitPrice).run();
-					}
+					const itemInsert = env.DB.prepare(
+						"INSERT INTO order_items (order_id, product_id, product_name, size, color, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?)"
+					);
+					await env.DB.batch([
+						env.DB.prepare("DELETE FROM order_items WHERE order_id = ?").bind(orderId),
+						...priced.map(({ item, unitPrice, orderItemProductId }) =>
+							itemInsert.bind(orderId, orderItemProductId, item.name_th || item.name || "", item.selectedSize || null, item.selectedColor || null, item.quantity, unitPrice)
+						)
+					]);
 
 					// A quote that is now fully priced becomes an ordinary order. One that still
 					// has a gap keeps its zero total, so a partial sum never reads as a final
@@ -2176,14 +2217,15 @@ export default {
 					}
 
 					if (images && Array.isArray(images) && productId) {
-						for (const img of images) {
-							if (!isValidImageKey(img?.image_key)) continue;
-							await env.DB.prepare(
+						const validImages = images.filter((img: any) => isValidImageKey(img?.image_key));
+						if (validImages.length) {
+							const imageInsert = env.DB.prepare(
 								"INSERT INTO product_images (product_id, image_key, attribute_type, attribute_value, is_main, price_1, price_2, price_3, price_4, price_5) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-							).bind(
+							);
+							await env.DB.batch(validImages.map((img: any) => imageInsert.bind(
 								productId, img.image_key, dbValue(img.attribute_type), dbValue(img.attribute_value), img.is_main ? 1 : 0,
 								dbValue(img.price_1), dbValue(img.price_2), dbValue(img.price_3), dbValue(img.price_4), dbValue(img.price_5)
-							).run();
+							)));
 						}
 					}
 
@@ -2226,18 +2268,20 @@ export default {
 
 				await saveProductCategories(env, Number(id), categoryList);
 
-				// Update images: simplest way is to delete and re-insert
+				// Update images: simplest way is to delete and re-insert, batched into
+				// one atomic round-trip instead of a DELETE plus one INSERT per image.
 				if (images && Array.isArray(images)) {
-					await env.DB.prepare("DELETE FROM product_images WHERE product_id = ?").bind(id).run();
-					for (const img of images) {
-						if (!isValidImageKey(img?.image_key)) continue;
-						await env.DB.prepare(
-							"INSERT INTO product_images (product_id, image_key, attribute_type, attribute_value, is_main, price_1, price_2, price_3, price_4, price_5) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-						).bind(
+					const validImages = images.filter((img: any) => isValidImageKey(img?.image_key));
+					const imageInsert = env.DB.prepare(
+						"INSERT INTO product_images (product_id, image_key, attribute_type, attribute_value, is_main, price_1, price_2, price_3, price_4, price_5) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+					);
+					await env.DB.batch([
+						env.DB.prepare("DELETE FROM product_images WHERE product_id = ?").bind(id),
+						...validImages.map((img: any) => imageInsert.bind(
 							id, img.image_key, dbValue(img.attribute_type), dbValue(img.attribute_value), img.is_main ? 1 : 0,
 							dbValue(img.price_1), dbValue(img.price_2), dbValue(img.price_3), dbValue(img.price_4), dbValue(img.price_5)
-						).run();
-					}
+						))
+					]);
 				}
 
 				return corsResponse({ success: true });
