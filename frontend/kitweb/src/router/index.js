@@ -23,7 +23,12 @@ export const routes = [
       { path: '', name: 'home', component: Home },
       { path: 'catalog/:category?/:productSlug?', name: 'catalog', component: Catalog },
       { path: 'institutional-catalog', name: 'institutional-catalog', component: () => import('../views/InstitutionalCatalogPage.vue') },
-      { path: 'orderpage', name: 'orderpage', component: OrderPage, meta: { requiresAuth: true } },
+      { path: 'business-sets', name: 'business-sets', component: () => import('../views/BusinessSetsPage.vue') },
+      { path: 'business-sets/:slug', name: 'business-set', component: () => import('../views/BusinessSetPage.vue') },
+      { path: 'orderpage', name: 'orderpage', component: OrderPage },
+      { path: 'ordertracking', name: 'ordertracking', component: () => import('../views/OrderTrackingPage.vue'), meta: { requiresAuth: true } },
+      { path: 'about', name: 'about', component: () => import('../views/AboutPage.vue') },
+      { path: 'project/:slug', name: 'project', component: () => import('../views/ProjectPage.vue') },
       { path: 'contactus', name: 'contactus', component: ContactUsPage },
       { path: 'login', name: 'login', component: Login },
       { path: 'event', name: 'event', component: EventPage },
@@ -41,6 +46,35 @@ export const routes = [
     redirect: (to) => `/${getDefaultLang()}${to.fullPath}`,
   },
 ]
+
+// Set by the catalog sidebar right before it navigates to a new category, so the
+// next navigation scrolls to the category bar instead of the top of the page.
+// Navbar and all other navigation keep the default scroll-to-top.
+export const scrollIntent = { toCategoryBar: false }
+
+// Reset scroll on navigation. Without this, Vue Router leaves the scroll
+// position where it was on the previous page, so a new page appears already
+// scrolled down. Back/forward restores the saved position; in-page hash links
+// scroll to their target (offset for the sticky navbar).
+// The navbar publishes its live height as --nav-h (App.vue), which differs
+// between the 64px mobile bar and the 80px desktop one. Reading it keeps anchor
+// scrolls from landing underneath the sticky header on either.
+function navOffset() {
+  if (typeof document === 'undefined') return 90
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--nav-h')
+  const parsed = parseInt(raw, 10)
+  return (Number.isFinite(parsed) ? parsed : 80) + 10
+}
+
+export function scrollBehavior(to, from, savedPosition) {
+  if (scrollIntent.toCategoryBar) {
+    scrollIntent.toCategoryBar = false
+    return { el: '#category-bar', top: navOffset(), behavior: 'smooth' }
+  }
+  if (savedPosition) return savedPosition
+  if (to.hash) return { el: to.hash, top: navOffset(), behavior: 'smooth' }
+  return { top: 0 }
+}
 
 export function installRouterGuards(router, i18n) {
   router.beforeEach((to, from, next) => {

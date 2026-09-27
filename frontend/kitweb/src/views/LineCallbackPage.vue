@@ -10,7 +10,7 @@ const errorMsg = ref('')
 onMounted(async () => {
   const code = route.query.code
   const state = route.query.state
-  const savedState = sessionStorage.getItem('line_oauth_state')
+  const savedState = localStorage.getItem('line_oauth_state')
 
   if (!code) {
     status.value = 'error'
@@ -24,7 +24,7 @@ onMounted(async () => {
     return
   }
 
-  sessionStorage.removeItem('line_oauth_state')
+  localStorage.removeItem('line_oauth_state')
 
   try {
     const redirectUri = window.location.origin + '/line-callback'
@@ -42,6 +42,13 @@ onMounted(async () => {
       throw new Error(result.error || 'Failed to get LINE profile')
     }
   } catch (e) {
+    // Let the opener stop its "connecting" state and show a friendly message.
+    if (window.opener) {
+      window.opener.postMessage(
+        { type: 'LINE_AUTH_ERROR', error: e.message || 'exchange_failed' },
+        window.location.origin
+      )
+    }
     status.value = 'error'
     errorMsg.value = e.message || 'Could not connect to LINE. Please close this window and try again.'
   }

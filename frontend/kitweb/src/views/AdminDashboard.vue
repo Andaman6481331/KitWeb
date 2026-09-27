@@ -1,10 +1,19 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { api, API_URL, getDiyImageUrl } from '../services/api';
 import { processProductImage } from '../services/image-processor';
 import { useI18n } from 'vue-i18n';
+import { defaultLang } from '../utils/localeRoutes';
+import AdminProjects from '../components/admin-projects.vue';
+import AdminSpotlights from '../components/admin-spotlights.vue';
+import AdminGallery from '../components/admin-gallery.vue';
+import AdminEvents from '../components/admin-events.vue';
+import AdminBusinessSets from '../components/admin-business-sets.vue';
 
 const { t } = useI18n();
+const route = useRoute();
+const currentLang = computed(() => route.params.lang || defaultLang);
 
 const products = ref([]);
 const categories = ref([]);
@@ -13,6 +22,7 @@ const password = ref('');
 const loginError = ref(false);
 const isEditing = ref(false);
 const editingId = ref(null);
+const formPanelOpen = ref(false);
 const showCategoryManager = ref(false);
 
 // New Category form
@@ -20,6 +30,16 @@ const newCat = ref({ name: '', name_th: '', path: '', default_usage: '', default
 
 // Filtering
 const activeFilter = ref('all');
+const searchQuery = ref('');
+const showThai = ref(true);
+const adminSortBy = ref('upload');
+const adminSortOpen = ref(false);
+
+// Dropdown states for form
+const categoryDropdownOpen = ref(false);
+const categorySearchQuery = ref('');
+const usageDropdownOpen = ref(false);
+const usageSearchQuery = ref('');
 
 // New product form
 const newProduct = ref({
@@ -33,8 +53,8 @@ const newProduct = ref({
   image_key: '',
   usage: '',
   usage_th: '',
-  use_for: '',
-  use_for_th: '',
+  attribute: '',
+  attribute_th: '',
   varieties: '',
   varieties_th: '',
   sizes: '',
@@ -56,15 +76,11 @@ const imagePreview = ref(null);
 const uploading = ref(false);
 const stockAdjustment = ref(0);
 
-const galleryImages = ref([]); // Array of { key, file, preview, attribute_type, attribute_value, is_new: boolean }
+const galleryImages = ref([]); // Array of { key, file, preview, attribute_type, attribute_value, price_1..5, is_new: boolean }
 const galleryFileInput = ref(null);
 
-// Variant states derived from gallery image link roles
-const sizeVariants = ref([]); // list of { name, price_1, price_2, price_3, price_4, price_5, stock, image_key }
-const initialVariantNames = ref([]); // track loaded variants
-
-const showDescTh = ref(true);
-const showUseForTh = ref(true);
+// Single shared EN/TH toggle for description, attribute, and usage examples
+const showThaiFields = ref(true);
 const usageOptions = [
   { en: 'sewing',           th: 'งานเย็บ' },
   { en: 'crafting',         th: 'งานประดิษฐ์' },
@@ -80,110 +96,62 @@ const usageOptions = [
   { en: 'punching',         th: 'งานตอก' }
 ];
 
-const selectedUsages = ref([]);
+// Each entry: { en, th, example, example_th } — one per selected usage type,
+// with a small example text the admin writes describing that usage for this product.
+const usageEntries = ref([]);
 
-// Sync FROM newProduct.usage -> selectedUsages (e.g. on editProduct load)
+const isUsageSelected = (en) => usageEntries.value.some(e => e.en === en);
+
+const toggleUsageOption = (u) => {
+  const idx = usageEntries.value.findIndex(e => e.en === u.en);
+  if (idx >= 0) {
+    usageEntries.value.splice(idx, 1);
+  } else {
+    usageEntries.value.push({ en: u.en, th: u.th, example: '', example_th: '' });
+  }
+};
+
+// Accepts either the new JSON format ([{type, example}]) or the legacy
+// comma-separated string format, and normalizes both into usageEntries.
+const parseUsageRaw = (raw, rawTh) => {
+  const parseSide = (str) => {
+    if (!str) return [];
+    try {
+      const parsed = JSON.parse(str);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // Legacy comma-separated list
+    }
+    return str.split(',').map(s => s.trim()).filter(Boolean).map(type => ({ type, example: '' }));
+  };
+  const enList = parseSide(raw);
+  const thList = parseSide(rawTh);
+  return enList.map((entry, i) => {
+    const opt = usageOptions.find(o => o.en === entry.type);
+    return {
+      en: entry.type || '',
+      th: thList[i]?.type || opt?.th || entry.type || '',
+      example: entry.example || '',
+      example_th: thList[i]?.example || ''
+    };
+  });
+};
+
+// Sync FROM newProduct.usage -> usageEntries (e.g. on editProduct load)
 watch(() => newProduct.value.usage, (val) => {
-  selectedUsages.value = val ? val.split(', ').map(s => s.trim()).filter(Boolean) : [];
+  usageEntries.value = parseUsageRaw(val, newProduct.value.usage_th);
 }, { immediate: true });
 
-// Sync TO newProduct when checkboxes change
-watch(selectedUsages, (val) => {
-  newProduct.value.usage = val.join(', ');
-  newProduct.value.usage_th = val
-    .map(en => usageOptions.find(u => u.en === en)?.th || en)
-    .join(', ');
-}, { flush: 'sync' });
-
-const detectedSizes = computed(() => {
-  const sizes = new Set();
-  galleryImages.value.forEach(img => {
-    if (img.attribute_type === 'size' && img.attribute_value) {
-      sizes.add(img.attribute_value.trim());
-    }
-  });
-  return Array.from(sizes);
-});
-
-const detectedColors = computed(() => {
-  const colors = new Set();
-  galleryImages.value.forEach(img => {
-    if (img.attribute_type === 'color' && img.attribute_value) {
-      colors.add(img.attribute_value.trim());
-    }
-  });
-  return Array.from(colors);
-});
-
-watch(
-  [
-    () => galleryImages.value.map(img => `${img.attribute_type}:${img.attribute_value}`),
-    () => [...initialVariantNames.value]
-  ],
-  () => {
-    const detected = new Set();
-    galleryImages.value.forEach(img => {
-      if (img.attribute_type === 'size' && img.attribute_value) {
-        const trimmed = img.attribute_value.trim();
-        if (trimmed) {
-          detected.add(trimmed);
-        }
-      }
-    });
-
-    const allSizeNames = Array.from(new Set([...initialVariantNames.value, ...detected]));
-
-    const updated = allSizeNames.map(size => {
-      const existing = sizeVariants.value.find(sv => sv.name === size);
-      if (existing) return existing;
-      
-      // Check if the loaded product had this variant (for edit mode)
-      if (isEditing.value && newProduct.value.variants) {
-        const match = newProduct.value.variants.find(v => v.variant_name === size);
-        if (match) {
-          return {
-            name: size,
-            price_1: match.price_1 || 0,
-            price_2: match.price_2 || 0,
-            price_3: match.price_3 || 0,
-            price_4: match.price_4 || 0,
-            price_5: match.price_5 || 0,
-            stock: match.stock || 0,
-            image_key: match.image_key || ''
-          };
-        }
-      }
-
-      return {
-        name: size,
-        price_1: newProduct.value.price_1 || 0,
-        price_2: newProduct.value.price_2 || 0,
-        price_3: newProduct.value.price_3 || 0,
-        price_4: newProduct.value.price_4 || 0,
-        price_5: newProduct.value.price_5 || 0,
-        stock: 0,
-        image_key: ''
-      };
-    });
-    sizeVariants.value = updated;
-  },
-  { deep: true, immediate: true }
-);
-
-const removeSizeVariant = (sizeName) => {
-  initialVariantNames.value = initialVariantNames.value.filter(n => n !== sizeName);
-
-  // Untag any gallery images that have this size name
-  galleryImages.value.forEach(img => {
-    if (img.attribute_type === 'size' && img.attribute_value?.trim() === sizeName) {
-      img.attribute_type = 'gallery';
-      img.attribute_value = '';
-    }
-  });
-
-  // Filter it from sizeVariants
-  sizeVariants.value = sizeVariants.value.filter(sv => sv.name !== sizeName);
-};
+// Sync TO newProduct when entries/examples change
+watch(usageEntries, (val) => {
+  if (val.length === 0) {
+    newProduct.value.usage = '';
+    newProduct.value.usage_th = '';
+  } else {
+    newProduct.value.usage = JSON.stringify(val.map(e => ({ type: e.en, example: e.example || '' })));
+    newProduct.value.usage_th = JSON.stringify(val.map(e => ({ type: e.th || e.en, example: e.example_th || '' })));
+  }
+}, { deep: true, flush: 'sync' });
 
 const updateStockAdjustment = (amount) => {
   stockAdjustment.value += amount;
@@ -199,6 +167,17 @@ const validateStockAdjustment = () => {
 
 const showFormulaPopup = ref(false);
 const formulaInput = ref("200, 180, 160, 130");
+
+const previewImageSrc = ref(null);
+const openImagePreview = (img) => {
+  // Newly picked local files have no server-side variants yet — their preview
+  // (an object URL) is already full resolution. Saved images only have a thumb
+  // rendered in the grid, so fetch the large variant for the lightbox.
+  previewImageSrc.value = img.is_new ? img.preview : getImageUrl(img.image_key, 'large');
+};
+const closeImagePreview = () => {
+  previewImageSrc.value = null;
+};
 
 const fileInput = ref(null);
 const triggerFileUpload = () => {
@@ -243,13 +222,64 @@ const formatProductCategories = (product) => {
 };
 
 const filteredProducts = computed(() => {
-  if (activeFilter.value === 'all') return products.value;
-  return products.value.filter(p => {
-    // Support both legacy single category and new multi-category
-    if (p.categories && p.categories.length > 0) {
-      return p.categories.includes(activeFilter.value);
-    }
-    return p.category === activeFilter.value;
+  let filtered = products.value;
+
+  // Apply category filter
+  if (activeFilter.value !== 'all') {
+    filtered = filtered.filter(p => {
+      if (p.categories && p.categories.length > 0) {
+        return p.categories.includes(activeFilter.value);
+      }
+      return p.category === activeFilter.value;
+    });
+  }
+
+  // Apply search filter
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase();
+    filtered = filtered.filter(p => {
+      const nameMatch = (p.name || '').toLowerCase().includes(query);
+      const nameThMatch = (p.name_th || '').toLowerCase().includes(query);
+      const skuMatch = (p.sku || '').toLowerCase().includes(query);
+      return nameMatch || nameThMatch || skuMatch;
+    });
+  }
+
+  // Apply sort
+  filtered = [...filtered];
+  if (adminSortBy.value === 'sku') {
+    filtered.sort((a, b) => (a.sku || '').localeCompare(b.sku || '', undefined, { numeric: true }));
+  } else if (adminSortBy.value === 'alpha') {
+    const bcp47 = showThai.value ? 'th-TH' : 'en';
+    filtered.sort((a, b) => {
+      const nameA = (showThai.value ? (a.name_th || a.name) : a.name) || '';
+      const nameB = (showThai.value ? (b.name_th || b.name) : b.name) || '';
+      return nameA.localeCompare(nameB, bcp47);
+    });
+  }
+  // 'upload' = default DB order, no sort needed
+
+  return filtered;
+});
+
+const filteredCategories = computed(() => {
+  if (!categorySearchQuery.value.trim()) return categories.value;
+  const query = categorySearchQuery.value.toLowerCase();
+  return categories.value.filter(cat => {
+    const nameMatch = (cat.name || '').toLowerCase().includes(query);
+    const nameThMatch = (cat.name_th || '').toLowerCase().includes(query);
+    const pathMatch = (cat.path || '').toLowerCase().includes(query);
+    return nameMatch || nameThMatch || pathMatch;
+  });
+});
+
+const filteredUsages = computed(() => {
+  if (!usageSearchQuery.value.trim()) return usageOptions;
+  const query = usageSearchQuery.value.toLowerCase();
+  return usageOptions.filter(u => {
+    const enMatch = (u.en || '').toLowerCase().includes(query);
+    const thMatch = (u.th || '').toLowerCase().includes(query);
+    return enMatch || thMatch;
   });
 });
 
@@ -280,6 +310,11 @@ const handleGalleryUpload = (event) => {
       preview: URL.createObjectURL(file),
       attribute_type: 'gallery',
       attribute_value: '',
+      price_1: null,
+      price_2: null,
+      price_3: null,
+      price_4: null,
+      price_5: null,
       is_new: true
     });
   });
@@ -298,27 +333,27 @@ const triggerGalleryUpload = () => {
 const resetForm = () => {
   newProduct.value = {
     name: '', name_th: '', description: '', description_th: '', price: 0, category: '', categories: [], image_key: '',
-    usage: '', usage_th: '', use_for: '', use_for_th: '', varieties: '', varieties_th: '', sizes: '', sizes_th: '', colors: '', colors_th: '',
+    usage: '', usage_th: '', attribute: '', attribute_th: '', varieties: '', varieties_th: '', sizes: '', sizes_th: '', colors: '', colors_th: '',
     price_1: 0, price_2: 0, price_3: 0, price_4: 0, price_5: 0, moq: '', is_visible: true, stock: 0
   };
   selectedFile.value = null;
   imagePreview.value = null;
   galleryImages.value = [];
-  sizeVariants.value = [];
-  initialVariantNames.value = [];
   isEditing.value = false;
   editingId.value = null;
   stockAdjustment.value = 0;
-  showDescTh.value = false;
+  showThaiFields.value = true;
+  formPanelOpen.value = false;
 };
 
 const editProduct = (product) => {
   isEditing.value = true;
+  formPanelOpen.value = true;
   editingId.value = product.id;
   newProduct.value = { ...product };
   // Normalize DB integer (1/0/null) to a boolean for the toggle
   newProduct.value.is_visible = product.is_visible !== 0;
-  showDescTh.value = false;
+  showThaiFields.value = true;
   imagePreview.value = null; // Clear local preview to show saved image
 
   if (!newProduct.value.categories || newProduct.value.categories.length === 0) {
@@ -341,26 +376,6 @@ const editProduct = (product) => {
     }));
   } else {
     galleryImages.value = [];
-  }
-
-  // Load variants directly to sizeVariants and initialVariantNames
-  if (product.variants && product.variants.length > 0) {
-    initialVariantNames.value = product.variants
-      .map(v => v.variant_name)
-      .filter(name => name !== 'Default');
-    sizeVariants.value = product.variants.map(v => ({
-      name: v.variant_name,
-      price_1: v.price_1 || 0,
-      price_2: v.price_2 || 0,
-      price_3: v.price_3 || 0,
-      price_4: v.price_4 || 0,
-      price_5: v.price_5 || 0,
-      stock: v.stock || 0,
-      image_key: v.image_key || ''
-    })).filter(v => v.name !== 'Default');
-  } else {
-    initialVariantNames.value = [];
-    sizeVariants.value = [];
   }
 
   // window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -434,7 +449,20 @@ const handleSubmit = async () => {
     // 2. Upload Gallery Images if new, saving keys directly to the gallery array
     const finalImages = [];
     let galleryIndex = 1;
+    const priceOrNull = (v) => {
+      const n = parseFloat(v);
+      return Number.isNaN(n) ? null : n;
+    };
+
     for (const img of galleryImages.value) {
+      const isLinked = img.attribute_type === 'variant_link';
+      const priceFields = {
+        price_1: isLinked ? priceOrNull(img.price_1) : null,
+        price_2: isLinked ? priceOrNull(img.price_2) : null,
+        price_3: isLinked ? priceOrNull(img.price_3) : null,
+        price_4: isLinked ? priceOrNull(img.price_4) : null,
+        price_5: isLinked ? priceOrNull(img.price_5) : null
+      };
       if (img.is_new) {
         const baseKey = await prepareAndUpload(img.file, `-g${galleryIndex++}`);
         img.image_key = baseKey; // save back to helper ref
@@ -443,85 +471,22 @@ const handleSubmit = async () => {
           image_key: baseKey,
           attribute_type: img.attribute_type,
           attribute_value: img.attribute_value,
-          is_main: false
+          is_main: false,
+          ...priceFields
         });
       } else {
         finalImages.push({
           image_key: img.image_key,
           attribute_type: img.attribute_type,
           attribute_value: img.attribute_value,
-          is_main: img.is_main
+          is_main: img.is_main,
+          ...priceFields
         });
       }
     }
 
     // Add images to payload
     newProduct.value.images = finalImages.filter(img => img.image_key);
-
-    // 3. Build variants payload
-    const variantsPayload = [];
-    const colorsList = detectedColors.value;
-
-    if (sizeVariants.value.length > 0) {
-      for (const sv of sizeVariants.value) {
-        // Find size variant image key
-        const sizeImageObj = galleryImages.value.find(img => img.attribute_type === 'size' && img.attribute_value?.trim() === sv.name);
-        const sizeImageKey = sizeImageObj ? sizeImageObj.image_key : null;
-
-        // Generate variant specific SKU slug
-        const sizeSlug = sv.name.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().substring(0, 5);
-        const variantSku = `${sku}-${sizeSlug}`;
-
-        const variantColors = colorsList.map(colorName => {
-          const colorImageObj = galleryImages.value.find(img => img.attribute_type === 'color' && img.attribute_value?.trim() === colorName);
-          const colorImageKey = colorImageObj ? colorImageObj.image_key : null;
-          return {
-            color_name: colorName,
-            image_key: colorImageKey,
-            stock: sv.stock || 0
-          };
-        });
-
-        variantsPayload.push({
-          variant_name: sv.name,
-          sku: variantSku,
-          price_1: parseFloat(sv.price_1) || 0,
-          price_2: parseFloat(sv.price_2) || 0,
-          price_3: parseFloat(sv.price_3) || 0,
-          price_4: parseFloat(sv.price_4) || 0,
-          price_5: parseFloat(sv.price_5) || 0,
-          stock: parseInt(sv.stock) || 0,
-          image_key: sizeImageKey,
-          colors: variantColors
-        });
-      }
-    } else if (colorsList.length > 0) {
-      // Colors only, no sizes -> create a single default variant
-      const variantColors = colorsList.map(colorName => {
-        const colorImageObj = galleryImages.value.find(img => img.attribute_type === 'color' && img.attribute_value?.trim() === colorName);
-        const colorImageKey = colorImageObj ? colorImageObj.image_key : null;
-        return {
-          color_name: colorName,
-          image_key: colorImageKey,
-          stock: parseInt(newProduct.value.stock) || 0
-        };
-      });
-
-      variantsPayload.push({
-        variant_name: 'Default',
-        sku: `${sku}-DFT`,
-        price_1: parseFloat(newProduct.value.price_1) || 0,
-        price_2: parseFloat(newProduct.value.price_2) || 0,
-        price_3: parseFloat(newProduct.value.price_3) || 0,
-        price_4: parseFloat(newProduct.value.price_4) || 0,
-        price_5: parseFloat(newProduct.value.price_5) || 0,
-        stock: parseInt(newProduct.value.stock) || 0,
-        image_key: null,
-        colors: variantColors
-      });
-    }
-
-    newProduct.value.variants = variantsPayload;
 
     const productPayload = {
       name: newProduct.value.name,
@@ -534,8 +499,8 @@ const handleSubmit = async () => {
       image_key: newProduct.value.image_key || null,
       usage: newProduct.value.usage || null,
       usage_th: newProduct.value.usage_th || null,
-      use_for: newProduct.value.use_for || null,
-      use_for_th: newProduct.value.use_for_th || null,
+      attribute: newProduct.value.attribute || null,
+      attribute_th: newProduct.value.attribute_th || null,
       varieties: newProduct.value.varieties || null,
       sizes: newProduct.value.sizes || null,
       colors: newProduct.value.colors || null,
@@ -546,14 +511,11 @@ const handleSubmit = async () => {
       price_5: newProduct.value.price_5,
       moq: newProduct.value.moq || null,
       is_visible: newProduct.value.is_visible !== false,
-      stock: newProduct.value.stock,
       sku: newProduct.value.sku || undefined,
-      images: finalImages.filter(img => img.image_key),
-      variants: variantsPayload
+      images: finalImages.filter(img => img.image_key)
     };
 
     if (isEditing.value) {
-      productPayload.stock = Math.max(0, (newProduct.value.stock || 0) + stockAdjustment.value);
       await api.updateProduct(editingId.value, productPayload);
       alert(t('admin.alertUpdated'));
     } else {
@@ -599,33 +561,15 @@ const applyPriceFormula = () => {
     return;
   }
 
-  if (sizeVariants.value.length > 0) {
-    let appliedCount = 0;
-    sizeVariants.value.forEach(sv => {
-      const p5 = parseFloat(sv.price_5);
-      if (!isNaN(p5) && p5 > 0) {
-        sv.price_1 = Number((p5 * percentages[0] / 100).toFixed(2));
-        sv.price_2 = Number((p5 * percentages[1] / 100).toFixed(2));
-        sv.price_3 = Number((p5 * percentages[2] / 100).toFixed(2));
-        sv.price_4 = Number((p5 * percentages[3] / 100).toFixed(2));
-        appliedCount++;
-      }
-    });
-    if (appliedCount === 0) {
-      alert("Please set a valid Level 5 price on at least one variant first.");
-      return;
-    }
-  } else {
-    const p5 = parseFloat(newProduct.value.price_5);
-    if (isNaN(p5) || p5 <= 0) {
-      alert("Please set a valid Level 5 price first.");
-      return;
-    }
-    newProduct.value.price_1 = Number((p5 * percentages[0] / 100).toFixed(2));
-    newProduct.value.price_2 = Number((p5 * percentages[1] / 100).toFixed(2));
-    newProduct.value.price_3 = Number((p5 * percentages[2] / 100).toFixed(2));
-    newProduct.value.price_4 = Number((p5 * percentages[3] / 100).toFixed(2));
+  const p5 = parseFloat(newProduct.value.price_5);
+  if (isNaN(p5) || p5 <= 0) {
+    alert("Please set a valid Level 5 price first.");
+    return;
   }
+  newProduct.value.price_1 = Number((p5 * percentages[0] / 100).toFixed(2));
+  newProduct.value.price_2 = Number((p5 * percentages[1] / 100).toFixed(2));
+  newProduct.value.price_3 = Number((p5 * percentages[2] / 100).toFixed(2));
+  newProduct.value.price_4 = Number((p5 * percentages[3] / 100).toFixed(2));
 
   showFormulaPopup.value = false;
 };
@@ -642,23 +586,6 @@ const onCategoriesChange = () => {
   newProduct.value.category = firstPath;
   if (!isEditing.value) {
     newProduct.value.sku = '';
-  }
-  const selectedCat = categories.value.find(c => c.path === firstPath);
-  if (selectedCat) {
-    if (selectedCat.default_use_for) {
-      newProduct.value.use_for = selectedCat.default_use_for;
-    }
-  }
-};
-
-const adjustStock = async (product, change) => {
-  try {
-    const result = await api.adjustStock(product.id, change);
-    if (result.success) {
-      product.stock = result.newStock;
-    }
-  } catch (error) {
-    alert('Failed to adjust stock');
   }
 };
 
@@ -711,6 +638,7 @@ const resetDiyForm = () => {
   diyImages.value = [];
   isDiyEditing.value = false;
   diyEditingId.value = null;
+  formPanelOpen.value = false;
 };
 
 const handleDiySubmit = async () => {
@@ -766,6 +694,7 @@ const handleDiySubmit = async () => {
 
 const editDiyProduct = (prod) => {
   isDiyEditing.value = true;
+  formPanelOpen.value = true;
   diyEditingId.value = prod.id;
   newDiyProduct.value = {
     name: prod.name,
@@ -819,6 +748,9 @@ const deleteDiyProduct = async (id) => {
             count: categories.length }) }}</p>
         </div>
         <div class="header-actions">
+          <router-link class="cat-btn orders-btn" :to="{ name: 'manageorders', params: { lang: currentLang } }">
+            <ion-icon name="receipt-outline"></ion-icon> {{ $t('manageOrders.title') }}
+          </router-link>
           <button class="cat-btn" @click="showCategoryManager = !showCategoryManager">
             <ion-icon name="list-outline"></ion-icon> {{ $t('admin.editCategories') }}
           </button>
@@ -834,7 +766,30 @@ const deleteDiyProduct = async (id) => {
         <button type="button" :class="{ active: activeAdminSection === 'diy' }" @click="activeAdminSection = 'diy'; resetDiyForm();">
           <ion-icon name="construct-outline"></ion-icon> DIY Sets Collection
         </button>
+        <button type="button" :class="{ active: activeAdminSection === 'projects' }" @click="activeAdminSection = 'projects'; resetForm();">
+          <ion-icon name="book-outline"></ion-icon> Projects &amp; Articles
+        </button>
+        <button type="button" :class="{ active: activeAdminSection === 'colors' }" @click="activeAdminSection = 'colors'; resetForm();">
+          <ion-icon name="color-palette-outline"></ion-icon> Color of the Month
+        </button>
+        <button type="button" :class="{ active: activeAdminSection === 'gallery' }" @click="activeAdminSection = 'gallery'; resetForm();">
+          <ion-icon name="images-outline"></ion-icon> Creator Gallery
+        </button>
+        <button type="button" :class="{ active: activeAdminSection === 'events' }" @click="activeAdminSection = 'events'; resetForm();">
+          <ion-icon name="calendar-outline"></ion-icon> Workshops &amp; Events
+        </button>
+        <button type="button" :class="{ active: activeAdminSection === 'sets' }" @click="activeAdminSection = 'sets'; resetForm();">
+          <ion-icon name="cube-outline"></ion-icon> {{ $t('admin.businessSets') }}
+        </button>
       </div>
+
+      <!-- Editorial content lives in its own component; it shares nothing with the
+           product form above beyond the tab it sits under. -->
+      <AdminProjects v-if="activeAdminSection === 'projects'" />
+      <AdminSpotlights v-if="activeAdminSection === 'colors'" />
+      <AdminGallery v-if="activeAdminSection === 'gallery'" />
+      <AdminEvents v-if="activeAdminSection === 'events'" />
+      <AdminBusinessSets v-if="activeAdminSection === 'sets'" />
 
       <!-- Category Manager Section (Togglable) -->
       <transition name="slide-fade">
@@ -869,16 +824,26 @@ const deleteDiyProduct = async (id) => {
         </section>
       </transition>
 
-      <div class="dashboard-grid">
-        <section class="form-section">
+      <!-- Form Panel Backdrop -->
+      <div v-if="formPanelOpen" class="form-panel-backdrop" @click="activeAdminSection === 'diy' ? resetDiyForm() : resetForm()"></div>
+
+      <!-- Slide-in Form Panel -->
+      <transition name="form-panel">
+        <section v-if="formPanelOpen" class="form-section">
           <template v-if="activeAdminSection === 'standard'">
             <div class="form-header">
               <div class="header-title-group">
                 <h2 style="padding: 0; margin: 0;">{{ isEditing ? $t('admin.editProduct') : $t('admin.addProduct') }}</h2>
               </div>
-              <button v-if="isEditing" @click="resetForm" class="cancel-btn">
-                <ion-icon name="close-circle-outline"></ion-icon> {{ $t('admin.cancelEdit') }}
-              </button>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <button type="button" @click="showThaiFields = !showThaiFields"
+                  style="font-size:11px; padding:2px 8px; border-radius:12px; border:1px solid #b2bec3; background: #f1f2f6; cursor:pointer; color:#636e72;">
+                  {{ showThaiFields ? 'TH' : 'EN' }}
+                </button>
+                <button @click="resetForm" class="cancel-btn">
+                  <ion-icon name="close-circle-outline"></ion-icon> {{ isEditing ? $t('admin.cancelEdit') : $t('admin.cancel') }}
+                </button>
+              </div>
             </div>
 
             <form id="product-form" @submit.prevent="handleSubmit">
@@ -906,47 +871,61 @@ const deleteDiyProduct = async (id) => {
                   <input type="file" ref="fileInput" class="hidden-input" @change="handleFileUpload" accept="image/*" />
                 </div>
                 <div class="form-group" style="margin-top:10px;">
-                  <label>
-                    {{ $t('admin.useFor') }}
-                    <button type="button" @click="showUseForTh = !showUseForTh"
-                      style="font-size:11px; padding:2px 8px; border-radius:12px; border:1px solid #b2bec3; background: #f1f2f6; cursor:pointer; color:#636e72;">
-                      {{ showUseForTh ? 'TH' : 'EN' }}
-                    </button>
-                  </label>
-                  <input v-if="!showUseForTh" v-model="newProduct.use_for" :placeholder="$t('admin.placeholderUseFor')" />
-                  <input v-if="showUseForTh" v-model="newProduct.use_for_th" :placeholder="`ใช้สำหรับทำอะไรบ้าง...`" />
+                  <label>{{ $t('admin.attribute') }}</label>
+                  <textarea v-if="!showThaiFields" v-model="newProduct.attribute" rows="2"
+                    :placeholder="$t('admin.placeholderAttribute')"></textarea>
+                  <textarea v-if="showThaiFields" v-model="newProduct.attribute_th" rows="2"
+                    placeholder="คุณสมบัติของสินค้า..."></textarea>
                 </div>
               </div>
               <div>
                 <div class="form-group">
                   <label>{{ $t('admin.categoriesLabel') }}</label>
-                  <div class="category-checkboxes">
-                    <label v-for="cat in categories" :key="cat.id" class="category-checkbox">
-                      <input
-                        type="checkbox"
-                        :value="cat.path"
-                        v-model="newProduct.categories"
-                        @change="onCategoriesChange"
-                      />
-                      <span>
-                        {{ cat.name }}
-                        <span v-if="cat.name_th" class="cat-th-label">({{ cat.name_th }})</span>
+                  <div class="dropdown-wrapper">
+                    <button
+                      type="button"
+                      class="dropdown-toggle"
+                      @click="categoryDropdownOpen = !categoryDropdownOpen"
+                    >
+                      <span v-if="newProduct.categories?.length > 0" class="dropdown-value">
+                        {{ newProduct.categories.length }} selected
                       </span>
-                    </label>
+                      <span v-else class="dropdown-placeholder">Select categories...</span>
+                      <ion-icon :name="categoryDropdownOpen ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+                    </button>
+                    <transition name="dropdown-fade">
+                      <div v-if="categoryDropdownOpen" class="dropdown-menu">
+                        <div class="dropdown-search">
+                          <input
+                            v-model="categorySearchQuery"
+                            type="text"
+                            placeholder="Search categories..."
+                            class="dropdown-search-input"
+                          />
+                        </div>
+                        <div class="dropdown-options">
+                          <label v-for="cat in filteredCategories" :key="cat.id" class="dropdown-option">
+                            <input
+                              type="checkbox"
+                              :value="cat.path"
+                              v-model="newProduct.categories"
+                              @change="onCategoriesChange"
+                              style="width: 16px;"
+                            />
+                            <span>{{ cat.name }}</span>
+                            <span v-if="cat.name_th" class="cat-th-label">({{ cat.name_th }})</span>
+                          </label>
+                        </div>
+                      </div>
+                    </transition>
                   </div>
                   <small class="auto-hint">{{ $t('admin.categoriesHint') }}</small>
                 </div>
                 <div class="form-group">
-                  <label style="display:flex; align-items:center; gap:8px;">
-                    {{ $t('admin.description') }}
-                    <button type="button" @click="showDescTh = !showDescTh"
-                      style="font-size:11px; padding:2px 8px; border-radius:12px; border:1px solid #b2bec3; background: #f1f2f6; cursor:pointer; color:#636e72;">
-                      {{ showDescTh ? 'TH' : 'EN' }}
-                    </button>
-                  </label>
-                  <textarea v-if="!showDescTh" required v-model="newProduct.description" rows="8"
+                  <label>{{ $t('admin.description') }}</label>
+                  <textarea v-if="!showThaiFields" required v-model="newProduct.description" rows="10"
                     placeholder="English description..."></textarea>
-                  <textarea v-if="showDescTh" v-model="newProduct.description_th" rows="8"
+                  <textarea v-if="showThaiFields" v-model="newProduct.description_th" rows="10"
                     placeholder="คำอธิบายภาษาไทย..."
                     ></textarea>
                   <small class="auto-hint">{{ $t('admin.autoTranslateHint') }}</small>
@@ -956,17 +935,55 @@ const deleteDiyProduct = async (id) => {
 
             <div class="form-group">
               <label>{{ $t('admin.usage') }}</label>
-              <div class="category-checkboxes">
-                <label v-for="u in usageOptions" :key="u.en" class="category-checkbox">
-                  <input
-                    type="checkbox"
-                    :value="u.en"
-                    v-model="selectedUsages"
-                  />
-                  <span>{{ u.en }} <span class="cat-th-label">({{ u.th }})</span></span>
-                </label>
+              <div class="dropdown-wrapper">
+                <button
+                  type="button"
+                  class="dropdown-toggle"
+                  @click="usageDropdownOpen = !usageDropdownOpen"
+                >
+                  <span v-if="usageEntries.length > 0" class="dropdown-value">
+                    {{ usageEntries.length }} selected
+                  </span>
+                  <span v-else class="dropdown-placeholder">Select usages...</span>
+                  <ion-icon :name="usageDropdownOpen ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+                </button>
+                <transition name="dropdown-fade">
+                  <div v-if="usageDropdownOpen" class="dropdown-menu">
+                    <div class="dropdown-search">
+                      <input
+                        v-model="usageSearchQuery"
+                        type="text"
+                        placeholder="Search usages..."
+                        class="dropdown-search-input"
+                      />
+                    </div>
+                    <div class="dropdown-options">
+                      <label v-for="u in filteredUsages" :key="u.en" class="dropdown-option">
+                        <input
+                          type="checkbox"
+                          :checked="isUsageSelected(u.en)"
+                          @change="toggleUsageOption(u)"
+                          style="width: 16px;"
+                        />
+                        <span>{{ u.en }} <span class="cat-th-label">({{ u.th }})</span></span>
+                      </label>
+                    </div>
+                  </div>
+                </transition>
               </div>
-              <small class="auto-hint" v-if="newProduct.usage">{{ newProduct.usage }}</small>
+
+              <!-- One small example text area per selected usage type -->
+              <div v-if="usageEntries.length > 0" class="usage-examples" style="margin-top:12px; display:flex; flex-direction:column; gap:10px;">
+                <div v-for="entry in usageEntries" :key="entry.en" class="usage-example-item">
+                  <label style="font-weight:600; font-size:13px;">
+                    {{ showThaiFields ? entry.th : entry.en }}
+                  </label>
+                  <textarea v-if="!showThaiFields" v-model="entry.example" rows="1"
+                    :placeholder="$t('admin.usageExamplePlaceholder')"></textarea>
+                  <textarea v-if="showThaiFields" v-model="entry.example_th" rows="1"
+                    placeholder="อธิบายตัวอย่างของการใช้งานนี้..."></textarea>
+                </div>
+              </div>
             </div>
 
           </form>
@@ -977,8 +994,8 @@ const deleteDiyProduct = async (id) => {
               <div class="header-title-group">
                 <h2 style="padding: 0; margin: 0;">{{ isDiyEditing ? 'Edit DIY Product' : 'Add New DIY Product' }}</h2>
               </div>
-              <button v-if="isDiyEditing" @click="resetDiyForm" class="cancel-btn">
-                <ion-icon name="close-circle-outline"></ion-icon> Cancel Edit
+              <button @click="resetDiyForm" class="cancel-btn">
+                <ion-icon name="close-circle-outline"></ion-icon> {{ isDiyEditing ? 'Cancel Edit' : $t('admin.cancel') }}
               </button>
             </div>
 
@@ -1016,13 +1033,9 @@ const deleteDiyProduct = async (id) => {
 
               <div class="form-group">
                 <label>Description</label>
-                <textarea required v-model="newDiyProduct.description" rows="6" placeholder="Describe the DIY kit contents, difficulty level, or instructions..."></textarea>
+                <textarea required v-model="newDiyProduct.description" rows="8" placeholder="Describe the DIY kit contents, difficulty level, or instructions..."></textarea>
               </div>
 
-              <div class="form-group">
-                <label>Stock Count</label>
-                <input v-model.number="newDiyProduct.stock" type="number" min="0" placeholder="0" required />
-              </div>
 
               <!-- DIY Images Gallery -->
               <div class="gallery-section">
@@ -1065,8 +1078,7 @@ const deleteDiyProduct = async (id) => {
                 <div class="modal-body">
                   <p>{{ $t('admin.formulaDesc') }}</p>
                   <div class="formula-info">
-                    <span class="info-tag" v-if="sizeVariants.length === 0">{{ $t('admin.currentL5', { price: newProduct.price_5 || '0.00' }) }}</span>
-                    <span class="info-tag" v-else>Applying to all variants with a set Level 5 price</span>
+                    <span class="info-tag">{{ $t('admin.currentL5', { price: newProduct.price_5 || '0.00' }) }}</span>
                   </div>
                   <div class="input-group">
                     <label>{{ $t('admin.percentages') }}</label>
@@ -1082,90 +1094,16 @@ const deleteDiyProduct = async (id) => {
               </div>
             </div>
           </transition>
-        </section>
 
-        <section class="list-section">
-          <template v-if="activeAdminSection === 'standard'">
-            <div class="list-header">
-              <h2 style="padding: 0; margin: 0 0 30px 0;">{{ $t('admin.inventory') }}</h2>
-              <!-- Filter Tabs -->
-              <div class="filter-tabs">
-                <button :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'">{{ $t('admin.all')
-                  }}</button>
-                <button v-for="cat in categories" :key="cat.id" :class="{ active: activeFilter === cat.path }"
-                  @click="activeFilter = cat.path">
-                  {{ cat.name_th ? `${cat.name} (${cat.name_th})` : cat.name }}
-                </button>
-              </div>
+          <!-- Image Preview Lightbox -->
+          <transition name="fade">
+            <div v-if="previewImageSrc" class="image-preview-overlay" @click.self="closeImagePreview">
+              <button type="button" class="image-preview-close" @click="closeImagePreview">&times;</button>
+              <img :src="previewImageSrc" class="image-preview-img" alt="Preview" />
             </div>
-
-            <div class="inventory-scroll">
-              <div v-for="product in filteredProducts" :key="product.id" class="product-item">
-                <div class="item-img">
-                  <img :src="getImageUrl(product.image_key || product.image)" :alt="product.name">
-                </div>
-                <div class="item-info">
-                  <strong>
-                    {{ product.name_th ? `${product.name_th} (${product.name})` : product.name }}
-                    <span v-if="product.is_visible === 0" class="hidden-badge">
-                      {{ $t('admin.hidden') || 'Hidden' }}
-                    </span>
-                  </strong>
-                  <span class="p-meta">SKU: {{ product.sku }} | {{ formatProductCategories(product) }} | ${{ product.price_1 || product.price }}</span>
-                  <div class="stock-control">
-                    <span :class="['stock-count', 
-                      product.stock === 0 ? 'low' : (product.stock > 0 && product.stock <= 5 ? 'warning' : '')
-                    ]">{{ $t('admin.inStock', {
-                      count:
-                      product.stock || 0 }) }}</span>
-                  </div>
-                </div>
-                <div class="item-actions">
-                  <button class="action-btn edit" @click="editProduct(product)"><ion-icon
-                      name="create-outline"></ion-icon></button>
-                  <button class="action-btn del" @click="deleteProduct(product.id)"><ion-icon
-                      name="trash-outline"></ion-icon></button>
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <template v-else-if="activeAdminSection === 'diy'">
-            <div class="list-header">
-              <h2>DIY Kits Collection ({{ diyProducts.length }} items)</h2>
-            </div>
-
-            <div class="inventory-scroll">
-              <div v-for="prod in diyProducts" :key="prod.id" class="product-item">
-                <div class="item-img">
-                  <img :src="getDiyImageUrl(prod.images && prod.images.length > 0 ? prod.images[0] : '')" :alt="prod.name">
-                </div>
-                <div class="item-info">
-                  <strong>{{ prod.name_th ? `${prod.name} (${prod.name_th})` : prod.name }}</strong>
-                  <span class="p-meta">SKU: {{ prod.sku }} | ฿{{ prod.price_1 }}</span>
-                  <div class="stock-control">
-                    <span :class="['stock-count', prod.stock === 0 ? 'low' : (prod.stock > 0 && prod.stock <= 5 ? 'warning' : '')]">
-                      {{ prod.stock || 0 }} in stock
-                    </span>
-                  </div>
-                </div>
-                <div class="item-actions">
-                  <button class="action-btn edit" @click="editDiyProduct(prod)">
-                    <ion-icon name="create-outline"></ion-icon>
-                  </button>
-                  <button class="action-btn del" @click="deleteDiyProduct(prod.id)">
-                    <ion-icon name="trash-outline"></ion-icon>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </template>
-        </section>
-      </div>
-
-      <!-- Gallery & Variant Manager (Full Width at Bottom for Standard section) -->
-      <transition name="slide-fade">
-        <section class="gallery-variant-manager" v-if="activeAdminSection === 'standard'">
+          </transition>
+                    <!-- Gallery & Variant Manager (For Standard section) -->
+          <div v-if="activeAdminSection === 'standard'" class="gallery-variant-manager">
           <div class="workspace-header">
             <h2><ion-icon name="images-outline"></ion-icon>{{$t('admin.galleryTitle')}}</h2>
             <button type="button" class="add-gallery-btn" @click="triggerGalleryUpload">
@@ -1178,19 +1116,24 @@ const deleteDiyProduct = async (id) => {
           <div class="gallery-workspace-grid" v-if="galleryImages.length > 0">
             <div v-for="(img, index) in galleryImages" :key="index" class="gallery-card">
               <div class="card-thumb">
-                <img :src="img.preview" />
+                <img :src="img.preview" @click="openImagePreview(img)" />
                 <button type="button" class="remove-card-btn" @click="removeGalleryImage(index)">&times;</button>
               </div>
               <div class="card-controls">
                 <label>Link Role</label>
                 <select v-model="img.attribute_type">
                   <option value="gallery">{{$t('admin.galleryOnly')}}</option>
-                  <option value="color">{{$t('admin.colorLink')}}</option>
-                  <option value="size">{{$t('admin.sizeLink')}}</option>
-                  <option value="variant">{{$t('admin.variantLink')}}</option>
+                  <option value="variant_link">{{$t('admin.variantLink')}}</option>
                 </select>
-                <input v-if="img.attribute_type !== 'gallery'" v-model="img.attribute_value" 
-                  :placeholder="img.attribute_type === 'color' ? 'e.g. Red' : 'e.g. 4 inches'" class="card-input" />
+                <input v-if="img.attribute_type === 'variant_link'" v-model="img.attribute_value"
+                  placeholder="e.g. Red / Large" class="card-input" />
+                <div v-if="img.attribute_type === 'variant_link'" class="card-price-tiers">
+                  <input type="number" step="1" v-model="img.price_1" class="card-input" :placeholder="$t('admin.level1')" />
+                  <input type="number" step="1" v-model="img.price_2" class="card-input" :placeholder="$t('admin.level2')" />
+                  <input type="number" step="1" v-model="img.price_3" class="card-input" :placeholder="$t('admin.level3')" />
+                  <input type="number" step="1" v-model="img.price_4" class="card-input" :placeholder="$t('admin.level4')" />
+                  <input type="number" step="1" v-model="img.price_5" class="card-input" :placeholder="$t('admin.level5')" />
+                </div>
               </div>
             </div>
           </div>
@@ -1204,7 +1147,6 @@ const deleteDiyProduct = async (id) => {
             </div>
             <p class="matrix-info-text">
               {{$t('admin.matrixInfoText')}}
-              <span v-if="sizeVariants.length > 0">{{$t('admin.matrixInfoTextColors')}}</span>
             </p>
             <div class="matrix-scrollable">
               <table class="matrix-table">
@@ -1216,57 +1158,21 @@ const deleteDiyProduct = async (id) => {
                     <th>{{$t('admin.level3')}}</th>
                     <th>{{$t('admin.level4')}}</th>
                     <th>{{$t('admin.level5')}}</th>
-                    <th>{{$t('admin.stock')}}</th>
                     <th style="width: 50px;"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  <!-- Case 1: Has Size Variants -->
-                  <template v-if="sizeVariants.length > 0">
-                    <tr v-for="(sv, idx) in sizeVariants" :key="idx">
-                      <td class="variant-name-cell">
-                        <strong>{{ sv.name }}</strong>
-                      </td>
-                      <td><input type="number" step="1" v-model="sv.price_1" class="matrix-input" /></td>
-                      <td><input type="number" step="1" v-model="sv.price_2" class="matrix-input" /></td>
-                      <td><input type="number" step="1" v-model="sv.price_3" class="matrix-input" /></td>
-                      <td><input type="number" step="1" v-model="sv.price_4" class="matrix-input" /></td>
-                      <td><input type="number" step="1" v-model="sv.price_5" class="matrix-input" /></td>
-                      <td><input type="number" v-model.number="sv.stock" class="matrix-input stock-input" /></td>
-                      <td style="text-align: center;">
-                        <button type="button" class="action-btn del" @click="removeSizeVariant(sv.name)" title="Remove Variant">
-                          <ion-icon name="trash-outline"></ion-icon>
-                        </button>
-                      </td>
-                    </tr>
-                  </template>
-                  <!-- Case 2: No Size Variants (Base Product) -->
-                  <template v-else>
-                    <tr>
-                      <td class="variant-name-cell">
-                        <strong>{{$t('admin.baseProduct')}}</strong>
-                      </td>
-                      <td><input type="number" step="1" v-model="newProduct.price_1" class="matrix-input" /></td>
-                      <td><input type="number" step="1" v-model="newProduct.price_2" class="matrix-input" /></td>
-                      <td><input type="number" step="1" v-model="newProduct.price_3" class="matrix-input" /></td>
-                      <td><input type="number" step="1" v-model="newProduct.price_4" class="matrix-input" /></td>
-                      <td><input type="number" step="1" v-model="newProduct.price_5" class="matrix-input" /></td>
-                      <td>
-                        <div v-if="!isEditing">
-                          <input type="number" v-model.number="newProduct.stock" class="matrix-input stock-input" min="0" />
-                        </div>
-                        <div v-else style="display: flex; align-items: center; gap: 6px;">
-                          <input type="number" readonly :value="Math.max(0, (newProduct.stock || 0) + stockAdjustment)" class="matrix-input stock-input" style="background:#f1f2f6; width: 60px;" />
-                          <div class="stock-control edit-stock-control" style="margin: 0; gap: 3px;">
-                            <button type="button" @click="updateStockAdjustment(-1)" class="stock-btn minus" style="width:16px; height:16px; font-size:9px;">-1</button>
-                            <input type="number" v-model.number="stockAdjustment" @input="validateStockAdjustment" class="stock-adjust-input" style="width:36px; padding:0; font-size:11px;" />
-                            <button type="button" @click="updateStockAdjustment(1)" class="stock-btn plus" style="width:16px; height:16px; font-size:9px;">+1</button>
-                          </div>
-                        </div>
-                      </td>
-                      <td></td>
-                    </tr>
-                  </template>
+                  <tr>
+                    <td class="variant-name-cell">
+                      <strong>{{$t('admin.baseProduct')}}</strong>
+                    </td>
+                    <td><input type="number" step="1" v-model="newProduct.price_1" class="matrix-input" /></td>
+                    <td><input type="number" step="1" v-model="newProduct.price_2" class="matrix-input" /></td>
+                    <td><input type="number" step="1" v-model="newProduct.price_3" class="matrix-input" /></td>
+                    <td><input type="number" step="1" v-model="newProduct.price_4" class="matrix-input" /></td>
+                    <td><input type="number" step="1" v-model="newProduct.price_5" class="matrix-input" /></td>
+                    <td></td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -1293,13 +1199,135 @@ const deleteDiyProduct = async (id) => {
             </div>
 
           </div>
+          </div>
 
           <!-- Submit Button at the bottom of the page -->
           <button type="submit" form="product-form" :disabled="uploading" :class="['submit-btn', isEditing ? 'update' : '']" style="margin-top: 30px; font-size: 16px;">
             {{ uploading ? $t('admin.processing') : (isEditing ? $t('admin.submitUpdate') : $t('admin.submitAdd')) }}
           </button>
         </section>
+        
       </transition>
+
+      <!-- Product list belongs to the inventory tabs only; the editorial tabs bring
+           their own list. Named explicitly so a new tab doesn't inherit it. -->
+      <section v-if="activeAdminSection === 'standard' || activeAdminSection === 'diy'" class="list-section">
+          <template v-if="activeAdminSection === 'standard'">
+            <div class="list-header">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 style="padding:0; margin:0;">{{ $t('admin.inventory') }}</h2>
+                <div style="display:flex; gap:12px; align-items:center;">
+                  <!-- Sort dropdown -->
+                  <div style="position:relative;">
+                    <button
+                      :class="['lang-toggle', { active: adminSortBy !== 'upload' }]"
+                      :title="'Sort products'"
+                      @click="adminSortOpen = !adminSortOpen"
+                      style="display:flex; align-items:center; gap:5px;"
+                    >
+                      <ion-icon name="swap-vertical-outline"></ion-icon>
+                      {{ adminSortBy === 'upload' ? 'Upload' : adminSortBy === 'sku' ? 'SKU' : 'A–Z' }}
+                    </button>
+                    <div v-if="adminSortOpen" @click.stop style="position:absolute; top:calc(100% + 6px); right:0; min-width:140px; background:#fff; border:1px solid #e0d5c8; border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,0.12); padding:6px; z-index:300;">
+                      <label v-for="opt in [{ value:'upload', label:'Upload order' }, { value:'sku', label:'SKU' }, { value:'alpha', label:'Alphabetical' }]" :key="opt.value"
+                        style="display:flex; align-items:center; gap:8px; padding:7px 10px; cursor:pointer; font-size:13px; color:#5d4037; border-radius:7px; transition:background 0.13s;"
+                        @mouseenter="$event.currentTarget.style.background='#FDF3E6'"
+                        @mouseleave="$event.currentTarget.style.background=''"
+                        @click="adminSortBy = opt.value; adminSortOpen = false"
+                      >
+                        <input type="radio" :value="opt.value" v-model="adminSortBy" style="accent-color:#DD876E; width:13px; height:13px; flex-shrink:0;">
+                        <span>{{ opt.label }}</span>
+                      </label>
+                    </div>
+                  </div>
+                  <button :class="['lang-toggle', { active: showThai }]" @click="showThai = !showThai">
+                    {{ showThai ? 'ไทย' : 'ENG' }}
+                  </button>
+                  <button class="add-product-btn" @click="resetForm(); formPanelOpen = true">
+                    <ion-icon name="add-circle-outline"></ion-icon> {{ $t('admin.addProduct') }}
+                  </button>
+                </div>
+              </div>
+              <!-- Search Bar -->
+              <div style="margin-bottom:15px;">
+                <input
+                  v-model="searchQuery"
+                  type="text"
+                  placeholder="Search by name, SKU..."
+                  class="search-input"
+                />
+              </div>
+              <!-- Filter Tabs -->
+              <div class="filter-tabs">
+                <button :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'; searchQuery = ''">{{ $t('admin.all')
+                  }}</button>
+                <button v-for="cat in categories" :key="cat.id" :class="{ active: activeFilter === cat.path }"
+                  @click="activeFilter = cat.path; searchQuery = ''">
+                  {{ cat.name_th ? `${cat.name} (${cat.name_th})` : cat.name }}
+                </button>
+              </div>
+            </div>
+
+            <div class="inventory-scroll">
+              <div v-for="product in filteredProducts" :key="product.id" class="product-item" @click="editProduct(product)">
+                <div class="item-img">
+                  <img :src="getImageUrl(product.image_key || product.image)" :alt="product.name">
+                </div>
+                <div class="item-info">
+                  <div>
+                    <strong>
+                    {{ showThai && product.name_th ? product.name_th : product.name }}
+                    <span v-if="product.is_visible === 0" class="hidden-badge">
+                      {{ $t('admin.hidden') || 'Hidden' }}
+                    </span>
+                  </strong>
+                  <span class="p-meta">SKU: {{ product.sku }} | {{ formatProductCategories(product) }} | ${{ product.price_1 || product.price }}</span>
+                  </div>
+                  <div class="stock-control">
+                    <div class="item-actions">
+                      <button class="action-btn edit"><ion-icon
+                          name="create-outline"></ion-icon></button>
+                      <button class="action-btn del" @click="deleteProduct(product.id)"><ion-icon
+                          name="trash-outline"></ion-icon></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <template v-else-if="activeAdminSection === 'diy'">
+            <div class="list-header">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 style="padding:0; margin:0;">DIY Kits Collection ({{ diyProducts.length }} items)</h2>
+                <button class="add-product-btn" @click="resetDiyForm(); formPanelOpen = true">
+                  <ion-icon name="add-circle-outline"></ion-icon> Add DIY Product
+                </button>
+              </div>
+            </div>
+
+            <div class="inventory-scroll">
+              <div v-for="prod in diyProducts" :key="prod.id" class="product-item" @click="editDiyProduct(prod)">
+                <div class="item-img">
+                  <img :src="getDiyImageUrl(prod.images && prod.images.length > 0 ? prod.images[0] : '')" :alt="prod.name">
+                </div>
+                <div class="item-info">
+                  <strong>{{ prod.name_th ? `${prod.name} (${prod.name_th})` : prod.name }}</strong>
+                  <span class="p-meta">SKU: {{ prod.sku }} | ฿{{ prod.price_1 }}</span>
+                </div>
+                <div class="item-actions">
+                  <button class="action-btn edit">
+                    <ion-icon name="create-outline"></ion-icon>
+                  </button>
+                  <button class="action-btn del" @click="deleteDiyProduct(prod.id)">
+                    <ion-icon name="trash-outline"></ion-icon>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </section>
+      <!-- </transition> -->
     </div>
   </div>
 </template>
@@ -1321,7 +1349,7 @@ const deleteDiyProduct = async (id) => {
 
 .admin-container {
   min-height: 100vh;
-  background: #f4f7f6;
+  /* background: #f4f7f6; */
   padding: 30px;
   font-family: 'Inter', sans-serif;
   width: 100%;
@@ -1423,6 +1451,11 @@ header {
   display: flex;
   align-items: center;
   gap: 5px;
+}
+
+.orders-btn {
+  background: #0984e3;
+  text-decoration: none;
 }
 
 .logout-btn {
@@ -1553,26 +1586,104 @@ header {
   font-size: 13px;
 }
 
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 1.6fr 1fr;
-  gap: 30px;
-  width: 100%;
+/* Form panel — fixed right-side drawer */
+.form-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 200;
 }
 
-.form-section,
-.list-section {
-  background: white;
-  padding: 30px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-  min-width: 0;
-  /* Important for grid items */
-}
-
-.list-section {
-  height: 760px;
+.form-section {
+  position: fixed;
+  top: 80px; /*Consider NavBar Height*/
+  right: 0;
+  width: 680px;
+  max-width: 92vw;
+  min-width: 50vw;
+  height: calc(100vh - 80px);
   overflow-y: scroll;
-  /* Important for grid items */
+  background: #fff;
+  z-index: 201;
+  padding: 32px 30px;
+  box-shadow: -6px 0 28px rgba(0, 0, 0, 0.18);
+}
+
+/* Slide-in / slide-out for the form panel */
+.form-panel-enter-active {
+  transition: transform 0.3s ease-out;
+}
+.form-panel-leave-active {
+  transition: transform 0.3s ease-in;
+}
+.form-panel-enter-from,
+.form-panel-leave-to {
+  transform: translateX(100%);
+}
+
+.list-section {
+  width: 100%;
+  padding: 30px;
+  border: rgb(237, 250, 255) 1px solid;
+  border-radius: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+.add-product-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #8b6f47;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.add-product-btn:hover {
+  background: #6d5035;
+}
+
+.lang-toggle {
+  padding: 6px 12px;
+  background: #f0f1f3;
+  border: 1px solid #d1d8e0;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #636e72;
+}
+
+.lang-toggle.active {
+  background: #8b6f47;
+  color: #fff;
+  border-color: #8b6f47;
+}
+
+.lang-toggle:hover {
+  border-color: #8b6f47;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e0e6ed;
+  border-radius: 10px;
+  font-size: 14px;
+  background: #f8f9fa;
+  transition: all 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #8b6f47;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(139, 111, 71, 0.1);
 }
 
 .form-header {
@@ -1758,6 +1869,123 @@ header {
   margin-bottom: 20px;
 }
 
+/* Dropdown Styles */
+.dropdown-wrapper {
+  position: relative;
+}
+
+.dropdown-toggle {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e0e6ed;
+  border-radius: 10px;
+  background: #f8f9fa;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s;
+  text-align: left;
+  color: #2d3436;
+}
+
+.dropdown-toggle:hover {
+  border-color: #8b6f47;
+  background: #fff;
+}
+
+.dropdown-toggle:focus {
+  outline: none;
+  border-color: #8b6f47;
+  box-shadow: 0 0 0 3px rgba(139, 111, 71, 0.1);
+}
+
+.dropdown-placeholder {
+  color: #b2bec3;
+}
+
+.dropdown-value {
+  font-weight: 500;
+  color: #2d3436;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e0e6ed;
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  margin-top: -1px;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.dropdown-search {
+  padding: 8px;
+  border-bottom: 1px solid #f1f2f6;
+  position: sticky;
+  top: 0;
+}
+
+.dropdown-search-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #e0e6ed;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+}
+
+.dropdown-search-input:focus {
+  border-color: #8b6f47;
+  background: #fff;
+}
+
+.dropdown-options {
+  padding: 4px;
+}
+
+.dropdown-option {
+  display: flex;
+  align-items: center;
+  justify-content: left;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 13px;
+  color: #2d3436;
+}
+
+.dropdown-option:hover {
+  background: #f8f9fa;
+}
+
+.dropdown-option input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.dropdown-fade-enter-active,
+.dropdown-fade-leave-active {
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.dropdown-fade-enter-from {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.dropdown-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
 label {
   display: block;
   margin-bottom: 8px;
@@ -1910,22 +2138,34 @@ select {
 
 .inventory-scroll {
   overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  padding: 4px 0;
 }
 
 .product-item {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid #f1f2f6;
+  flex-direction: column;
+  padding: 14px;
+  border: 1px solid #f1f2f6;
+  border-radius: 12px;
+  background: #fafbfc;
+  transition: all 0.2s;
+}
+
+.product-item:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #dfe6e9;
+  cursor: pointer;
 }
 
 .item-img {
-  width: 45px;
-  height: 45px;
+  width: 100%;
+  aspect-ratio: 1 / 1;
   border-radius: 8px;
   overflow: hidden;
-  flex-shrink: 0;
+  margin-bottom: 10px;
 }
 
 .item-img img {
@@ -1937,24 +2177,31 @@ select {
 .item-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .item-info strong {
   display: block;
-  font-size: 14px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2d3436;
+  line-height: 1.3;
+  word-break: break-word;
 }
 
 .p-meta {
   font-size: 11px;
   color: #636e72;
+  line-height: 1.3;
+  display: block;
 }
 
 .stock-control {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   margin-top: 5px;
 }
@@ -2034,7 +2281,9 @@ select {
 
 .item-actions {
   display: flex;
-  gap: 5px;
+  gap: 8px;
+  margin-top: 12px;
+  justify-content: center;
 }
 
 .action-btn {
@@ -2056,6 +2305,9 @@ select {
 .action-btn.del {
   background: #ffebee;
   color: #d32f2f;
+}
+.action-btn.del:hover {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 512 512'%3E%3Cpath fill='%23d32f2f' d='M400 113.3h-80v-20c0-16.2-13.1-29.3-29.3-29.3h-69.3C205.1 64 192 77.1 192 93.3v20h-80V144h288v-30.7zM224 113.3v-20h64v20H224zM80 176l37.5 282.3c2.4 18 17.8 31.7 36 31.7h205c18.2 0 33.6-13.7 36-31.7L432 176H80z'/%3E%3C/svg%3E") 10 2, pointer;
 }
 
 .slide-fade-enter-active,
@@ -2137,6 +2389,54 @@ select {
   margin: 0 0 15px 0;
   color: #666;
   font-size: 0.9rem;
+}
+
+/* Image Preview Lightbox */
+.image-preview-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  padding: 40px;
+}
+
+.image-preview-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+  animation: modalPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.image-preview-close {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  font-size: 32px;
+  line-height: 1;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.image-preview-close:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .formula-info {
@@ -2273,11 +2573,9 @@ select {
 
 /* Gallery & Variant Manager Styling */
 .gallery-variant-manager {
-  background: white;
-  padding: 30px;
-  border-radius: 20px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-  margin-top: 30px;
+  margin-top: 20px;
+  border-top: 1px solid #f1f2f6;
+  padding-top: 16px;
   width: 100%;
 }
 
@@ -2285,17 +2583,18 @@ select {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 25px;
-  border-bottom: 2px solid #f1f2f6;
-  padding-bottom: 15px;
+  margin-bottom: 12px;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .workspace-header h2 {
-  font-size: 1.4rem;
+  font-size: 1rem;
   color: #2d3436;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  margin: 0;
   margin: 0;
 }
 
@@ -2320,9 +2619,9 @@ select {
 
 .gallery-workspace-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
 .gallery-card {
@@ -2349,6 +2648,7 @@ select {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  cursor: zoom-in;
 }
 
 .remove-card-btn {
@@ -2370,10 +2670,10 @@ select {
 }
 
 .card-controls {
-  padding: 15px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 5px;
 }
 
 .card-controls label {
@@ -2399,6 +2699,17 @@ select {
   color: #b2bec3;
 }
 
+.card-price-tiers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.card-price-tiers .card-input {
+  padding: 6px;
+  font-size: 12px;
+}
+
 .gallery-workspace-empty {
   text-align: center;
   padding: 40px 20px;
@@ -2408,9 +2719,8 @@ select {
 
 /* Pricing Matrix Workspace Styling */
 .pricing-matrix-workspace {
-  margin-top: 30px;
-  border-top: 2px solid #f1f2f6;
-  padding-top: 25px;
+  margin-top: 16px;
+  padding-top: 0;
 }
 
 .matrix-header-row {
@@ -2421,15 +2731,16 @@ select {
 }
 
 .pricing-matrix-workspace h3 {
-  font-size: 1.2rem;
+  font-size: 0.95rem;
   color: #2d3436;
   margin: 0;
+  font-weight: 600;
 }
 
 .matrix-info-text {
-  font-size: 13px;
+  font-size: 12px;
   color: #636e72;
-  margin: 0 0 20px 0;
+  margin: 0 0 12px 0;
 }
 
 .matrix-scrollable {
@@ -2463,8 +2774,8 @@ select {
 }
 
 .matrix-input {
-  width: 90px;
-  padding: 8px 12px;
+  width: 70px;
+  padding: 8px 4px;
   border: 1px solid #e1e8ed;
   border-radius: 8px;
   font-size: 14px;

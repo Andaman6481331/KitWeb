@@ -14,6 +14,11 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
+	// Slip verification is OFF for now — orders go straight to LINE OA with manual payment.
+	// Flip to "true" (and set EASYSLIP_API_KEY + PROMPTPAY_ACCOUNT secrets) to enable EasySlip checks.
+	"vars": {
+		"SLIP_VERIFICATION_ENABLED": "false"
+	},
 	"d1_databases": [
 		{
 			"binding": "DB",

@@ -1,31 +1,50 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
-import VideoCard from '../components/video-card.vue';
+import { useI18n } from 'vue-i18n';
 import InstagramSection from '../components/InstagramSection.vue';
-import AboutKitcharoen from '../components/AboutKitcharoen.vue';
-import AutoScrollBanner from '../components/auto-scroll-banner.vue';
 import FeaturedCategories from '../components/featured-categories.vue';
 import customerReview from '../components/customer-review.vue';
-import { api, getUtilsUrl } from '../services/api';
-import { codeToPath, defaultLang } from '../utils/localeRoutes';
-import ProductStock from '../components/products-stock.vue';
+import InfoBanner from '../components/info-banner.vue';
+import SectionNav from '../components/section-nav.vue';
+import FeaturedProject from '../components/featured-project.vue';
+import NewArrivals from '../components/new-arrivals.vue';
+import LatestProjects from '../components/latest-projects.vue';
+import ColorSpotlight from '../components/color-spotlight.vue';
+import HomeBusinessSets from '../components/home-business-sets.vue';
+import CreatorGallery from '../components/creator-gallery.vue';
+import { getUtilsUrl } from '../services/api';
+import { defaultLang } from '../utils/localeRoutes';
 
-const products = ref([]);
+const { t } = useI18n();
 const route = useRoute();
 const currentLang = computed(() => route.params.lang || defaultLang);
-const loading = ref(true);
+
+// The sets band hides itself when the shop has published none, so its rail entry
+// only appears once we know there is something to scroll to.
+const hasBusinessSets = ref(false);
+
+// Section navigator (right-side mini-map rail)
+const sections = computed(() => [
+  { id: 'home-featured',   label: t('home.nav.featured') },
+  { id: 'home-new',        label: t('home.nav.newArrivals') },
+  { id: 'home-categories', label: t('home.nav.categories') },
+  { id: 'home-color',      label: t('home.nav.color') },
+  ...(hasBusinessSets.value ? [{ id: 'home-sets', label: t('home.nav.sets') }] : []),
+  { id: 'home-articles',   label: t('home.nav.articles') },
+  { id: 'home-reviews',    label: t('home.nav.makers') },
+  { id: 'home-promo',      label: t('home.nav.promo') },
+]);
 
 // ── Hero Carousel ──────────────────────────────
 // Bump BANNER_VERSION whenever you re-upload a banner to R2 under the same name.
+// Four slides, not six: at a 10s interval nobody ever reached the last two.
 const BANNER_VERSION = 4;
 const slides = [
-  getUtilsUrl('banner-beads-large.webp', BANNER_VERSION),
   getUtilsUrl('banner-main-large.webp', BANNER_VERSION),
-  getUtilsUrl('banner-needles-large.webp', BANNER_VERSION),
-  getUtilsUrl('banner-thread-large.webp', BANNER_VERSION),
-  getUtilsUrl('banner-tools-large.webp', BANNER_VERSION),
-  getUtilsUrl('banner-yarn-large.webp', BANNER_VERSION)
+  getUtilsUrl('banner-yarn-large.webp', BANNER_VERSION),
+  getUtilsUrl('banner-beads-large.webp', BANNER_VERSION),
+  getUtilsUrl('banner-tools-large.webp', BANNER_VERSION)
 ];
 
 const currentSlide = ref(0);
@@ -48,21 +67,21 @@ const onTouchEnd = (e) => {
   restartSlideInterval();
 };
 
-onMounted(async () => {
-  restartSlideInterval();
-  try {
-    products.value = await api.getProducts();
-  } catch (error) {
-    console.error('Error loading products:', error);
-  } finally {
-    loading.value = false;
-  }
-});
+onMounted(() => { restartSlideInterval(); });
 
 onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
 </script>
 <template>
   <div class="content">
+
+    <!-- Info Banner -->
+    <InfoBanner :badge="$t('home.bannerBadge')" :text="$t('home.bannerText')" />
+
+    <!-- The hero is this page's LCP but it is a CSS background, which the
+         preload scanner never sees. This hidden copy gets it fetched early, the
+         same trick EventPage and ContactUsPage already use. -->
+    <img :src="slides[0]" fetchpriority="high" aria-hidden="true" alt=""
+      style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">
 
     <!-- Hero Carousel -->
     <section
@@ -123,6 +142,36 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
         />
       </div>
     </section>
+
+    <!-- Weekly Featured Project: the page's freshness anchor, straight below the
+         hero so a returning visitor sees what changed without scrolling. -->
+    <div id="home-featured" class="home-anchor">
+      <FeaturedProject />
+    </div>
+
+    <!-- New Arrivals: derived from products.created_at, so it refreshes itself. -->
+    <div id="home-new" class="home-anchor">
+      <NewArrivals />
+    </div>
+
+    <!-- Featured Categories -->
+    <div id="home-categories" class="home-anchor">
+      <FeaturedCategories />
+    </div>
+
+    <!-- Color of the Month: one admin action changes it, and the band tints
+         itself from the chosen hex, so the change is visible at a glance. -->
+    <div id="home-color" class="home-anchor">
+      <ColorSpotlight />
+    </div>
+
+    <!-- Business Sets: fixed wholesale bundles. Sits with the product bands
+         rather than beside the wholesale CTA at the foot of the page, because
+         these are priced goods a visitor can act on, not a pitch. -->
+    <div id="home-sets" class="home-anchor">
+      <HomeBusinessSets @loaded="count => hasBusinessSets = count > 0" />
+    </div>
+
       <div class="feature-bar">
     <div class="feature-item">
       <div class="icon-wrap">
@@ -218,34 +267,62 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
     </div>
   </div>
 
-    <!-- Featured Categories -->
-    <FeaturedCategories />
+    <!-- Heritage strip. The full story lives on the About page; here it gets only
+         enough room to establish provenance and point onward. -->
+    <section id="home-about" class="about-strip">
+      <p class="about-strip-eyebrow">{{ $t('about.eyebrow') }}</p>
+      <p class="about-strip-line">{{ $t('about.subtitle') }}</p>
+      <router-link :to="{ name: 'about', params: { lang: currentLang } }" class="about-strip-link">
+        {{ $t('about.readStory') }}
+        <span aria-hidden="true">&rarr;</span>
+      </router-link>
+    </section>
 
-    <!-- About us / History / Location -->
-    <AboutKitcharoen />
-
-    <!-- Video Card Display -->
-    <VideoCard />
-
-    <!-- Auto Item Scroll Banner -->
-    <AutoScrollBanner />
+    <!-- Latest from KitCraft: three-card teaser, full archive on the events page -->
+    <div id="home-articles" class="home-anchor">
+      <LatestProjects />
+    </div>
 
     <!-- KitCraft Instagram Ads -->
-    <InstagramSection />
+    <div id="home-instagram" class="home-anchor">
+      <InstagramSection />
+    </div>
 
-    <!-- Customer Review -->
-    <customerReview />
+    <!-- From our makers. Community photos and customer words are the same claim
+         made two ways, so they share one band and one heading instead of becoming
+         a third social block below the Instagram one. -->
+    <section id="home-reviews" class="home-anchor makers-band">
+      <div class="makers-head">
+        <p class="makers-eyebrow">{{ $t('home.makersEyebrow') }}</p>
+        <h2 class="makers-title">{{ $t('home.makersTitle') }}</h2>
+      </div>
 
-    <!-- Promotional Banner -->
-    <section class="promo-section">
+      <CreatorGallery
+        class="makers-gallery"
+        :limit="8"
+        :show-heading="false"
+        :show-submit-prompt="false"
+        bare
+      />
+
+      <customerReview />
+    </section>
+
+    <!-- Wholesale. This slot used to carry a generic "special offer" pointing at
+         the catalog; wholesale is the actual business, so it says so and routes
+         to the partners page. -->
+    <section class="promo-section" id="home-promo">
       <div class="promo-content">
-        <h2>{{ $t('home.specialOffer') }}</h2>
-        <p>{{ $t('home.promoText') }}</p>
-        <router-link :to="{ name: 'catalog', params: { lang: currentLang } }" class="no-style">
-          <button class="promo-button">{{ $t('home.shopSale') }}</button>
+        <h2>{{ $t('home.wholesaleTitle') }}</h2>
+        <p>{{ $t('home.wholesaleText') }}</p>
+        <router-link :to="{ name: 'partners', params: { lang: currentLang } }" class="no-style">
+          <button class="promo-button">{{ $t('home.wholesaleCta') }}</button>
         </router-link>
       </div>
     </section>
+
+    <!-- Section Navigator: right-side mini-map rail -->
+    <SectionNav :sections="sections" />
   </div>
 </template>
 
@@ -264,19 +341,128 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
   background-color: #FBF7F2;
 }
 
+/* Keep section headings clear of the sticky navbar when scrolled to via the rail */
+.home-anchor,
+.about-strip,
+.promo-section {
+  scroll-margin-top: 90px;
+}
+
+/* ===== FROM OUR MAKERS ===== */
+/* One band, two kinds of proof: photos of what people made, then what they said
+   about it. customerReview brings its own padding, so this only owns the header
+   and the gallery strip above it. */
+.makers-band {
+  background: #FBF7F2;
+  padding-top: clamp(40px, 5vw, 70px);
+}
+
+.makers-head {
+  max-width: 1200px;
+  margin: 0 auto 22px auto;
+  padding: 0 5%;
+  text-align: center;
+}
+
+.makers-eyebrow {
+  margin: 0 0 8px 0;
+  font-family: 'Work Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8b6f47;
+}
+
+.makers-title {
+  margin: 0;
+  font-family: 'Crimson Pro', serif;
+  font-size: clamp(1.7rem, 3vw, 2.3rem);
+  font-weight: 600;
+  line-height: 1.15;
+  color: #4a3529;
+}
+
+.makers-gallery {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 5%;
+}
+
+/* ===== HERITAGE STRIP ===== */
+/* Deliberately small. It exists to say "since 1984" and hand off to the About
+   page, not to retell the story on a page that has products to show. */
+.about-strip {
+  padding: 40px 5%;
+  text-align: center;
+  background: #FBF7F2;
+  border-top: 1px solid #eee0d0;
+  border-bottom: 1px solid #eee0d0;
+}
+
+.about-strip-eyebrow {
+  margin: 0 0 10px 0;
+  font-family: 'Work Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8b6f47;
+}
+
+.about-strip-line {
+  margin: 0 auto 16px auto;
+  max-width: 620px;
+  font-family: 'Crimson Pro', serif;
+  font-size: 26px;
+  line-height: 1.35;
+  color: #604539;
+}
+
+.about-strip-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: 'Work Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #8b6f47;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.about-strip-link:hover {
+  color: #DD876E;
+  border-bottom-color: #DD876E;
+}
+
+@media (max-width: 640px) {
+  .about-strip {
+    padding: 30px 20px;
+  }
+
+  .about-strip-line {
+    font-size: 21px;
+  }
+}
+
 /* ===== HERO CAROUSEL ===== */
 .hero-carousel {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
+  /* The floor matters: with only an aspect ratio, a narrow viewport shrinks the
+     section to width/1.78 (about 219px on a phone) while the content still asks
+     for its padding, heading, subtitle and buttons — which then overflow and get
+     clipped by the overflow:hidden above. */
+  min-height: 440px;
   max-height: 80vh;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   image-rendering: high-quality;
-  object-fit: cover;
-  object-position: top;
 }
 
 
@@ -351,7 +537,6 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
   line-height: 1.6;
   margin: 0 0 32px 0;
   max-width: 560px;
-  text-indent: 1rem;
 }
 
 .hero-buttons {
@@ -571,31 +756,59 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
 }
 
 /* ===== RESPONSIVE ===== */
-@media (max-width: 992px) {
+@media (max-width: 1024px) {
   .hero-carousel { max-height: 70vh; }
   .feature-bar { grid-template-columns: repeat(2, 1fr); }
   .carousel-arrow { width: 40px; height: 40px; }
 }
 
 @media (max-width: 768px) {
-  .hero-carousel { max-height: 60vh; }
+  /* Height follows the viewport rather than the image ratio, the way the Events
+     hero already does it, so the section can never collapse under its content. */
+  .hero-carousel {
+    aspect-ratio: auto;
+    min-height: 68svh;
+    max-height: none;
+  }
 
-  .hero-content { padding: 60px 20px; text-align: center; }
+  /* The base overlay fades left-to-right, which suited left-aligned copy. The
+     text is centred at this width, so it would sit over the transparent half —
+     switch to the radial the Events hero uses. */
+  .carousel-overlay {
+    background: radial-gradient(
+      circle at center,
+      rgba(250, 244, 236, 0.84) 0%,
+      rgba(80, 60, 45, 0.18) 60%,
+      rgba(40, 28, 20, 0.34) 100%
+    );
+  }
+
+  .hero-content {
+    padding: 40px 20px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .hero-text { max-width: 100%; }
 
   .hero-eyebrow { justify-content: center; }
 
   .hero-title {
     font-size: clamp(1.9rem, 7vw, 2.6rem);
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
 
   .hero-subtitle {
     font-size: clamp(0.9rem, 3.2vw, 1.1rem);
     text-indent: 0;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
+    margin-left: auto;
+    margin-right: auto;
   }
 
-  .hero-buttons { justify-content: center; flex-wrap: wrap; }
+  .hero-buttons { justify-content: center; flex-wrap: wrap; gap: 12px; }
 
   .cta-primary,
   .cta-secondary { padding: 12px 28px; font-size: 15px; }
@@ -609,11 +822,20 @@ onUnmounted(() => { if (slideInterval) clearInterval(slideInterval); });
 }
 
 @media (max-width: 480px) {
+  .hero-carousel { min-height: 72svh; }
+
+  .hero-content { padding: 32px 18px; }
+
   .hero-title { font-size: 1.85rem; }
 
   .hero-buttons { flex-direction: column; width: 100%; }
 
   .cta-primary,
   .cta-secondary { width: 100%; }
+}
+
+@media (hover: none) {
+  .cta-primary:hover,
+  .cta-secondary:hover { transform: none; }
 }
 </style>

@@ -25,6 +25,8 @@ interface Env {
 	LINE_LOGIN_CHANNEL_SECRET?: string;
 	EASYSLIP_API_KEY?: string;
 	PROMPTPAY_ACCOUNT?: string;
+	// Feature flag: "true" turns on EasySlip slip verification. Unset/other = off (manual payment via LINE OA).
+	SLIP_VERIFICATION_ENABLED?: string;
 	ADMIN_PASSWORD?: string;
 	JWT_SECRET?: string;
 }
@@ -49,6 +51,206 @@ function formatProductSku(prefix: string, sequence: number): string {
 	return `${prefix}${sequence.toString().padStart(3, '0')}`;
 }
 
+/**
+ * Build a URL slug for a product.
+ *
+ * The storefront used to do this in the browser, but its regex stripped every
+ * non-ASCII character, so a Thai-only name produced a bare "-42". Product URLs are
+ * prerendered now, so we fall back through name -> sku -> id until something
+ * usable survives.
+ */
+function generateProductSlug(name: string | null, sku: string | null, id: number | string): string {
+	const ascii = (name || "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+	if (ascii) return `${ascii}-${id}`;
+
+	const skuPart = (sku || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+	if (skuPart) return `${skuPart}-${id}`;
+
+	return `product-${id}`;
+}
+
+/** Slug for editorial content. Falls back to a dated stub when the title is non-Latin. */
+function generateProjectSlug(title: string, id?: number | string): string {
+	const ascii = (title || "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+	if (ascii) return id ? `${ascii}-${id}` : ascii;
+	return `project-${id ?? Date.now()}`;
+}
+
+/** Parse the projects.product_ids JSON column into a number array, tolerating bad data. */
+function parseProductIds(raw: any): number[] {
+	if (Array.isArray(raw)) return raw.map(Number).filter((n) => Number.isFinite(n));
+	if (typeof raw !== "string" || !raw.trim()) return [];
+	try {
+		const parsed = JSON.parse(raw);
+		return Array.isArray(parsed) ? parsed.map(Number).filter((n) => Number.isFinite(n)) : [];
+	} catch {
+		return [];
+	}
+}
+
+/** Shape a raw projects row for the API. */
+function mapProjectRow(row: any) {
+	return {
+		...row,
+		product_ids: parseProductIds(row.product_ids),
+		is_featured: Number(row.is_featured) === 1,
+		is_published: row.is_published === null || row.is_published === undefined ? true : Number(row.is_published) === 1
+	};
+}
+
+/** Shape a raw spotlights row for the API. */
+function mapSpotlightRow(row: any) {
+	return {
+		...row,
+		product_ids: parseProductIds(row.product_ids),
+		is_active: Number(row.is_active) === 1
+	};
+}
+
+/** Shape a raw gallery row for the API. */
+function mapGalleryRow(row: any) {
+	return {
+		...row,
+		product_id: row.product_id === null || row.product_id === undefined ? null : Number(row.product_id),
+		project_id: row.project_id === null || row.project_id === undefined ? null : Number(row.project_id),
+		is_visible: row.is_visible === null || row.is_visible === undefined ? true : Number(row.is_visible) === 1
+	};
+}
+
+/** Slug for a business set. Mirrors generateProjectSlug's non-Latin fallback. */
+function generateSetSlug(name: string, id?: number | string): string {
+	const ascii = (name || "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+	if (ascii) return id ? `${ascii}-${id}` : ascii;
+	return `set-${id ?? Date.now()}`;
+}
+
+/**
+ * Load sets with their lines, denormalizing each component's name, MOQ and box
+ * prices so the client can roll up a price without fetching the whole catalog.
+ * Two queries and an in-memory join, never N+1.
+ *
+ * A line is `missing` when its product was deleted or hidden; a set with any
+ * missing line is `is_incomplete` and has no correct price.
+ */
+async function loadSets(env: any, opts: { slug?: string; includeUnpublished?: boolean } = {}) {
+	const conditions: string[] = [];
+	const binds: any[] = [];
+	if (opts.slug) {
+		conditions.push("slug = ?");
+		binds.push(opts.slug);
+	}
+	if (!opts.includeUnpublished) {
+		conditions.push("(is_published IS NULL OR is_published = 1)");
+	}
+
+	let query = "SELECT * FROM product_sets";
+	if (conditions.length) query += " WHERE " + conditions.join(" AND ");
+	query += " ORDER BY sort_order ASC, id ASC";
+
+	const { results: setRows } = await env.DB.prepare(query).bind(...binds).all();
+	const sets = (setRows || []) as any[];
+	if (!sets.length) return [];
+
+	const placeholders = sets.map(() => "?").join(",");
+	const { results: itemRows } = await env.DB.prepare(
+		`SELECT i.id, i.set_id, i.product_id, i.variant_id, i.quantity, i.sort_order,
+		        p.id AS p_id, p.name, p.name_th, p.moq, p.image_key AS p_image_key, p.is_visible,
+		        p.price_1 AS p_price_1, p.price_2 AS p_price_2, p.price_3 AS p_price_3,
+		        v.id AS v_id, v.variant_name, v.image_key AS v_image_key,
+		        v.price_1 AS v_price_1, v.price_2 AS v_price_2, v.price_3 AS v_price_3
+		 FROM product_set_items i
+		 LEFT JOIN products p ON p.id = i.product_id
+		 LEFT JOIN product_variants v ON v.id = i.variant_id
+		 WHERE i.set_id IN (${placeholders})
+		 ORDER BY i.sort_order ASC, i.id ASC`
+	).bind(...sets.map((s) => s.id)).all();
+
+	const bySet = new Map<number, any[]>();
+	for (const r of (itemRows || []) as any[]) {
+		// Deleted product -> no join row; hidden product -> is_visible 0.
+		const missing = r.p_id === null || Number(r.is_visible) === 0;
+		const useVariant = r.v_id !== null;
+		const line = {
+			id: Number(r.id),
+			product_id: Number(r.product_id),
+			variant_id: r.variant_id === null ? null : Number(r.variant_id),
+			quantity: Number(r.quantity),
+			sort_order: Number(r.sort_order) || 0,
+			// Variant name is appended so a set line reads "Crochet Hook (4 inches)".
+			name: useVariant && r.name ? `${r.name} (${r.variant_name})` : r.name,
+			name_th: r.name_th,
+			// MOQ is the box size and always lives on the parent product.
+			moq: r.moq,
+			price_1: Number(useVariant ? r.v_price_1 : r.p_price_1) || 0,
+			price_2: Number(useVariant ? r.v_price_2 : r.p_price_2) || 0,
+			price_3: Number(useVariant ? r.v_price_3 : r.p_price_3) || 0,
+			image_key: (useVariant ? r.v_image_key : r.p_image_key) || null,
+			missing
+		};
+		const list = bySet.get(Number(r.set_id)) || [];
+		list.push(line);
+		bySet.set(Number(r.set_id), list);
+	}
+
+	return sets.map((s) => {
+		const items = bySet.get(Number(s.id)) || [];
+		return {
+			...s,
+			price_tier: Number(s.price_tier) || 1,
+			discount_pct: Number(s.discount_pct) || 0,
+			is_published: s.is_published === null || s.is_published === undefined
+				? true
+				: Number(s.is_published) === 1,
+			sort_order: Number(s.sort_order) || 0,
+			is_incomplete: items.some((i) => i.missing),
+			items
+		};
+	});
+}
+
+/**
+ * Parse the events.gallery JSON column into a media array, dropping anything that
+ * is not a usable {type, src} pair rather than letting it reach the template.
+ */
+function parseEventGallery(raw: any): any[] {
+	const list = Array.isArray(raw) ? raw : (() => {
+		if (typeof raw !== "string" || !raw.trim()) return [];
+		try {
+			const parsed = JSON.parse(raw);
+			return Array.isArray(parsed) ? parsed : [];
+		} catch {
+			return [];
+		}
+	})();
+
+	return list
+		.filter((m: any) => m && typeof m.src === "string" && m.src.trim())
+		.map((m: any) => ({
+			type: m.type === "video" ? "video" : "image",
+			src: String(m.src).trim(),
+			title: typeof m.title === "string" ? m.title : ""
+		}));
+}
+
+/** Shape a raw events row for the API. */
+function mapEventRow(row: any) {
+	return {
+		...row,
+		gallery: parseEventGallery(row.gallery),
+		is_upcoming: Number(row.is_upcoming) === 1,
+		is_visible: row.is_visible === null || row.is_visible === undefined ? true : Number(row.is_visible) === 1
+	};
+}
+
 /** Allocate the next unused base product SKU for a category prefix (e.g. tools -> TO001). */
 async function allocateProductSku(env: Env, category: string, preferredSku?: string | null): Promise<string> {
 	if (preferredSku) {
@@ -61,19 +263,21 @@ async function allocateProductSku(env: Env, category: string, preferredSku?: str
 		"SELECT sku FROM products WHERE sku GLOB ?"
 	).bind(`${prefix}[0-9][0-9][0-9]`).all();
 
-	let maxSequence = 0;
+	// This single query already returns every SKU in the prefix's range, so the
+	// used sequences and the first free one can both be derived in memory —
+	// no need to re-query D1 once per candidate (worst case was up to 1000
+	// round-trips). products.sku has a UNIQUE index, so a genuine race with a
+	// concurrent allocation still fails safely at INSERT time.
+	const usedSequences = new Set<number>();
 	const pattern = new RegExp(`^${prefix}(\\d{3})$`);
 	for (const row of results) {
 		const match = String(row.sku).match(pattern);
-		if (match) {
-			maxSequence = Math.max(maxSequence, parseInt(match[1], 10));
-		}
+		if (match) usedSequences.add(parseInt(match[1], 10));
 	}
+	const maxSequence = usedSequences.size ? Math.max(...usedSequences) : 0;
 
 	for (let seq = maxSequence + 1; seq <= maxSequence + 1000; seq++) {
-		const candidate = formatProductSku(prefix, seq);
-		const taken = await env.DB.prepare("SELECT id FROM products WHERE sku = ?").bind(candidate).first();
-		if (!taken) return candidate;
+		if (!usedSequences.has(seq)) return formatProductSku(prefix, seq);
 	}
 
 	throw new Error("Unable to allocate a unique SKU");
@@ -88,6 +292,142 @@ function generateDiySKU(count: number): string {
 		temp = Math.floor(temp / 26) - 1;
 	}
 	return `${prefix}${suffix}`;
+}
+
+// A product row can exist before its price has been uploaded. Treat a missing or
+// non-positive price as "not priced yet" (null) rather than free (0) — an order
+// containing one becomes a quote instead of silently charging nothing.
+function usablePrice(raw: unknown): number | null {
+	const n = Number(raw);
+	return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+// ---- Tier / MOQ pricing -------------------------------------------------------
+// The storefront never shows a raw box price: it divides the reached tier's box
+// price by the MOQ to get a per-piece figure. The Worker has to land on the same
+// number, or a customer is quoted one price and billed another. These mirror
+// frontend/kitweb/src/utils/productPricing.js and add-to-order-modal.vue.
+
+// MOQ doubles as the box size and is stored as free text ("20 pcs"), so take the
+// leading integer; no usable number means no box grouping.
+function parseMoq(raw: unknown): number {
+	const match = String(raw ?? "").match(/\d+/);
+	const n = match ? parseInt(match[0], 10) : NaN;
+	return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+function roundHalfUp(value: number, decimals = 2): number {
+	const factor = 10 ** decimals;
+	return Math.floor(value * factor + 0.5 + Number.EPSILON * factor) / factor;
+}
+
+// Only L1-L3 are customer-facing; L4/L5 are staff-only and never billed from here.
+function tierForQuantity(totalQty: number): 1 | 2 | 3 {
+	return totalQty >= 50 ? 3 : totalQty >= 20 ? 2 : 1;
+}
+
+// The reached tier's box price, falling back to a LOWER tier when that tier has no
+// price set — never upward, so an unfilled tier can't cost a customer their discount.
+function tierBoxPrice(row: any, tier: number): number {
+	const p1 = Number(row?.price_1) || 0;
+	const p2 = Number(row?.price_2) || 0;
+	const p3 = Number(row?.price_3) || 0;
+	if (tier === 3) return p3 > 0 ? p3 : (p2 > 0 ? p2 : p1);
+	if (tier === 2) return p2 > 0 ? p2 : p1;
+	return p1;
+}
+
+// The per-piece price for one line, given how many pieces of that product the whole
+// order carries. Null means no tier is populated — "not priced yet", never free.
+function perPiecePrice(row: any, totalQty: number, moqRaw: unknown): number | null {
+	const box = tierBoxPrice(row, tierForQuantity(totalQty));
+	return box > 0 ? usablePrice(roundHalfUp(box / parseMoq(moqRaw))) : null;
+}
+
+// Tiers are volume-based, so every cart line for the same product counts toward one
+// volume — two variants of a product are one quantity as far as the tier goes.
+function quantityByProduct(items: any[]): Map<string, number> {
+	const totals = new Map<string, number>();
+	for (const item of items) {
+		const key = String(item?.id);
+		totals.set(key, (totals.get(key) || 0) + Math.max(0, Number(item?.quantity) || 0));
+	}
+	return totals;
+}
+
+// Tells a customer the price staff just confirmed on their quote. Returns whether
+// we reached them; mirrors /orders/status, including the line_push_failed flag so
+// unreachable customers stay visible in Manage Orders.
+async function pushQuotePriced(
+	env: Env,
+	order: { id: string; line_user_id: string | null },
+	totalAmount: number,
+	lines: { item: any; unitPrice: number | null }[]
+): Promise<boolean> {
+	const token = env.LINE_CHANNEL_ACCESS_TOKEN || env.LINE_NOTIFY_TOKEN;
+	if (!order.line_user_id || !token) return false;
+
+	const itemRows = lines.map(({ item, unitPrice }) => ({
+		type: "box",
+		layout: "horizontal",
+		margin: "md",
+		contents: [
+			{
+				type: "text",
+				text: `${item.name_th || item.name || ""}\n${item.selectedSize || ""} / ${item.selectedColor || ""} ×${item.quantity}`,
+				size: "sm", color: "#555555", flex: 5, wrap: true
+			},
+			{
+				type: "text",
+				text: `฿${((unitPrice ?? 0) * (Number(item.quantity) || 0)).toFixed(2)}`,
+				size: "sm", color: "#111111", align: "end", flex: 2
+			}
+		]
+	}));
+
+	const flexMessage = {
+		type: "flex",
+		altText: `ยืนยันราคาคำสั่งซื้อ ${order.id}`,
+		contents: {
+			type: "bubble",
+			body: {
+				type: "box",
+				layout: "vertical",
+				contents: [
+					{ type: "text", text: "Kitcharoen", weight: "bold", color: "#DD876E", size: "sm" },
+					{ type: "text", text: "ยืนยันราคาแล้ว", weight: "bold", size: "xl", margin: "md" },
+					{ type: "text", text: `รหัส: ${order.id}`, size: "sm", color: "#888888", margin: "sm" },
+					{ type: "separator", margin: "lg" },
+					{ type: "box", layout: "vertical", margin: "lg", spacing: "sm", contents: itemRows },
+					{ type: "separator", margin: "lg" },
+					{
+						type: "box",
+						layout: "horizontal",
+						margin: "lg",
+						contents: [
+							{ type: "text", text: "รวมทั้งหมด", size: "md", weight: "bold", flex: 3 },
+							{ type: "text", text: `฿${totalAmount.toFixed(2)}`, size: "md", weight: "bold", color: "#DD876E", align: "end", flex: 2 }
+						]
+					},
+					{ type: "text", text: "เจ้าหน้าที่จะติดต่อเรื่องการชำระเงินค่ะ ขอบคุณค่ะ 🧵", size: "xs", color: "#888888", margin: "lg", wrap: true }
+				]
+			}
+		}
+	};
+
+	try {
+		const pushResp = await fetch("https://api.line.me/v2/bot/message/push", {
+			method: "POST",
+			headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+			body: JSON.stringify({ to: order.line_user_id, messages: [flexMessage] })
+		});
+		if (pushResp.ok) return true;
+		console.error(`LINE quote-priced push failed for order ${order.id} (user ${order.line_user_id}): ${pushResp.status} ${await pushResp.text()}`);
+	} catch (err) {
+		console.error(`LINE quote-priced push error for order ${order.id} (user ${order.line_user_id}):`, err);
+	}
+	await env.DB.prepare("UPDATE orders SET line_push_failed = 1 WHERE id = ?").bind(order.id).run();
+	return false;
 }
 
 function parseRange(encoded: string | null, size: number) {
@@ -190,12 +530,13 @@ function isValidImageKey(value: unknown): value is string {
 }
 
 async function saveProductCategories(env: Env, productId: number, categories: string[]) {
-	await env.DB.prepare("DELETE FROM product_categories WHERE product_id = ?").bind(productId).run();
-	for (const path of categories) {
-		await env.DB.prepare(
-			"INSERT OR IGNORE INTO product_categories (product_id, category_path) VALUES (?, ?)"
-		).bind(productId, path).run();
-	}
+	const insert = env.DB.prepare(
+		"INSERT OR IGNORE INTO product_categories (product_id, category_path) VALUES (?, ?)"
+	);
+	await env.DB.batch([
+		env.DB.prepare("DELETE FROM product_categories WHERE product_id = ?").bind(productId),
+		...categories.map(path => insert.bind(productId, path))
+	]);
 }
 
 async function handleR2Request(
@@ -353,31 +694,16 @@ export default {
 						p.*,
 						(SELECT json_group_array(pc.category_path) FROM product_categories pc WHERE pc.product_id = p.id) as categories,
 						(SELECT json_group_array(json_object(
-							'id', v.id,
-							'variant_name', v.variant_name,
-							'sku', v.sku,
-							'price_1', v.price_1,
-							'price_2', v.price_2,
-							'price_3', v.price_3,
-							'price_4', v.price_4,
-							'price_5', v.price_5,
-							'stock', v.stock,
-							'image_key', v.image_key,
-							'colors', (
-								SELECT json_group_array(json_object(
-									'id', c.id,
-									'color_name', c.color_name,
-									'image_key', c.image_key,
-									'stock', c.stock
-								)) FROM variant_colors c WHERE c.variant_id = v.id
-							)
-						)) FROM product_variants v WHERE v.product_id = p.id) as variants,
-						(SELECT json_group_array(json_object(
 							'id', i.id,
 							'image_key', i.image_key,
 							'attribute_type', i.attribute_type,
 							'attribute_value', i.attribute_value,
-							'is_main', i.is_main
+							'is_main', i.is_main,
+							'price_1', i.price_1,
+							'price_2', i.price_2,
+							'price_3', i.price_3,
+							'price_4', i.price_4,
+							'price_5', i.price_5
 						)) FROM product_images i WHERE i.product_id = p.id) as images
 					FROM products p
 				`;
@@ -405,27 +731,186 @@ export default {
 
 				// Map and parse nested JSON
 				const parsedProducts = products.map((p: any) => {
-					let parsedVariants = [];
-					if (typeof p.variants === 'string') {
-						try {
-							parsedVariants = JSON.parse(p.variants);
-							parsedVariants = parsedVariants.map((v: any) => ({
-								...v,
-								colors: typeof v.colors === 'string' ? JSON.parse(v.colors) : (v.colors || [])
-							}));
-						} catch (err) {
-							console.error("Failed to parse variants JSON:", err);
-						}
-					}
 					return {
 						...p,
+						// Prefer the persisted slug; older rows predate the column, so
+						// derive one on read rather than shipping a null to the router.
+						slug: p.slug || generateProductSlug(p.name, p.sku, p.id),
 						categories: parseProductCategories(p.categories, p.category),
-						images: typeof p.images === 'string' ? JSON.parse(p.images) : (p.images || []),
-						variants: parsedVariants
+						images: typeof p.images === 'string' ? JSON.parse(p.images) : (p.images || [])
 					};
 				});
 
-				return corsResponse(parsedProducts);
+				// Storefront calls (no include_hidden) are safe to cache briefly in the
+				// browser: several components on the same page independently call
+				// getProducts(), so a short TTL collapses those into one D1 hit instead
+				// of one per component. Admin calls always need fresh data after an edit.
+				const cacheHeaders: Record<string, string> = includeHidden ? {} : { "Cache-Control": "public, max-age=30" };
+				return corsResponse(parsedProducts, { headers: cacheHeaders });
+			}
+
+			// ── Projects (editorial content) ──────────────────────────────
+			// Query params:
+			//   featured=1     -> the single homepage slot (falls back to newest)
+			//   product_id=12  -> projects that link this product (product page)
+			//   limit=3        -> cap results (teasers)
+			//   include_unpublished=1 (admin lists; still safe to expose read-only)
+			if (url.pathname === "/projects" && request.method === "GET") {
+				const featured = url.searchParams.get("featured") === "1";
+				const productId = url.searchParams.get("product_id");
+				const limitParam = parseInt(url.searchParams.get("limit") || "", 10);
+				const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 50) : null;
+				const includeUnpublished = url.searchParams.get("include_unpublished") === "1";
+
+				const conditions: string[] = [];
+				if (!includeUnpublished) {
+					conditions.push("(is_published IS NULL OR is_published = 1)");
+				}
+
+				let query = "SELECT * FROM projects";
+				if (conditions.length) query += " WHERE " + conditions.join(" AND ");
+				query += " ORDER BY published_at DESC, id DESC";
+
+				const { results } = await env.DB.prepare(query).all();
+				let rows = (results || []).map(mapProjectRow);
+
+				// Linked-product filter is applied here rather than in SQL because
+				// product_ids is a JSON column, not a junction table.
+				if (productId) {
+					const wanted = Number(productId);
+					rows = rows.filter((r: any) => r.product_ids.includes(wanted));
+				}
+
+				if (featured) {
+					const flagged = rows.filter((r: any) => r.is_featured);
+					// Never return an empty homepage slot: fall back to the newest post.
+					rows = flagged.length ? [flagged[0]] : rows.slice(0, 1);
+				}
+
+				if (limit) rows = rows.slice(0, limit);
+
+				return corsResponse(rows);
+			}
+
+			if (url.pathname.startsWith("/projects/") && request.method === "GET") {
+				const slug = decodeURIComponent(url.pathname.slice("/projects/".length));
+				if (!slug) return corsResponse({ error: "Slug required" }, { status: 400 });
+
+				const row = await env.DB.prepare("SELECT * FROM projects WHERE slug = ?").bind(slug).first();
+				if (!row) return corsResponse({ error: "Not found" }, { status: 404 });
+
+				return corsResponse(mapProjectRow(row));
+			}
+
+			// ── Business Sets ─────────────────────────────────────────────
+			// Fixed wholesale bundles. Incomplete sets (a component was deleted or
+			// hidden) are suppressed here rather than by each page, so every consumer
+			// behaves the same and no page can render a set with no correct price.
+			if (url.pathname === "/business-sets" && request.method === "GET") {
+				// Admin lists need drafts and broken sets so they can be fixed; the
+				// storefront must never see either. Read-only, so it is safe to expose.
+				const includeUnpublished = url.searchParams.get("include_unpublished") === "1";
+				const sets = await loadSets(env, { includeUnpublished });
+				return corsResponse(includeUnpublished ? sets : sets.filter((s: any) => !s.is_incomplete));
+			}
+
+			if (url.pathname.startsWith("/business-sets/") && request.method === "GET") {
+				const slug = decodeURIComponent(url.pathname.slice("/business-sets/".length));
+				if (!slug) return corsResponse({ error: "Slug required" }, { status: 400 });
+
+				const [set] = await loadSets(env, { slug });
+				if (!set || set.is_incomplete) return corsResponse({ error: "Not found" }, { status: 404 });
+
+				return corsResponse(set);
+			}
+
+			// ── Color of the Month ────────────────────────────────────────
+			// active=1 returns just the current color (falls back to the newest
+			// row, so the homepage band is never empty). No param returns the
+			// full list, newest first, for the admin panel and the archive.
+			if (url.pathname === "/spotlights" && request.method === "GET") {
+				const activeOnly = url.searchParams.get("active") === "1";
+
+				const { results } = await env.DB.prepare(
+					"SELECT * FROM spotlights ORDER BY starts_on DESC, id DESC"
+				).all();
+				let rows = (results || []).map(mapSpotlightRow);
+
+				if (activeOnly) {
+					const flagged = rows.filter((r: any) => r.is_active);
+					rows = flagged.length ? [flagged[0]] : rows.slice(0, 1);
+				}
+
+				// products.colors is empty for the whole catalog right now, so
+				// curated product_ids is the real source. This fallback used to run
+				// one LIKE '%...%' query per unlinked row (unindexable, since a
+				// leading wildcard can't use a b-tree index); now it's a single
+				// query, matched in memory, however many rows need it. The fallback
+				// makes the section fill itself in as soon as staff start recording
+				// colors on products.
+				const unlinked = (rows as any[]).filter(r => !r.product_ids.length);
+				if (unlinked.length) {
+					const { results: candidates } = await env.DB.prepare(
+						"SELECT id, colors FROM products WHERE is_visible = 1 AND colors IS NOT NULL AND colors != ''"
+					).all();
+					for (const row of unlinked) {
+						const needle = String(row.color_name).toLowerCase();
+						row.product_ids = (candidates || [])
+							.filter((p: any) => typeof p.colors === "string" && p.colors.toLowerCase().includes(needle))
+							.slice(0, 8)
+							.map((p: any) => Number(p.id));
+					}
+				}
+
+				return corsResponse(rows);
+			}
+
+			// ── Creator gallery ───────────────────────────────────────────
+			// Query params:
+			//   product_id=12 / project_id=3 -> photos attached to one thing
+			//   limit=8                      -> cap results (home teaser)
+			//   include_hidden=1             -> admin list
+			if (url.pathname === "/gallery" && request.method === "GET") {
+				const productId = url.searchParams.get("product_id");
+				const projectId = url.searchParams.get("project_id");
+				const limitParam = parseInt(url.searchParams.get("limit") || "", 10);
+				const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 60) : null;
+				const includeHidden = url.searchParams.get("include_hidden") === "1";
+
+				const conditions: string[] = [];
+				const binds: any[] = [];
+				if (!includeHidden) conditions.push("(is_visible IS NULL OR is_visible = 1)");
+				if (productId) {
+					conditions.push("product_id = ?");
+					binds.push(Number(productId));
+				}
+				if (projectId) {
+					conditions.push("project_id = ?");
+					binds.push(Number(projectId));
+				}
+
+				let query = "SELECT * FROM gallery";
+				if (conditions.length) query += " WHERE " + conditions.join(" AND ");
+				// sort_order is the curated running order; id breaks ties newest-first.
+				query += " ORDER BY sort_order ASC, id DESC";
+				if (limit) query += ` LIMIT ${limit}`;
+
+				const { results } = await env.DB.prepare(query).bind(...binds).all();
+				return corsResponse((results || []).map(mapGalleryRow));
+			}
+
+			// ── Workshops & market appearances ────────────────────────────
+			// Chronological, with anything flagged upcoming pushed to the end so the
+			// grid finishes on what is next rather than what is over.
+			if (url.pathname === "/events" && request.method === "GET") {
+				const includeHidden = url.searchParams.get("include_hidden") === "1";
+
+				let query = "SELECT * FROM events";
+				if (!includeHidden) query += " WHERE (is_visible IS NULL OR is_visible = 1)";
+				query += " ORDER BY is_upcoming ASC, starts_on ASC, id ASC";
+
+				const { results } = await env.DB.prepare(query).all();
+				return corsResponse((results || []).map(mapEventRow));
 			}
 
 			if (url.pathname === "/diy/products" && request.method === "GET") {
@@ -447,70 +932,41 @@ export default {
 			}
 
 			if (url.pathname === "/institutional/catalog" && request.method === "GET") {
-				try {
-					// 1. Try querying the exact requested schema (product and product_img)
-					const query = `
-						SELECT 
-							p.id, 
-							p.sku, 
-							p.title, 
-							p.description, 
-							p.category_id,
-							img.image_key AS image_url
-						FROM product p
-						LEFT JOIN product_img img ON p.id = img.product_id
-					`;
-					const { results } = await env.DB.prepare(query).all();
-					
-					// Perform grouping by category_id
-					const grouped: { [key: string]: any[] } = {};
-					results.forEach((p: any) => {
-						const cat = p.category_id || "Other";
-						if (!grouped[cat]) {
-							grouped[cat] = [];
-						}
-						grouped[cat].push(p);
-					});
+				// There is no product/product_img table in this schema (only
+				// products/product_images) — this used to try that schema first on
+				// every call, always fail, and fall back here, wasting one guaranteed
+				// D1 query per request. Query the real tables directly instead.
+				// Fetch from products mapping name -> title, category -> category_id, image_key -> image_url
+				const query = `
+					SELECT
+						p.id,
+						p.sku,
+						p.name AS title,
+						p.name_th,
+						p.description,
+						p.description_th,
+						p.category AS category_id,
+						p.image_key AS image_url
+					FROM products p
+					WHERE p.is_visible = 1 OR p.is_visible IS NULL
+				`;
+				const { results } = await env.DB.prepare(query).all();
 
-					return corsResponse({
-						success: true,
-						grouped,
-						products: results
-					});
-				} catch (err: any) {
-					console.warn("D1 query on product/product_img failed, falling back to products/product_images: ", err.message);
-					
-					// 2. Fallback to existing products / product_images tables
-					// Fetch from products mapping name -> title, category -> category_id, image_key -> image_url
-					const query = `
-						SELECT 
-							p.id, 
-							p.sku, 
-							p.name AS title, 
-							p.description, 
-							p.category AS category_id,
-							p.image_key AS image_url
-						FROM products p
-						WHERE p.is_visible = 1 OR p.is_visible IS NULL
-					`;
-					const { results } = await env.DB.prepare(query).all();
-					
-					// Perform grouping by category_id
-					const grouped: { [key: string]: any[] } = {};
-					results.forEach((p: any) => {
-						const cat = p.category_id || "Other";
-						if (!grouped[cat]) {
-							grouped[cat] = [];
-						}
-						grouped[cat].push(p);
-					});
+				// Perform grouping by category_id
+				const grouped: { [key: string]: any[] } = {};
+				results.forEach((p: any) => {
+					const cat = p.category_id || "Other";
+					if (!grouped[cat]) {
+						grouped[cat] = [];
+					}
+					grouped[cat].push(p);
+				});
 
-					return corsResponse({
-						success: true,
-						grouped,
-						products: results
-					});
-				}
+				return corsResponse({
+					success: true,
+					grouped,
+					products: results
+				});
 			}
 
 			if (url.pathname.startsWith("/images/") && (request.method === "GET" || request.method === "HEAD")) {
@@ -579,76 +1035,164 @@ export default {
 				if (!token || !staffUserId) {
 					return corsResponse({ error: "LINE Messaging API credentials not configured" }, { status: 500 });
 				}
-				if (!env.EASYSLIP_API_KEY) {
-					return corsResponse({ error: "EasySlip API key not configured" }, { status: 500 });
-				}
-				if (!env.PROMPTPAY_ACCOUNT) {
-					return corsResponse({ error: "PromptPay account not configured" }, { status: 500 });
+
+				// Slip verification (EasySlip) is gated behind a flag so we can launch with
+				// manual / LINE-OA payment now and switch on automated slip checks later.
+				// Enabled ONLY when the var is exactly "true"; anything else (incl. unset) = off.
+				const slipVerificationEnabled = env.SLIP_VERIFICATION_ENABLED === "true";
+
+				if (slipVerificationEnabled) {
+					if (!env.EASYSLIP_API_KEY) {
+						return corsResponse({ error: "EasySlip API key not configured" }, { status: 500 });
+					}
+					if (!env.PROMPTPAY_ACCOUNT) {
+						return corsResponse({ error: "PromptPay account not configured" }, { status: 500 });
+					}
 				}
 
 				const formData = await request.formData();
 				const customerName = formData.get("customerName") as string;
 				const phoneNumber = formData.get("phoneNumber") as string;
 				const shippingAddress = formData.get("shippingAddress") as string;
-				const totalAmount = parseFloat(formData.get("totalAmount") as string);
+				const orderNote = (formData.get("orderNote") as string) || "";
 				const lineUserId = (formData.get("lineUserId") as string) || "";
+				const lineDisplayName = (formData.get("lineDisplayName") as string) || "";
+				const customerId = (formData.get("customerId") as string) || null;
 				const cartItemsRaw = formData.get("cartItems") as string;
-				const slipFile = formData.get("slipImage") as File;
+				// Only treat slipImage as a slip if it's an actual uploaded file. When the
+				// frontend has no slip it may append the string "null"/"" — ignore that.
+				const slipFileRaw = formData.get("slipImage");
+				const slipFile = (slipFileRaw && typeof (slipFileRaw as any).arrayBuffer === "function")
+					? (slipFileRaw as File)
+					: null;
 
-				if (!customerName || !slipFile || isNaN(totalAmount)) {
+				// Name, phone and address are required. The slip requirement depends on whether
+				// the cart turns out to be a quote, so it is checked after pricing below.
+				if (!customerName || !phoneNumber || !shippingAddress) {
 					return corsResponse({ error: "Missing required fields" }, { status: 400 });
 				}
 
 				const cartItems: any[] = JSON.parse(cartItemsRaw || "[]");
-
-				// Convert slip to base64 (stack-safe reduce — do NOT spread Uint8Array)
-				const arrayBuffer = await slipFile.arrayBuffer();
-				const base64String = btoa(
-					new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), "")
-				);
-				const dataUri = `data:image/jpeg;base64,${base64String}`;
-
-				// Call EasySlip API v2
-				const easySlipRes = await fetch("https://api.easyslip.com/v2/verify/bank", {
-					method: "POST",
-					headers: {
-						"Authorization": `Bearer ${env.EASYSLIP_API_KEY}`,
-						"Content-Type": "application/json"
-					},
-					body: JSON.stringify({ base64: dataUri })
-				});
-
-				if (!easySlipRes.ok) {
-					const errBody = await easySlipRes.json().catch(() => ({})) as any;
-					console.error("EasySlip error:", easySlipRes.status, errBody);
-					return corsResponse({ error: "SLIP_INVALID" }, { status: 400 });
+				if (cartItems.length === 0) {
+					return corsResponse({ error: "Cart is empty" }, { status: 400 });
 				}
 
-				const slipData = await easySlipRes.json() as any;
+				// Price every line from the DB — client-sent prices/total are NOT trusted.
+				// Both product kinds price from their tier columns divided by the box size,
+				// which is what the storefront displays. A null unitPrice means the product
+				// exists but isn't priced yet; a missing product row is a different failure
+				// (PRODUCT_UNAVAILABLE).
+				const cartQtyByProduct = quantityByProduct(cartItems);
 
-				// Validate amount
-				const slipAmount = slipData?.data?.amount ?? slipData?.amount;
-				if (Math.abs(parseFloat(slipAmount) - totalAmount) > 0.01) {
-					return corsResponse({ error: "AMOUNT_MISMATCH" }, { status: 400 });
+				// Batch-fetch every distinct product/diy id referenced in the cart in two
+				// queries instead of one round-trip per cart line.
+				const diyIds = [...new Set(
+					cartItems.filter(i => typeof i.id === "string" && i.id.startsWith("diy-"))
+						.map(i => parseInt((i.id as string).substring(4), 10))
+				)];
+				const productIds = [...new Set(
+					cartItems.filter(i => !(typeof i.id === "string" && i.id.startsWith("diy-"))).map(i => i.id)
+				)];
+				const diyRows = diyIds.length
+					? (await env.DB.prepare(
+						`SELECT id, price_1, price_2, price_3 FROM diy_products WHERE id IN (${diyIds.map(() => "?").join(",")})`
+					).bind(...diyIds).all()).results as any[]
+					: [];
+				const productRows = productIds.length
+					? (await env.DB.prepare(
+						`SELECT id, price_1, price_2, price_3, moq FROM products WHERE id IN (${productIds.map(() => "?").join(",")})`
+					).bind(...productIds).all()).results as any[]
+					: [];
+				const diyById = new Map(diyRows.map(r => [String(r.id), r]));
+				const productById = new Map(productRows.map(r => [String(r.id), r]));
+
+				const pricedItems: { item: any; unitPrice: number | null; orderItemProductId: any }[] = [];
+				let totalAmount = 0;
+				for (const item of cartItems) {
+					const isDiy = typeof item.id === "string" && item.id.startsWith("diy-");
+					const productQty = cartQtyByProduct.get(String(item.id)) || 0;
+					let unitPrice: number | null = null;
+					let orderItemProductId: any = null;
+					let found = false;
+					if (isDiy) {
+						const diyId = parseInt((item.id as string).substring(4), 10);
+						const p = diyById.get(String(diyId));
+						// DIY kits are sold as single units — no box, so the box size is 1.
+						if (p) { found = true; unitPrice = perPiecePrice(p, productQty, 1); }
+					} else {
+						const p = productById.get(String(item.id));
+						if (p) { found = true; unitPrice = perPiecePrice(p, productQty, p.moq); orderItemProductId = item.id; }
+					}
+					if (!found) {
+						return corsResponse({ error: "PRODUCT_UNAVAILABLE", detail: item.name || String(item.id) }, { status: 400 });
+					}
+					const qty = Math.max(0, Number(item.quantity) || 0);
+					if (unitPrice !== null) totalAmount += unitPrice * qty;
+					pricedItems.push({ item, unitPrice, orderItemProductId });
 				}
 
-				// Validate receiver account
-				const receiverAccount =
-					slipData?.data?.receiver?.accountNo ??
-					slipData?.data?.receiver?.promptpay ??
-					slipData?.receiver?.accountNo ?? "";
-				if (!receiverAccount.replace(/[-\s]/g, "").includes(env.PROMPTPAY_ACCOUNT.replace(/[-\s]/g, ""))) {
-					return corsResponse({ error: "WRONG_ACCOUNT" }, { status: 400 });
+				// One unpriced line turns the whole submission into a quote: staff confirm the
+				// final price and payment with the customer before anything is charged.
+				const isQuote = pricedItems.some(p => p.unitPrice === null);
+
+				// A quote has no agreed total to check a slip against, so verification (and the
+				// slip requirement) only applies once every line is priced.
+				if (slipVerificationEnabled && !isQuote && !slipFile) {
+					return corsResponse({ error: "Missing required fields" }, { status: 400 });
 				}
 
-				// Check duplicate transaction ref
-				const transRef: string =
-					slipData?.data?.transRef ?? slipData?.transRef ?? crypto.randomUUID();
-				const dupCheck = await env.DB.prepare(
-					"SELECT id FROM orders WHERE slip_transaction_ref = ?"
-				).bind(transRef).first();
-				if (dupCheck) {
-					return corsResponse({ error: "DUPLICATE" }, { status: 400 });
+				// Read the uploaded slip bytes once (used by verification and/or storage).
+				const arrayBuffer = slipFile ? await slipFile.arrayBuffer() : null;
+				let transRef = crypto.randomUUID();
+
+				if (slipVerificationEnabled && !isQuote) {
+					// Convert slip to base64 (stack-safe reduce — do NOT spread Uint8Array)
+					const base64String = btoa(
+						new Uint8Array(arrayBuffer!).reduce((data, byte) => data + String.fromCharCode(byte), "")
+					);
+					const dataUri = `data:image/jpeg;base64,${base64String}`;
+
+					// Call EasySlip API v2
+					const easySlipRes = await fetch("https://api.easyslip.com/v2/verify/bank", {
+						method: "POST",
+						headers: {
+							"Authorization": `Bearer ${env.EASYSLIP_API_KEY}`,
+							"Content-Type": "application/json"
+						},
+						body: JSON.stringify({ base64: dataUri })
+					});
+
+					if (!easySlipRes.ok) {
+						const errBody = await easySlipRes.json().catch(() => ({})) as any;
+						console.error("EasySlip error:", easySlipRes.status, errBody);
+						return corsResponse({ error: "SLIP_INVALID" }, { status: 400 });
+					}
+
+					const slipData = await easySlipRes.json() as any;
+
+					// Validate amount
+					const slipAmount = slipData?.data?.amount ?? slipData?.amount;
+					if (Math.abs(parseFloat(slipAmount) - totalAmount) > 0.01) {
+						return corsResponse({ error: "AMOUNT_MISMATCH" }, { status: 400 });
+					}
+
+					// Validate receiver account
+					const receiverAccount =
+						slipData?.data?.receiver?.accountNo ??
+						slipData?.data?.receiver?.promptpay ??
+						slipData?.receiver?.accountNo ?? "";
+					if (!receiverAccount.replace(/[-\s]/g, "").includes(env.PROMPTPAY_ACCOUNT!.replace(/[-\s]/g, ""))) {
+						return corsResponse({ error: "WRONG_ACCOUNT" }, { status: 400 });
+					}
+
+					// Check duplicate transaction ref
+					transRef = slipData?.data?.transRef ?? slipData?.transRef ?? crypto.randomUUID();
+					const dupCheck = await env.DB.prepare(
+						"SELECT id FROM orders WHERE slip_transaction_ref = ?"
+					).bind(transRef).first();
+					if (dupCheck) {
+						return corsResponse({ error: "DUPLICATE" }, { status: 400 });
+					}
 				}
 
 				// Generate order ID
@@ -656,74 +1200,89 @@ export default {
 				const random = Math.floor(Math.random() * 99999).toString().padStart(5, "0");
 				const orderId = `WH-${now.getFullYear()}-${random}`;
 
-				// Upload slip to R2
-				const slipKey = `slips/${orderId}-${Date.now()}.jpg`;
-				await env.SLIPS.put(slipKey, arrayBuffer, {
-					httpMetadata: { contentType: slipFile.type || "image/jpeg" }
-				});
-				const slipUrl = `slips/${slipKey}`;
-
-				// Persist order to D1
-				await env.DB.prepare(
-					"INSERT INTO orders (id, customer_name, total_amount, payment_method, note, customer_id, phone_number, shipping_address, slip_url, line_user_id, slip_transaction_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-				).bind(orderId, customerName, totalAmount, "PromptPay", "", null, phoneNumber, shippingAddress, slipUrl, lineUserId || null, transRef).run();
-
-				// Persist order items + update stock
-				for (const item of cartItems) {
-					const productName = item.name_th || item.name;
-					await env.DB.prepare(
-						"INSERT INTO order_items (order_id, product_id, product_name, size, color, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?)"
-					).bind(orderId, item.id, productName, item.selectedSize, item.selectedColor, item.quantity, item.price).run();
-
-					const isDiy = typeof item.id === "string" && item.id.startsWith("diy-");
-					const dbTable = isDiy ? "diy_products" : "products";
-					const productId = isDiy ? parseInt((item.id as string).substring(4), 10) : item.id;
-
-					const p = await env.DB.prepare(`SELECT stock FROM ${dbTable} WHERE id = ?`).bind(productId).first() as any;
-					if (p) {
-						const newStock = p.stock - item.quantity;
-						await env.DB.prepare(`UPDATE ${dbTable} SET stock = ? WHERE id = ?`).bind(newStock, productId).run();
-						if (!isDiy) {
-							await env.DB.prepare(
-								"INSERT INTO stock_history (product_id, admin_id, change_amount, new_stock, reason) VALUES (?, ?, ?, ?, ?)"
-							).bind(productId, "SYSTEM", -item.quantity, newStock, `ORDER_${orderId}`).run();
-						}
-					}
+				// Store the uploaded slip (if any) — kept even when unverified so staff can review it.
+				let slipUrl: string | null = null;
+				if (arrayBuffer && slipFile) {
+					const slipKey = `slips/${orderId}-${Date.now()}.jpg`;
+					await env.SLIPS.put(slipKey, arrayBuffer, {
+						httpMetadata: { contentType: slipFile.type || "image/jpeg" }
+					});
+					slipUrl = `slips/${slipKey}`;
 				}
 
+				// A quote carries no total — the priced lines alone would read as a final price.
+				const paymentMethod = isQuote
+					? "QUOTE"
+					: (slipVerificationEnabled ? "PromptPay" : "PromptPay (manual)");
+
+				// Persist order + items in one batch (server-computed total; linked to the
+				// account when logged in). Batching also makes the write atomic — a failed
+				// item insert can no longer leave an order with zero items behind.
+				const orderInsert = env.DB.prepare(
+					"INSERT INTO orders (id, customer_name, total_amount, payment_method, note, customer_id, phone_number, shipping_address, slip_url, line_user_id, line_display_name, slip_transaction_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+				).bind(orderId, customerName, isQuote ? 0 : totalAmount, paymentMethod, orderNote, customerId, phoneNumber, shippingAddress, slipUrl, lineUserId || null, lineDisplayName || null, transRef);
+
+				const itemInsert = env.DB.prepare(
+					"INSERT INTO order_items (order_id, product_id, product_name, size, color, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?)"
+				);
+				const itemStatements = pricedItems.map(({ item, unitPrice, orderItemProductId }) =>
+					itemInsert.bind(orderId, orderItemProductId, item.name_th || item.name, item.selectedSize, item.selectedColor, item.quantity, unitPrice)
+				);
+
+				await env.DB.batch([orderInsert, ...itemStatements]);
+
 				// Build staff LINE notification (use name_th)
-				let lineMsg = `🧾 คำสั่งซื้อใหม่ (เว็บไซต์)\n`;
+				let lineMsg = isQuote
+					? `📝 ขอใบเสนอราคา (เว็บไซต์) — รอใส่ราคา\n`
+					: `🧾 คำสั่งซื้อใหม่ (เว็บไซต์)\n`;
 				lineMsg += `รหัส: ${orderId}\n`;
 				lineMsg += `ชื่อ: ${customerName}  โทร: ${phoneNumber}\n`;
+				if (lineDisplayName) lineMsg += `LINE: ${lineDisplayName}\n`;
 				lineMsg += `ที่อยู่: ${shippingAddress}\n\n`;
-				cartItems.forEach((item: any, i: number) => {
+				pricedItems.forEach(({ item, unitPrice }, i: number) => {
 					const name = item.name_th || item.name;
 					lineMsg += `${i + 1}) ${name}\n`;
 					lineMsg += `   ขนาด: ${item.selectedSize} | สี: ${item.selectedColor}\n`;
-					lineMsg += `   จำนวน: ${item.quantity} ชิ้น × ${item.price} บาท\n`;
-					lineMsg += `   รวม: ${(item.price * item.quantity).toFixed(2)} บาท\n\n`;
+					if (unitPrice === null) {
+						lineMsg += `   จำนวน: ${item.quantity} ชิ้น — รอใส่ราคา\n\n`;
+					} else {
+						lineMsg += `   จำนวน: ${item.quantity} ชิ้น × ${unitPrice} บาท\n`;
+						lineMsg += `   รวม: ${(unitPrice * item.quantity).toFixed(2)} บาท\n\n`;
+					}
 				});
-				lineMsg += `รวมทั้งหมด: ${totalAmount.toFixed(2)} บาท\n`;
-				lineMsg += `หลักฐานการโอน: ${slipUrl}`;
+				lineMsg += isQuote
+					? `รวมทั้งหมด: รอยืนยันราคากับลูกค้า\n`
+					: `รวมทั้งหมด: ${totalAmount.toFixed(2)} บาท\n`;
+				if (orderNote) lineMsg += `หมายเหตุ: ${orderNote}\n`;
+				lineMsg += slipUrl
+					? `หลักฐานการโอน: ${slipUrl}`
+					: `การชำระเงิน: รอชำระ/ตรวจสอบโดยเจ้าหน้าที่`;
 
-				await fetch("https://api.line.me/v2/bot/message/push", {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						"Authorization": `Bearer ${token}`
-					},
-					body: JSON.stringify({
-						to: staffUserId,
-						messages: [{ type: "text", text: lineMsg }]
-					})
-				});
+				// The order is already saved — don't let a LINE push failure 500 the request
+				// (that would make the customer retry and create duplicate orders).
+				try {
+					await fetch("https://api.line.me/v2/bot/message/push", {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							"Authorization": `Bearer ${token}`
+						},
+						body: JSON.stringify({
+							to: staffUserId,
+							messages: [{ type: "text", text: lineMsg }]
+						})
+					});
+				} catch (err) {
+					console.error(`Staff LINE push failed for order ${orderId}:`, err);
+				}
 
-				// Push an order-confirmation Flex Message to the customer.
-				// This opens a 1:1 chat with them in the OA console and delivers their receipt.
+				// Push a confirmation to the customer. This opens a 1:1 chat with them in the
+				// OA console. A quote gets a plain acknowledgement instead of the Flex receipt:
+				// there is no agreed total yet, and a receipt showing one would be a promise.
 				if (lineUserId) {
-					const itemRows = cartItems.map((item: any) => {
+					const itemRows = isQuote ? [] : pricedItems.map(({ item, unitPrice }) => {
 						const name = item.name_th || item.name;
-						const lineTotal = (item.price * item.quantity).toFixed(2);
+						const lineTotal = (unitPrice! * item.quantity).toFixed(2);
 						return {
 							type: "box",
 							layout: "horizontal",
@@ -786,6 +1345,15 @@ export default {
 						}
 					};
 
+					const quoteMessage = {
+						type: "text",
+						text: `Kitcharoen\nเราได้รับคำขอของคุณแล้ว (รหัส: ${orderId})\n\n`
+							+ `มีสินค้าบางรายการที่ยังไม่ได้ระบุราคา เจ้าหน้าที่จะติดต่อกลับ`
+							+ `เพื่อยืนยันราคาและวิธีชำระเงินก่อนจัดส่งค่ะ ขอบคุณค่ะ 🧵`
+					};
+
+					const customerMessage = isQuote ? quoteMessage : flexMessage;
+
 					// Flag-and-log if the push fails (e.g. customer connected LINE Login but
 					// never added the OA as a friend, so they're unreachable). The order still
 					// succeeds; line_push_failed lets staff see who can't be contacted on LINE.
@@ -798,7 +1366,7 @@ export default {
 							},
 							body: JSON.stringify({
 								to: lineUserId,
-								messages: [flexMessage]
+								messages: [customerMessage]
 							})
 						});
 						if (!pushResp.ok) {
@@ -812,7 +1380,7 @@ export default {
 					}
 				}
 
-				return corsResponse({ success: true, orderId });
+				return corsResponse({ success: true, orderId, isQuote });
 			}
 
 			if (url.pathname === "/rfq/submit" && request.method === "POST") {
@@ -913,7 +1481,53 @@ export default {
 						id: user.id,
 						email: user.email,
 						businessName: user.business_name,
-						owner_name: user.owner_name
+						ownerName: user.owner_name,
+						owner_name: user.owner_name,
+						phone: user.phone,
+						shippingAddress: user.shipping_address,
+						lineDisplayName: user.line_display_name,
+						lineUserId: user.line_user_id
+					}
+				});
+			}
+
+			// Update the logged-in customer's profile (prefill/save at checkout).
+			// Token is the user id (see login), passed in the Authorization header.
+			if (url.pathname === "/customer/update" && request.method === "POST") {
+				const userId = request.headers.get("Authorization");
+				if (!userId) {
+					return corsResponse({ error: "Unauthorized" }, { status: 401 });
+				}
+				const existing = await env.DB.prepare("SELECT id FROM customers WHERE id = ?").bind(userId).first();
+				if (!existing) {
+					return corsResponse({ error: "Unauthorized" }, { status: 401 });
+				}
+				const body = await request.json() as any;
+				// COALESCE keeps the existing value when a field isn't provided.
+				await env.DB.prepare(
+					"UPDATE customers SET business_name = COALESCE(?, business_name), owner_name = COALESCE(?, owner_name), phone = COALESCE(?, phone), shipping_address = COALESCE(?, shipping_address), line_display_name = COALESCE(?, line_display_name), line_user_id = COALESCE(?, line_user_id) WHERE id = ?"
+				).bind(
+					body.businessName ?? null,
+					body.ownerName ?? null,
+					body.phone ?? null,
+					body.shippingAddress ?? null,
+					body.lineDisplayName ?? null,
+					body.lineUserId ?? null,
+					userId
+				).run();
+				const updated = await env.DB.prepare("SELECT * FROM customers WHERE id = ?").bind(userId).first() as any;
+				return corsResponse({
+					success: true,
+					user: {
+						id: updated.id,
+						email: updated.email,
+						businessName: updated.business_name,
+						ownerName: updated.owner_name,
+						owner_name: updated.owner_name,
+						phone: updated.phone,
+						shippingAddress: updated.shipping_address,
+						lineDisplayName: updated.line_display_name,
+						lineUserId: updated.line_user_id
 					}
 				});
 			}
@@ -975,6 +1589,327 @@ export default {
 			const auth = request.headers.get("Authorization");
 			if (auth !== (env.ADMIN_PASSWORD || "").trim()) {
 				return corsResponse("Unauthorized", { status: 401 });
+			}
+
+			// ── Projects: create / update ─────────────────────────────────
+			// Sending an id updates that row; omitting it inserts a new one.
+			if (url.pathname === "/projects" && request.method === "POST") {
+				const body = await request.json() as any;
+				const title = (body.title || "").trim();
+				if (!title) return corsResponse({ error: "title is required" }, { status: 400 });
+
+				const productIds = JSON.stringify(parseProductIds(body.product_ids));
+				const isFeatured = body.is_featured ? 1 : 0;
+				const isPublished = body.is_published === false ? 0 : 1;
+				const publishedAt = (body.published_at || "").trim() || new Date().toISOString();
+
+				// Only one project can hold the homepage slot.
+				if (isFeatured) {
+					await env.DB.prepare("UPDATE projects SET is_featured = 0").run();
+				}
+
+				if (body.id) {
+					await env.DB.prepare(
+						`UPDATE projects SET title = ?, title_th = ?, cover_image_key = ?, excerpt = ?,
+						 excerpt_th = ?, body = ?, body_th = ?, video_url = ?, product_ids = ?,
+						 is_featured = ?, is_published = ?, published_at = ? WHERE id = ?`
+					).bind(
+						title, body.title_th || null, body.cover_image_key || null, body.excerpt || null,
+						body.excerpt_th || null, body.body || null, body.body_th || null, body.video_url || null,
+						productIds, isFeatured, isPublished, publishedAt, body.id
+					).run();
+
+					const updated = await env.DB.prepare("SELECT * FROM projects WHERE id = ?").bind(body.id).first();
+					return corsResponse(mapProjectRow(updated));
+				}
+
+				// Insert with a placeholder slug, then rewrite it with the row id
+				// appended so slugs stay unique even when two posts share a title.
+				const placeholder = `pending-${crypto.randomUUID()}`;
+				const inserted = await env.DB.prepare(
+					`INSERT INTO projects (title, title_th, slug, cover_image_key, excerpt, excerpt_th,
+					 body, body_th, video_url, product_ids, is_featured, is_published, published_at)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+				).bind(
+					title, body.title_th || null, placeholder, body.cover_image_key || null, body.excerpt || null,
+					body.excerpt_th || null, body.body || null, body.body_th || null, body.video_url || null,
+					productIds, isFeatured, isPublished, publishedAt
+				).first() as any;
+
+				const newId = inserted.id;
+				const slug = generateProjectSlug(title, newId);
+				await env.DB.prepare("UPDATE projects SET slug = ? WHERE id = ?").bind(slug, newId).run();
+
+				const created = await env.DB.prepare("SELECT * FROM projects WHERE id = ?").bind(newId).first();
+				return corsResponse(mapProjectRow(created));
+			}
+
+			if (url.pathname === "/projects/delete" && request.method === "POST") {
+				const body = await request.json() as any;
+				if (!body.id) return corsResponse({ error: "id is required" }, { status: 400 });
+				await env.DB.prepare("DELETE FROM projects WHERE id = ?").bind(body.id).run();
+				return corsResponse({ success: true });
+			}
+
+			// ── Business Sets: create / update ────────────────────────────
+			// Sending an id updates that row; omitting it inserts a new one. The item
+			// list is replaced wholesale rather than diffed -- a set is small and always
+			// edited as a whole.
+			if (url.pathname === "/business-sets" && request.method === "POST") {
+				const body = await request.json() as any;
+
+				const name = (body.name || "").trim();
+				if (!name) return corsResponse({ error: "name is required" }, { status: 400 });
+
+				const priceTier = body.price_tier === undefined ? 1 : Number(body.price_tier);
+				if (!Number.isInteger(priceTier) || priceTier < 1 || priceTier > 3) {
+					return corsResponse({ error: "price_tier must be 1, 2 or 3" }, { status: 400 });
+				}
+
+				const discountPct = body.discount_pct === undefined ? 0 : Number(body.discount_pct);
+				if (!Number.isFinite(discountPct) || discountPct < 0 || discountPct > 100) {
+					return corsResponse({ error: "discount_pct must be between 0 and 100" }, { status: 400 });
+				}
+
+				const rawItems = Array.isArray(body.items) ? body.items : [];
+				const items = rawItems.map((it: any) => ({
+					product_id: Number(it.product_id),
+					variant_id: it.variant_id === null || it.variant_id === undefined ? null : Number(it.variant_id),
+					quantity: Number(it.quantity)
+				}));
+				for (const it of items) {
+					if (!Number.isInteger(it.product_id) || it.product_id <= 0) {
+						return corsResponse({ error: "each item needs a product_id" }, { status: 400 });
+					}
+					if (!Number.isInteger(it.quantity) || it.quantity <= 0) {
+						return corsResponse({ error: "each item quantity must be a positive integer" }, { status: 400 });
+					}
+				}
+
+				// A set with no lines has nothing to quote, so it cannot go live.
+				const isPublished = items.length === 0 ? 0 : (body.is_published === false ? 0 : 1);
+				const sortOrder = Number(body.sort_order) || 0;
+
+				let setId: number;
+				if (body.id) {
+					setId = Number(body.id);
+					await env.DB.prepare(
+						`UPDATE product_sets SET name = ?, name_th = ?, cover_image_key = ?, description = ?,
+						 description_th = ?, price_tier = ?, discount_pct = ?, is_published = ?, sort_order = ?
+						 WHERE id = ?`
+					).bind(
+						name, body.name_th || null, body.cover_image_key || null, body.description || null,
+						body.description_th || null, priceTier, discountPct, isPublished, sortOrder, setId
+					).run();
+				} else {
+					const res = await env.DB.prepare(
+						`INSERT INTO product_sets (name, name_th, slug, cover_image_key, description,
+						 description_th, price_tier, discount_pct, is_published, sort_order)
+						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+					).bind(
+						name, body.name_th || null, `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+						body.cover_image_key || null, body.description || null, body.description_th || null,
+						priceTier, discountPct, isPublished, sortOrder
+					).run();
+					setId = Number(res.meta.last_row_id);
+					// Slug needs the id, so it is written once the row exists -- same order
+					// as /projects.
+					await env.DB.prepare("UPDATE product_sets SET slug = ? WHERE id = ?")
+						.bind(generateSetSlug(name, setId), setId).run();
+				}
+
+				await env.DB.prepare("DELETE FROM product_set_items WHERE set_id = ?").bind(setId).run();
+				for (let i = 0; i < items.length; i++) {
+					const it = items[i];
+					await env.DB.prepare(
+						`INSERT INTO product_set_items (set_id, product_id, variant_id, quantity, sort_order)
+						 VALUES (?, ?, ?, ?, ?)`
+					).bind(setId, it.product_id, it.variant_id, it.quantity, i).run();
+				}
+
+				const row = (await loadSets(env, { includeUnpublished: true }))
+					.find((s: any) => Number(s.id) === setId);
+				return corsResponse(row);
+			}
+
+			if (url.pathname === "/business-sets/delete" && request.method === "POST") {
+				const body = await request.json() as any;
+				if (!body.id) return corsResponse({ error: "id is required" }, { status: 400 });
+				await env.DB.prepare("DELETE FROM product_set_items WHERE set_id = ?").bind(body.id).run();
+				await env.DB.prepare("DELETE FROM product_sets WHERE id = ?").bind(body.id).run();
+				return corsResponse({ success: true });
+			}
+
+			// ── Color of the Month: create / update ───────────────────────
+			// Sending an id updates that row; omitting it inserts a new one.
+			if (url.pathname === "/spotlights" && request.method === "POST") {
+				const body = await request.json() as any;
+				const colorName = (body.color_name || "").trim();
+				if (!colorName) return corsResponse({ error: "color_name is required" }, { status: 400 });
+
+				const hex = (body.hex || "").trim() || "#C4694E";
+				const productIds = JSON.stringify(parseProductIds(body.product_ids));
+				const isActive = body.is_active ? 1 : 0;
+				const startsOn = (body.starts_on || "").trim() || new Date().toISOString();
+
+				// Only one color can be the current one.
+				if (isActive) {
+					await env.DB.prepare("UPDATE spotlights SET is_active = 0").run();
+				}
+
+				if (body.id) {
+					await env.DB.prepare(
+						`UPDATE spotlights SET color_name = ?, color_name_th = ?, hex = ?, blurb = ?,
+						 blurb_th = ?, product_ids = ?, is_active = ?, starts_on = ? WHERE id = ?`
+					).bind(
+						colorName, body.color_name_th || null, hex, body.blurb || null,
+						body.blurb_th || null, productIds, isActive, startsOn, body.id
+					).run();
+
+					const updated = await env.DB.prepare("SELECT * FROM spotlights WHERE id = ?").bind(body.id).first();
+					return corsResponse(mapSpotlightRow(updated));
+				}
+
+				const inserted = await env.DB.prepare(
+					`INSERT INTO spotlights (color_name, color_name_th, hex, blurb, blurb_th,
+					 product_ids, is_active, starts_on)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+				).bind(
+					colorName, body.color_name_th || null, hex, body.blurb || null,
+					body.blurb_th || null, productIds, isActive, startsOn
+				).first() as any;
+
+				const created = await env.DB.prepare("SELECT * FROM spotlights WHERE id = ?").bind(inserted.id).first();
+				return corsResponse(mapSpotlightRow(created));
+			}
+
+			if (url.pathname === "/spotlights/delete" && request.method === "POST") {
+				const body = await request.json() as any;
+				if (!body.id) return corsResponse({ error: "id is required" }, { status: 400 });
+				await env.DB.prepare("DELETE FROM spotlights WHERE id = ?").bind(body.id).run();
+				return corsResponse({ success: true });
+			}
+
+			// ── Creator gallery: create / update ──────────────────────────
+			// Sending an id updates that row; omitting it inserts a new one.
+			if (url.pathname === "/gallery" && request.method === "POST") {
+				const body = await request.json() as any;
+				const imageKey = (body.image_key || "").trim();
+				if (!imageKey) return corsResponse({ error: "image_key is required" }, { status: 400 });
+
+				// A blank select in the admin form posts "" — store NULL, not 0, or the
+				// row would claim to belong to a product that does not exist.
+				const productId = body.product_id ? Number(body.product_id) : null;
+				const projectId = body.project_id ? Number(body.project_id) : null;
+				const isVisible = body.is_visible === false ? 0 : 1;
+				const sortOrder = Number.isFinite(Number(body.sort_order)) ? Number(body.sort_order) : 0;
+				// Handles are stored bare; the client renders the '@'.
+				const handle = (body.credit_handle || "").trim().replace(/^@+/, "") || null;
+
+				if (body.id) {
+					await env.DB.prepare(
+						`UPDATE gallery SET image_key = ?, caption = ?, caption_th = ?, credit_name = ?,
+						 credit_handle = ?, credit_url = ?, product_id = ?, project_id = ?,
+						 is_visible = ?, sort_order = ? WHERE id = ?`
+					).bind(
+						imageKey, body.caption || null, body.caption_th || null, body.credit_name || null,
+						handle, body.credit_url || null, productId, projectId,
+						isVisible, sortOrder, body.id
+					).run();
+
+					const updated = await env.DB.prepare("SELECT * FROM gallery WHERE id = ?").bind(body.id).first();
+					return corsResponse(mapGalleryRow(updated));
+				}
+
+				const inserted = await env.DB.prepare(
+					`INSERT INTO gallery (image_key, caption, caption_th, credit_name, credit_handle,
+					 credit_url, product_id, project_id, is_visible, sort_order)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+				).bind(
+					imageKey, body.caption || null, body.caption_th || null, body.credit_name || null,
+					handle, body.credit_url || null, productId, projectId, isVisible, sortOrder
+				).first() as any;
+
+				const created = await env.DB.prepare("SELECT * FROM gallery WHERE id = ?").bind(inserted.id).first();
+				return corsResponse(mapGalleryRow(created));
+			}
+
+			if (url.pathname === "/gallery/delete" && request.method === "POST") {
+				const body = await request.json() as any;
+				if (!body.id) return corsResponse({ error: "id is required" }, { status: 400 });
+				await env.DB.prepare("DELETE FROM gallery WHERE id = ?").bind(body.id).run();
+				return corsResponse({ success: true });
+			}
+
+			// ── Workshops: create / update ────────────────────────────────
+			// Sending an id updates that row; omitting it inserts a new one.
+			if (url.pathname === "/events" && request.method === "POST") {
+				const body = await request.json() as any;
+				const title = (body.title || "").trim();
+				if (!title) return corsResponse({ error: "title is required" }, { status: 400 });
+
+				// Re-serialise rather than trusting the posted string: a malformed
+				// gallery would otherwise sit in the column until it broke the page.
+				const gallery = JSON.stringify(parseEventGallery(body.gallery));
+				const isUpcoming = body.is_upcoming ? 1 : 0;
+				const isVisible = body.is_visible === false ? 0 : 1;
+				const startsOn = (body.starts_on || "").trim() || null;
+
+				if (body.id) {
+					await env.DB.prepare(
+						`UPDATE events SET title = ?, title_th = ?, date_label = ?, date_label_th = ?,
+						 cover_image_key = ?, description = ?, description_th = ?, location = ?, location_th = ?,
+						 participants = ?, participants_th = ?, gallery = ?, is_upcoming = ?, is_visible = ?,
+						 starts_on = ? WHERE id = ?`
+					).bind(
+						title, body.title_th || null, body.date_label || null, body.date_label_th || null,
+						body.cover_image_key || null, body.description || null, body.description_th || null,
+						body.location || null, body.location_th || null, body.participants || null,
+						body.participants_th || null, gallery, isUpcoming, isVisible, startsOn, body.id
+					).run();
+
+					const updated = await env.DB.prepare("SELECT * FROM events WHERE id = ?").bind(body.id).first();
+					return corsResponse(mapEventRow(updated));
+				}
+
+				const inserted = await env.DB.prepare(
+					`INSERT INTO events (title, title_th, date_label, date_label_th, cover_image_key,
+					 description, description_th, location, location_th, participants, participants_th,
+					 gallery, is_upcoming, is_visible, starts_on)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+				).bind(
+					title, body.title_th || null, body.date_label || null, body.date_label_th || null,
+					body.cover_image_key || null, body.description || null, body.description_th || null,
+					body.location || null, body.location_th || null, body.participants || null,
+					body.participants_th || null, gallery, isUpcoming, isVisible, startsOn
+				).first() as any;
+
+				const created = await env.DB.prepare("SELECT * FROM events WHERE id = ?").bind(inserted.id).first();
+				return corsResponse(mapEventRow(created));
+			}
+
+			if (url.pathname === "/events/delete" && request.method === "POST") {
+				const body = await request.json() as any;
+				if (!body.id) return corsResponse({ error: "id is required" }, { status: 400 });
+				await env.DB.prepare("DELETE FROM events WHERE id = ?").bind(body.id).run();
+				return corsResponse({ success: true });
+			}
+
+			// One-shot: persist a slug for every product that predates the column.
+			// Safe to re-run; it only touches rows where slug IS NULL.
+			if (url.pathname === "/products/backfill-slugs" && request.method === "POST") {
+				const { results } = await env.DB.prepare(
+					"SELECT id, name, sku FROM products WHERE slug IS NULL OR TRIM(slug) = ''"
+				).all();
+
+				let updated = 0;
+				for (const p of (results || []) as any[]) {
+					const slug = generateProductSlug(p.name, p.sku, p.id);
+					await env.DB.prepare("UPDATE products SET slug = ? WHERE id = ?").bind(slug, p.id).run();
+					updated++;
+				}
+
+				return corsResponse({ success: true, updated });
 			}
 
 			// Update an order's status + tracking number, and notify the customer on LINE
@@ -1087,6 +2022,126 @@ export default {
 				return corsResponse({ success: true, customerNotified });
 			}
 
+			// Staff full order edit: customer/fulfilment fields + line items.
+			// Prices/total are recomputed server-side from the DB when a product id is present.
+			if (url.pathname === "/orders/update" && request.method === "POST") {
+				const body = await request.json() as any;
+				const orderId = (body.orderId as string || "").trim();
+				if (!orderId) {
+					return corsResponse({ error: "orderId is required" }, { status: 400 });
+				}
+				const existing = await env.DB.prepare(
+					"SELECT id, payment_method, line_user_id FROM orders WHERE id = ?"
+				).bind(orderId).first() as any;
+				if (!existing) {
+					return corsResponse({ error: "Order not found" }, { status: 404 });
+				}
+
+				// Update editable fields (COALESCE keeps existing values when omitted).
+				await env.DB.prepare(
+					"UPDATE orders SET customer_name = COALESCE(?, customer_name), phone_number = COALESCE(?, phone_number), shipping_address = COALESCE(?, shipping_address), line_display_name = COALESCE(?, line_display_name), note = COALESCE(?, note), status = COALESCE(?, status), tracking_number = COALESCE(?, tracking_number) WHERE id = ?"
+				).bind(
+					body.customerName ?? null,
+					body.phoneNumber ?? null,
+					body.shippingAddress ?? null,
+					body.lineDisplayName ?? null,
+					body.note ?? null,
+					body.status ?? null,
+					body.trackingNumber ?? null,
+					orderId
+				).run();
+
+				// If an items array is supplied, replace the line items and recompute the total.
+				let customerNotified = false;
+				if (Array.isArray(body.items)) {
+					let newTotal = 0;
+					// Same tier/MOQ maths as /order/submit, so a staff edit re-prices a line
+					// exactly as the storefront would — including re-tiering it when the
+					// quantity changes.
+					const editQtyByProduct = quantityByProduct(body.items);
+
+					// Batch-fetch every distinct product/diy id in the edited lines instead of
+					// one round-trip per line (same pattern as /order/submit).
+					const diyIds = [...new Set(
+						body.items.filter((i: any) => typeof i.id === "string" && i.id.startsWith("diy-"))
+							.map((i: any) => parseInt((i.id as string).substring(4), 10))
+					)];
+					const productIds = [...new Set(
+						body.items.filter((i: any) =>
+							!(typeof i.id === "string" && i.id.startsWith("diy-")) &&
+							i.id !== null && i.id !== undefined && i.id !== ""
+						).map((i: any) => i.id)
+					)];
+					const diyRows = diyIds.length
+						? (await env.DB.prepare(
+							`SELECT id, price_1, price_2, price_3 FROM diy_products WHERE id IN (${diyIds.map(() => "?").join(",")})`
+						).bind(...diyIds).all()).results as any[]
+						: [];
+					const productRows = productIds.length
+						? (await env.DB.prepare(
+							`SELECT id, price_1, price_2, price_3, moq FROM products WHERE id IN (${productIds.map(() => "?").join(",")})`
+						).bind(...productIds).all()).results as any[]
+						: [];
+					const diyById = new Map(diyRows.map(r => [String(r.id), r]));
+					const productById = new Map(productRows.map(r => [String(r.id), r]));
+
+					const priced: { item: any; unitPrice: number | null; orderItemProductId: any }[] = [];
+					for (const item of body.items) {
+						const isDiy = typeof item.id === "string" && item.id.startsWith("diy-");
+						const productQty = editQtyByProduct.get(String(item.id)) || 0;
+						let unitPrice: number | null = null;
+						let orderItemProductId: any = null;
+						if (isDiy) {
+							const diyId = parseInt((item.id as string).substring(4), 10);
+							const p = diyById.get(String(diyId));
+							if (p) unitPrice = perPiecePrice(p, productQty, 1);
+						} else if (item.id !== null && item.id !== undefined && item.id !== "") {
+							const p = productById.get(String(item.id));
+							if (p) { unitPrice = perPiecePrice(p, productQty, p.moq); orderItemProductId = item.id; }
+						}
+						// No catalog price to use — either a custom/manual line with no product,
+						// or a product still awaiting its price. Either way the staff-entered
+						// price is what we have, and it is how a quote gets priced up.
+						if (unitPrice === null) unitPrice = usablePrice(item.price);
+						const qty = Math.max(0, Number(item.quantity) || 0);
+						if (unitPrice !== null) newTotal += unitPrice * qty;
+						priced.push({ item, unitPrice, orderItemProductId });
+					}
+
+					const itemInsert = env.DB.prepare(
+						"INSERT INTO order_items (order_id, product_id, product_name, size, color, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?)"
+					);
+					await env.DB.batch([
+						env.DB.prepare("DELETE FROM order_items WHERE order_id = ?").bind(orderId),
+						...priced.map(({ item, unitPrice, orderItemProductId }) =>
+							itemInsert.bind(orderId, orderItemProductId, item.name_th || item.name || "", item.selectedSize || null, item.selectedColor || null, item.quantity, unitPrice)
+						)
+					]);
+
+					// A quote that is now fully priced becomes an ordinary order. One that still
+					// has a gap keeps its zero total, so a partial sum never reads as a final
+					// price. Ordinary orders are never turned into quotes here — that stays a
+					// staff decision, not a side effect of editing lines.
+					const stillUnpriced = priced.some(p => p.unitPrice === null);
+					if (existing.payment_method === "QUOTE" && stillUnpriced) {
+						await env.DB.prepare("UPDATE orders SET total_amount = 0 WHERE id = ?").bind(orderId).run();
+					} else if (existing.payment_method === "QUOTE") {
+						const settled = env.SLIP_VERIFICATION_ENABLED === "true" ? "PromptPay" : "PromptPay (manual)";
+						await env.DB.prepare(
+							"UPDATE orders SET total_amount = ?, payment_method = ? WHERE id = ?"
+						).bind(newTotal, settled, orderId).run();
+						// The pricing is already saved — a push failure must not undo it.
+						customerNotified = await pushQuotePriced(
+							env, { id: orderId, line_user_id: existing.line_user_id }, newTotal, priced
+						);
+					} else {
+						await env.DB.prepare("UPDATE orders SET total_amount = ? WHERE id = ?").bind(newTotal, orderId).run();
+					}
+				}
+
+				return corsResponse({ success: true, customerNotified });
+			}
+
 			// POS in-store cash sale: records a walk-in sale into pos_orders / pos_order_items
 			if (url.pathname === "/sellcash/submit" && request.method === "POST") {
 				const body = await request.json() as any;
@@ -1131,11 +2186,10 @@ export default {
 
 			if (url.pathname === "/products" && request.method === "POST") {
 				const body = await request.json() as any;
-				const { name, name_th, description, price, category, categories, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images, stock, variants } = body;
+				const { name, name_th, description, price, category, categories, image_key, usage, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images } = body;
 				const categoryList = normalizeCategoryList(categories, category);
 				const primaryCategory = categoryList[0] || category || null;
 				const activePrice = price || price_3 || 0;
-				const initialStock = stock || 0;
 				let productId: number | null = null;
 
 				if (!primaryCategory) {
@@ -1146,45 +2200,32 @@ export default {
 					const sku = await allocateProductSku(env, primaryCategory, body.sku);
 
 					const { meta } = await env.DB.prepare(
-						"INSERT INTO products (name, name_th, description, description_th, price, category, image_key, usage, usage_th, use_for, use_for_th, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, stock, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+						"INSERT INTO products (name, name_th, description, description_th, price, category, image_key, usage, usage_th, attribute, attribute_th, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 					).bind(
 						dbValue(name), dbValue(name_th), dbValue(description), dbValue(body.description_th || null), activePrice, primaryCategory,
-						dbValue(image_key), dbValue(usage), dbValue(body.usage_th || null), dbValue(use_for), dbValue(body.use_for_th || null), dbValue(varieties), dbValue(sizes), dbValue(colors),
-						price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, dbValue(moq), is_visible === false ? 0 : 1, initialStock, sku
+						dbValue(image_key), dbValue(usage), dbValue(body.usage_th || null), dbValue(body.attribute || null), dbValue(body.attribute_th || null), dbValue(varieties), dbValue(sizes), dbValue(colors),
+						price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, dbValue(moq), is_visible === false ? 0 : 1, sku
 					).run();
 
 					productId = meta.last_row_id;
 
 					if (productId) {
+						// Slug needs the row id, so it is written straight after insert.
+						await env.DB.prepare("UPDATE products SET slug = ? WHERE id = ?")
+							.bind(generateProductSlug(name, sku, productId), productId).run();
 						await saveProductCategories(env, productId, categoryList);
 					}
 
 					if (images && Array.isArray(images) && productId) {
-						for (const img of images) {
-							if (!isValidImageKey(img?.image_key)) continue;
-							await env.DB.prepare(
-								"INSERT INTO product_images (product_id, image_key, attribute_type, attribute_value, is_main) VALUES (?, ?, ?, ?, ?)"
-							).bind(productId, img.image_key, dbValue(img.attribute_type), dbValue(img.attribute_value), img.is_main ? 1 : 0).run();
-						}
-					}
-
-					if (variants && Array.isArray(variants) && productId) {
-						for (const v of variants) {
-							if (!v?.variant_name || !v?.sku) continue;
-							const vResult = await env.DB.prepare(
-								"INSERT INTO product_variants (product_id, variant_name, sku, price_1, price_2, price_3, price_4, price_5, stock, image_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-							).bind(productId, v.variant_name, v.sku, v.price_1 || 0, v.price_2 || 0, v.price_3 || 0, v.price_4 || 0, v.price_5 || 0, v.stock || 0, v.image_key || null).run();
-
-							const variantId = vResult.meta.last_row_id;
-
-							if (v.colors && Array.isArray(v.colors) && variantId) {
-								for (const c of v.colors) {
-									if (!c?.color_name) continue;
-									await env.DB.prepare(
-										"INSERT INTO variant_colors (variant_id, color_name, image_key, stock) VALUES (?, ?, ?, ?)"
-									).bind(variantId, c.color_name, c.image_key || null, c.stock || 0).run();
-								}
-							}
+						const validImages = images.filter((img: any) => isValidImageKey(img?.image_key));
+						if (validImages.length) {
+							const imageInsert = env.DB.prepare(
+								"INSERT INTO product_images (product_id, image_key, attribute_type, attribute_value, is_main, price_1, price_2, price_3, price_4, price_5) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+							);
+							await env.DB.batch(validImages.map((img: any) => imageInsert.bind(
+								productId, img.image_key, dbValue(img.attribute_type), dbValue(img.attribute_value), img.is_main ? 1 : 0,
+								dbValue(img.price_1), dbValue(img.price_2), dbValue(img.price_3), dbValue(img.price_4), dbValue(img.price_5)
+							)));
 						}
 					}
 
@@ -1200,7 +2241,7 @@ export default {
 			if (url.pathname.startsWith("/products/") && request.method === "PUT") {
 				const id = url.pathname.split("/products/")[1];
 				const body = await request.json() as any;
-				const { name, name_th, description, price, category, categories, image_key, usage, use_for, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images, stock, variants } = body;
+				const { name, name_th, description, price, category, categories, image_key, usage, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images } = body;
 				const categoryList = normalizeCategoryList(categories, category);
 				const primaryCategory = categoryList[0] || category || null;
 				const activePrice = price_3 || price || 0;
@@ -1209,58 +2250,38 @@ export default {
 					return corsResponse({ error: "At least one category is required" }, { status: 400 });
 				}
 
-				const currentProduct = await env.DB.prepare("SELECT stock FROM products WHERE id = ?").bind(id).first() as any;
-
 				await env.DB.prepare(
-					"UPDATE products SET name=?, name_th=?, description=?, description_th=?, price=?, category=?, image_key=?, usage=?, usage_th=?, use_for=?, use_for_th=?, varieties=?, sizes=?, colors=?, price_1=?, price_2=?, price_3=?, price_4=?, price_5=?, moq=?, is_visible=?, stock=? WHERE id=?"
+					"UPDATE products SET name=?, name_th=?, description=?, description_th=?, price=?, category=?, image_key=?, usage=?, usage_th=?, attribute=?, attribute_th=?, varieties=?, sizes=?, colors=?, price_1=?, price_2=?, price_3=?, price_4=?, price_5=?, moq=?, is_visible=? WHERE id=?"
 				).bind(
 					dbValue(name), dbValue(name_th), dbValue(description), dbValue(body.description_th || null), activePrice, primaryCategory,
-					dbValue(image_key), dbValue(usage), dbValue(body.usage_th || null), dbValue(use_for), dbValue(body.use_for_th || null), dbValue(varieties), dbValue(sizes), dbValue(colors),
-					price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, dbValue(moq), is_visible === false ? 0 : 1, stock ?? 0, id
+					dbValue(image_key), dbValue(usage), dbValue(body.usage_th || null), dbValue(body.attribute || null), dbValue(body.attribute_th || null), dbValue(varieties), dbValue(sizes), dbValue(colors),
+					price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, dbValue(moq), is_visible === false ? 0 : 1, id
 				).run();
+
+				// Keep the slug in step with a renamed product. The id suffix means
+				// the URL stays unique; old links 404 rather than silently mismatching.
+				// SKU is read back from the row because the edit form does not always
+				// send it, and it is the fallback when the name has no Latin characters.
+				const existing = await env.DB.prepare("SELECT sku FROM products WHERE id = ?").bind(id).first() as any;
+				await env.DB.prepare("UPDATE products SET slug = ? WHERE id = ?")
+					.bind(generateProductSlug(name, existing?.sku || null, id), id).run();
 
 				await saveProductCategories(env, Number(id), categoryList);
 
-				if (currentProduct && stock !== undefined && currentProduct.stock !== stock) {
-					const change = stock - currentProduct.stock;
-					await env.DB.prepare(
-						"INSERT INTO stock_history (product_id, admin_id, change_amount, new_stock, reason) VALUES (?, ?, ?, ?, ?)"
-					).bind(id, 'admin', change, stock, 'PRODUCT_UPDATE').run();
-				}
-
-				// Update images: simplest way is to delete and re-insert
+				// Update images: simplest way is to delete and re-insert, batched into
+				// one atomic round-trip instead of a DELETE plus one INSERT per image.
 				if (images && Array.isArray(images)) {
-					await env.DB.prepare("DELETE FROM product_images WHERE product_id = ?").bind(id).run();
-					for (const img of images) {
-						if (!isValidImageKey(img?.image_key)) continue;
-						await env.DB.prepare(
-							"INSERT INTO product_images (product_id, image_key, attribute_type, attribute_value, is_main) VALUES (?, ?, ?, ?, ?)"
-						).bind(id, img.image_key, dbValue(img.attribute_type), dbValue(img.attribute_value), img.is_main ? 1 : 0).run();
-					}
-				}
-
-				// Update variants & variant colors: delete and re-insert
-				if (variants && Array.isArray(variants)) {
-					// Delete existing variants (will cascade delete variant_colors)
-					await env.DB.prepare("DELETE FROM product_variants WHERE product_id = ?").bind(id).run();
-
-					for (const v of variants) {
-						if (!v?.variant_name || !v?.sku) continue;
-						const vResult = await env.DB.prepare(
-							"INSERT INTO product_variants (product_id, variant_name, sku, price_1, price_2, price_3, price_4, price_5, stock, image_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-						).bind(id, v.variant_name, v.sku, v.price_1 || 0, v.price_2 || 0, v.price_3 || 0, v.price_4 || 0, v.price_5 || 0, v.stock || 0, v.image_key || null).run();
-
-						const variantId = vResult.meta.last_row_id;
-
-						if (v.colors && Array.isArray(v.colors) && variantId) {
-							for (const c of v.colors) {
-								if (!c?.color_name) continue;
-								await env.DB.prepare(
-									"INSERT INTO variant_colors (variant_id, color_name, image_key, stock) VALUES (?, ?, ?, ?)"
-								).bind(variantId, c.color_name, c.image_key || null, c.stock || 0).run();
-							}
-						}
-					}
+					const validImages = images.filter((img: any) => isValidImageKey(img?.image_key));
+					const imageInsert = env.DB.prepare(
+						"INSERT INTO product_images (product_id, image_key, attribute_type, attribute_value, is_main, price_1, price_2, price_3, price_4, price_5) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+					);
+					await env.DB.batch([
+						env.DB.prepare("DELETE FROM product_images WHERE product_id = ?").bind(id),
+						...validImages.map((img: any) => imageInsert.bind(
+							id, img.image_key, dbValue(img.attribute_type), dbValue(img.attribute_value), img.is_main ? 1 : 0,
+							dbValue(img.price_1), dbValue(img.price_2), dbValue(img.price_3), dbValue(img.price_4), dbValue(img.price_5)
+						))
+					]);
 				}
 
 				return corsResponse({ success: true });
@@ -1274,32 +2295,9 @@ export default {
 				return corsResponse({ success: true });
 			}
 
-			// Stock Adjustment Endpoint
-			if (url.pathname.match(/^\/products\/\d+\/stock$/) && request.method === "POST") {
-				const id = url.pathname.split("/")[2];
-				const { change, admin_id, reason } = await request.json() as any;
-
-				// 1. Get current stock
-				const product = await env.DB.prepare("SELECT stock FROM products WHERE id = ?").bind(id).first() as any;
-				if (!product) return corsResponse({ error: "Product not found" }, { status: 404 });
-
-				const newStock = product.stock + change;
-
-				// 2. Update stock
-				await env.DB.prepare("UPDATE products SET stock = ? WHERE id = ?").bind(newStock, id).run();
-
-				// 3. Log history
-				await env.DB.prepare(
-					"INSERT INTO stock_history (product_id, admin_id, change_amount, new_stock, reason) VALUES (?, ?, ?, ?, ?)"
-				).bind(id, admin_id, change, newStock, reason || 'MANUAL_ADJUSTMENT').run();
-
-				return corsResponse({ success: true, newStock });
-			}
-
 			if (url.pathname === "/diy/products" && request.method === "POST") {
 				const body = await request.json() as any;
-				const { name, name_th, description, price_1, price_2, price_3, images, stock } = body;
-				const initialStock = stock || 0;
+				const { name, name_th, description, price_1, price_2, price_3, images } = body;
 
 				let seqVal = 0;
 				const seqResult = await env.DB.prepare("SELECT seq FROM sqlite_sequence WHERE name = 'diy_products'").first() as any;
@@ -1311,8 +2309,8 @@ export default {
 				const serializedImages = JSON.stringify(images || []);
 
 				const { meta } = await env.DB.prepare(
-					"INSERT INTO diy_products (name, name_th, description, price_1, price_2, price_3, images, stock, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-				).bind(name, name_th, description, price_1 || 0, price_2 || 0, price_3 || 0, serializedImages, initialStock, sku).run();
+					"INSERT INTO diy_products (name, name_th, description, price_1, price_2, price_3, images, sku) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+				).bind(name, name_th, description, price_1 || 0, price_2 || 0, price_3 || 0, serializedImages, sku).run();
 
 				return corsResponse({ success: true, id: meta.last_row_id, sku });
 			}
@@ -1320,13 +2318,13 @@ export default {
 			if (url.pathname.startsWith("/diy/products/") && request.method === "PUT") {
 				const id = url.pathname.split("/diy/products/")[1];
 				const body = await request.json() as any;
-				const { name, name_th, description, price_1, price_2, price_3, images, stock } = body;
+				const { name, name_th, description, price_1, price_2, price_3, images } = body;
 
 				const serializedImages = JSON.stringify(images || []);
 
 				await env.DB.prepare(
-					"UPDATE diy_products SET name=?, name_th=?, description=?, price_1=?, price_2=?, price_3=?, images=?, stock=? WHERE id=?"
-				).bind(name, name_th, description, price_1 || 0, price_2 || 0, price_3 || 0, serializedImages, stock || 0, id).run();
+					"UPDATE diy_products SET name=?, name_th=?, description=?, price_1=?, price_2=?, price_3=?, images=? WHERE id=?"
+				).bind(name, name_th, description, price_1 || 0, price_2 || 0, price_3 || 0, serializedImages, id).run();
 
 				return corsResponse({ success: true });
 			}
@@ -1338,10 +2336,9 @@ export default {
 					await deleteR2Images(env.IMAGES, imageKeys);
 					// Set referencing order_items product_id to NULL to preserve order history without violating FK constraints
 					await env.DB.prepare("UPDATE order_items SET product_id = NULL WHERE product_id = ?").bind(id).run();
-					// Explicitly clean up related images and stock history
+					// Explicitly clean up related images
 					await env.DB.prepare("DELETE FROM product_images WHERE product_id = ?").bind(id).run();
 					await env.DB.prepare("DELETE FROM product_variants WHERE product_id = ?").bind(id).run();
-					await env.DB.prepare("DELETE FROM stock_history WHERE product_id = ?").bind(id).run();
 					// Delete standard product
 					await env.DB.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
 					return corsResponse({ success: true });

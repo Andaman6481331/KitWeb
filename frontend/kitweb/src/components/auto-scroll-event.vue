@@ -1,39 +1,30 @@
 <script setup>
-import { ref } from 'vue';
 import { getUtilsUrl } from '@/services/api';
 
-const isPaused = ref(false);
+// One source of truth; the template renders it twice to make the loop seamless.
+const cards = [
+    'shop-card01-large.webp',
+    'shop-card02-large.webp',
+    'shop-card03-large.webp',
+    'shop-card04-large.webp',
+];
 </script>
 <template>
     <div class="banner-section">
-        <!-- Alternative: Reverse Direction Banner -->
-        <div class="scroll-banner" :class="{ paused: isPaused }">
+        <div class="scroll-banner">
             <div class="scroll-track">
+                <div class="scroll-set">
+                    <div v-for="src in cards" :key="src" class="banner-item">
+                        <img :src="getUtilsUrl(src)" alt="" loading="lazy" />
+                    </div>
+                </div>
 
-                <!-- Duplicate set -->
-                <div class="banner-item">
-                    <img :src="getUtilsUrl('shop-card01-large.webp')" alt="" />
-                </div>
-                <div class="banner-item">
-                    <img :src="getUtilsUrl('shop-card02-large.webp')" alt="" />
-                </div>
-                <div class="banner-item">
-                    <img :src="getUtilsUrl('shop-card03-large.webp')" alt="" />
-                </div>
-                <div class="banner-item">
-                    <img :src="getUtilsUrl('shop-card04-large.webp')" alt="" />
-                </div>
-                <div class="banner-item">
-                    <img :src="getUtilsUrl('shop-card01-large.webp')" alt="" />
-                </div>
-                <div class="banner-item">
-                    <img :src="getUtilsUrl('shop-card02-large.webp')" alt="" />
-                </div>
-                <div class="banner-item">
-                    <img :src="getUtilsUrl('shop-card03-large.webp')" alt="" />
-                </div>
-                <div class="banner-item">
-                    <img :src="getUtilsUrl('shop-card04-large.webp')" alt="" />
+                <!-- The second copy is what makes the loop seamless. Hidden from
+                     assistive tech so the same four images are not announced twice. -->
+                <div class="scroll-set" aria-hidden="true">
+                    <div v-for="src in cards" :key="`dup-${src}`" class="banner-item">
+                        <img :src="getUtilsUrl(src)" alt="" loading="lazy" />
+                    </div>
                 </div>
             </div>
         </div>
@@ -41,17 +32,21 @@ const isPaused = ref(false);
 </template>
 
 <style scoped>
-/* Scrolling Banner Container */
-* {
-    user-select: none;
+/* The containing block. Without it the track's own width escapes the page on
+   narrow viewports. */
+.banner-section {
+    overflow: hidden;
+    max-width: 100%;
 }
 
 .scroll-banner {
+    --sb-gap: clamp(10px, 2.5vw, 20px);
     width: 100%;
     overflow: hidden;
     position: relative;
     margin-top: 24px;
     margin-bottom: 24px;
+    user-select: none;
 }
 
 .scroll-banner::before,
@@ -59,115 +54,84 @@ const isPaused = ref(false);
     content: '';
     position: absolute;
     top: 0;
-    width: 100px;
+    /* A fixed 100px ate 200px of a 500px screen. */
+    width: clamp(24px, 8vw, 100px);
     height: 100%;
     z-index: 10;
     pointer-events: none;
 }
 
+/* Matches .diy-page on EventPage; the old #f8f9fa left a visible seam. */
 .scroll-banner::before {
     left: 0;
-    background: linear-gradient(to right, #f8f9fa, transparent);
+    background: linear-gradient(to right, #fafafa, transparent);
 }
 
 .scroll-banner::after {
     right: 0;
-    background: linear-gradient(to left, #f8f9fa, transparent);
+    background: linear-gradient(to left, #fafafa, transparent);
 }
 
 /* Scroll Track */
 .scroll-track {
     display: flex;
-    gap: 20px;
+    gap: var(--sb-gap);
+    width: max-content;
     animation: scroll 30s linear infinite;
-    width: fit-content;
+    will-change: transform;
+    backface-visibility: hidden;
 }
 
-.scroll-banner.reverse .scroll-track {
-    animation: scrollReverse 30s linear infinite;
+.scroll-set {
+    display: flex;
+    gap: var(--sb-gap);
 }
 
-/* Scroll Animations */
+/* Two equal sets plus the one gap between them: a bare -50% lands half a gap
+   short and visibly jumps on every loop. */
 @keyframes scroll {
-    0% {
-        transform: translateX(0);
-    }
-
-    100% {
-        transform: translateX(-50%);
-    }
+    from { transform: translateX(0); }
+    to { transform: translateX(calc(-50% - var(--sb-gap) / 2)); }
 }
 
-/* Banner Item */
+/* Banner Item — fluid, and the same portrait shape at every width. The old
+   fixed sizes flipped these portrait shop cards to 200x120 landscape on mobile
+   while object-fit stayed `cover`, which cropped them beyond recognition. */
 .banner-item {
     flex-shrink: 0;
-    width: 350px;
-    height: 500px;
+    width: clamp(140px, 42vw, 300px);
+    aspect-ratio: 7 / 10;
     border-radius: 20px;
     overflow: hidden;
     position: relative;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-    cursor: pointer;
 }
 
 .banner-item img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.3s ease;
+    display: block;
 }
 
-/* Overlay */
-.overlay {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
-    padding: 16px;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-
-.label {
-    color: white;
-    font-size: 0.95rem;
-    font-weight: 600;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .banner-header {
-        flex-direction: column;
-        gap: 16px;
-        text-align: center;
+/* Touch and reduced-motion both get a rail they can move themselves — there is
+   no hover to pause the drift with. */
+@media (max-width: 768px), (prefers-reduced-motion: reduce) {
+    .scroll-banner {
+        overflow-x: auto;
+        scroll-snap-type: x proximity;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
     }
 
-    .banner-header h3 {
-        font-size: 1.5rem;
-    }
-
-    .banner-item {
-        width: 200px;
-        height: 120px;
-    }
-
-    .scroll-track {
-        gap: 12px;
-    }
-}
-
-@media (max-width: 480px) {
-    .banner-item {
-        width: 160px;
-        height: 100px;
-    }
+    .scroll-banner::-webkit-scrollbar { display: none; }
 
     .scroll-banner::before,
-    .scroll-banner::after {
-        width: 50px;
-    }
+    .scroll-banner::after { display: none; }
+
+    .scroll-track { animation: none; }
+
+    .banner-item { scroll-snap-align: start; }
 }
 </style>

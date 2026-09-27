@@ -1,37 +1,58 @@
 <script setup>
-import ProductStock from '../components/products-stock.vue';
 import DiyProductKit from '../components/diy-product-kit.vue';
 import CategoryView from '../views/CategoryView.vue';
-import { getUtilsUrl } from '@/services/api';
+import ProductPage from '../views/ProductPage.vue';
+import InfoBanner from '../components/info-banner.vue';
+import SectionNav from '../components/section-nav.vue';
+import BreadcrumbBar from '../components/breadcrumb-bar.vue';
 import { useRoute, useRouter } from 'vue-router';
 import { computed, ref } from 'vue';
-import { codeToPath, defaultLang } from '@/utils/localeRoutes';
+import { defaultLang } from '@/utils/localeRoutes';
+import { catalogGroups } from '@/utils/catalogCategories';
+import { scrollIntent } from '@/router';
 import { useI18n } from 'vue-i18n';
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const route = useRoute();
 const router = useRouter();
 
 const currentLang = computed(() => route.params.lang || defaultLang);
-const currentCategory = computed(() => route.params.category || "needles");
+const currentCategory = computed(() => route.params.category || "all");
+
+// A product slug turns this route into a product page: the grid, its sidebar and
+// the DIY block step aside so the product gets the whole page. The route itself
+// is unchanged, which is what keeps every existing link and the canonical valid.
+// ProductPage draws its own breadcrumb, since only it knows the product's name.
+const isProductView = computed(() => Boolean(route.params.productSlug));
+
+// Group keys are camelCase, raw backend slugs lowercase. Fall back to the raw
+// value rather than printing a missing key path at the user.
+const tCategory = (key) => {
+    if (!key) return '';
+    const raw = String(key).trim();
+    if (te(`categories.${raw}`, 'en')) return t(`categories.${raw}`);
+    const lower = raw.toLowerCase();
+    if (te(`categories.${lower}`, 'en')) return t(`categories.${lower}`);
+    return key;
+};
+
+const crumbs = computed(() => {
+    const items = [{ label: t('nav.home'), to: { name: 'home', params: { lang: currentLang.value } } }];
+    if (currentCategory.value === 'all') {
+        items.push({ label: t('nav.products') });
+        return items;
+    }
+    items.push({
+        label: t('nav.products'),
+        to: { name: 'catalog', params: { lang: currentLang.value, category: 'all' } }
+    });
+    items.push({ label: tCategory(currentCategory.value) });
+    return items;
+});
 
 const sortBy = ref('popular');
 const sidebarOpen = ref(false);
-
-const categories = [
-  'yarn', 'needles', 'thread', 'tools',
-  'beads', 'decorative', 'flora'
-];
-
-const categoryIcons = {
-  yarn: 'color-wand-outline',
-  needles: 'cut-outline',
-  thread: 'git-network-outline',
-  tools: 'construct-outline',
-  beads: 'radio-button-on-outline',
-  decorative: 'sparkles-outline',
-  flora: 'leaf-outline',
-};
+const sortDropdownOpen = ref(false);
 
 const sortOptions = computed(() => [
   { value: 'popular', label: t('catalog.sortPopular') },
@@ -41,27 +62,35 @@ const sortOptions = computed(() => [
 ]);
 
 const selectCategory = (cat) => {
+  // Flag the sidebar-initiated navigation so scrollBehavior scrolls to the
+  // category bar (not the top). Only when the category actually changes, so a
+  // no-op re-select doesn't leave a stale flag for the next navigation.
+  if (cat !== currentCategory.value) {
+    scrollIntent.toCategoryBar = true;
+  }
   router.push({
     name: 'catalog',
     params: { lang: currentLang.value, category: cat }
   });
 };
+
+const sections = computed(() => [
+  { id: 'catalog-material', label: t('catalog.nav.material') },
+  { id: 'catalog-diy',      label: t('catalog.nav.diy') },
+]);
 </script>
 
 <template>
-    <!-- Preload hero image -->
-    <img :src="getUtilsUrl('shop06-large.webp')" fetchpriority="high" aria-hidden="true"
-        style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">
+    <!-- Info Banner -->
+    <InfoBanner :badge="$t('catalog.bannerBadge')" :text="$t('catalog.bannerText')" />
 
-    <!-- Page Header -->
-    <div class="catalog-header" :style="{ backgroundImage: `url(${getUtilsUrl('shop06-large.webp')})` }">
-        <div class="overlay"></div>
-        <div class="header-content">
-            <span class="since-badge" v-reveal delay="0.2s">{{ $t('catalog.since') }}</span>
-            <h1 class="catalog-title" v-reveal>{{ $t('catalog.title') }}</h1>
-            <p class="catalog-subtitle" v-reveal delay="0.6s">{{ $t('catalog.subtitle') }}</p>
-        </div>
-    </div>
+    <!-- Product page: the grid, sidebar and DIY block are not rendered here. -->
+    <ProductPage v-if="isProductView" />
+
+    <template v-else>
+    <!-- Breadcrumb bar. Replaces the old photo hero: the category panel below
+         already titles the page, so this slot is spent on navigation instead. -->
+    <BreadcrumbBar :items="crumbs" />
 
     <!-- Mobile filter bar -->
     <div class="mobile-filter-bar">
@@ -69,14 +98,14 @@ const selectCategory = (cat) => {
             <ion-icon name="funnel-outline"></ion-icon>
             {{ $t('catalog.filter') || 'Filter & Categories' }}
         </button>
-        <span class="mobile-current-cat">{{ $t(`categories.${currentCategory}`) }}</span>
+        <span class="mobile-current-cat">{{ tCategory(currentCategory) }}</span>
     </div>
 
     <!-- Sidebar overlay (mobile) -->
     <div v-if="sidebarOpen" class="sidebar-overlay" @click="sidebarOpen = false"></div>
 
     <!-- Main layout: sidebar + content -->
-    <div class="catalog-layout">
+    <div id="catalog-material" class="catalog-layout catalog-anchor">
 
         <!-- Sidebar -->
         <aside class="catalog-sidebar" :class="{ open: sidebarOpen }">
@@ -86,31 +115,46 @@ const selectCategory = (cat) => {
 
             <!-- Category Navigation -->
             <div class="sidebar-section">
-                <h3 class="sidebar-heading">{{ $t('catalog.allCategories') || 'Categories' }}</h3>
+                <div class="sidebar-heading-row">
+                    <h3 class="sidebar-heading">{{ $t('catalog.allCategories') || 'Categories' }}</h3>
+                    <div class="sort-dropdown-wrapper">
+                        <button
+                            class="sort-btn"
+                            :class="{ active: sortBy !== 'popular' }"
+                            :title="$t('catalog.sortBy')"
+                            @click="sortDropdownOpen = !sortDropdownOpen"
+                        >
+                            <ion-icon name="swap-vertical-outline"></ion-icon>
+                        </button>
+                        <transition name="sort-drop">
+                            <div v-if="sortDropdownOpen" class="sort-dropdown-menu" @click.stop>
+                                <label
+                                    v-for="opt in sortOptions"
+                                    :key="opt.value"
+                                    class="sort-dropdown-option"
+                                    @click="sortDropdownOpen = false"
+                                >
+                                    <input type="radio" :value="opt.value" v-model="sortBy">
+                                    <span>{{ opt.label }}</span>
+                                </label>
+                            </div>
+                        </transition>
+                    </div>
+                </div>
                 <ul class="sidebar-category-list">
-                    <li v-for="cat in categories" :key="cat">
+                    <li v-for="group in catalogGroups" :key="group.key">
                         <button
                             class="sidebar-cat-item"
-                            :class="{ active: currentCategory === cat }"
-                            @click="selectCategory(cat); sidebarOpen = false"
+                            :class="{ active: currentCategory === group.key }"
+                            @click="selectCategory(group.key); sidebarOpen = false"
                         >
-                            <ion-icon :name="categoryIcons[cat] || 'grid-outline'" class="cat-icon"></ion-icon>
-                            <span>{{ $t(`categories.${cat}`) }}</span>
+                            <ion-icon class="sidebar-cat-icon" v-if="group.svgSrc" :src="group.svgSrc"></ion-icon>
+                            <ion-icon class="sidebar-cat-icon" v-else-if="group.icon" :name="group.icon"></ion-icon>
+                            <span>{{ $t(`categories.${group.key}`) }}</span>
                             <ion-icon name="chevron-forward-outline" class="arrow-icon"></ion-icon>
                         </button>
                     </li>
                 </ul>
-            </div>
-
-            <!-- Sort Section -->
-            <div class="sidebar-section">
-                <h3 class="sidebar-heading">{{ $t('catalog.sortBy') || 'Sort By' }}</h3>
-                <div class="sidebar-sort-options">
-                    <label v-for="opt in sortOptions" :key="opt.value" class="sort-option">
-                        <input type="radio" :value="opt.value" v-model="sortBy">
-                        <span>{{ opt.label }}</span>
-                    </label>
-                </div>
             </div>
         </aside>
 
@@ -125,74 +169,21 @@ const selectCategory = (cat) => {
     </div>
 
     <!-- DIY Kit -->
-    <div class="section-header" v-reveal>
-        <span class="section-tag">{{ $t('diyKits.tag') }}</span>
-        <h2 class="section-title">{{ $t('diyKits.title') }}</h2>
-        <p class="section-description">{{ $t('diyKits.description') }}</p>
+    <div id="catalog-diy" class="catalog-anchor">
+        <div class="section-header" v-reveal>
+            <span class="section-tag">{{ $t('diyKits.tag') }}</span>
+            <h2 class="section-title">{{ $t('diyKits.title') }}</h2>
+            <p class="section-description">{{ $t('diyKits.description') }}</p>
+        </div>
+        
+        <DiyProductKit />
     </div>
-    <DiyProductKit />
+    <!-- Section Navigator: right-side mini-map rail -->
+    <SectionNav :sections="sections" />
+    </template>
 </template>
 
 <style scoped>
-/* ── Page Header ─────────────────────────────────────── */
-.catalog-header {
-    padding: 120px 5% 100px 5%;
-    background-size: cover;
-    background-position: center;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-}
-
-.overlay {
-    position: absolute;
-    inset: 0;
-    background:
-        radial-gradient(
-            circle at center,
-            rgba(250, 244, 236, 0.838) 0%,
-            rgba(80, 60, 45, 0.18) 60%,
-            rgba(40, 28, 20, 0.337) 100%
-        );
-    z-index: 1;
-}
-
-.header-content {
-    position: relative;
-    z-index: 2;
-    max-width: 1000px;
-    margin: 0 auto;
-}
-
-.since-badge {
-    display: block;
-    font-family: 'Work Sans', sans-serif;
-    font-size: 14px;
-    font-weight: 700;
-    color: #604539e0;
-    letter-spacing: 4px;
-    margin-bottom: 15px;
-    text-transform: uppercase;
-}
-
-.catalog-title {
-    font-family: 'ZCOOL XiaoWei', serif;
-    font-size: 4rem;
-    color: #604539;
-    margin: 0 auto 25px;
-    line-height: 1.1;
-    font-weight: 400;
-}
-
-.catalog-subtitle {
-    font-family: 'Work Sans', sans-serif;
-    font-size: 1.35rem;
-    color: #604539e0;
-    max-width: 800px;
-    margin: 0 auto;
-    line-height: 1.6;
-}
-
 /* ── Mobile filter bar ───────────────────────────────── */
 .mobile-filter-bar {
     display: none;
@@ -238,12 +229,13 @@ const selectCategory = (cat) => {
 /* ── Layout ──────────────────────────────────────────── */
 .catalog-layout {
     display: flex;
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 24px 20px;
-    gap: 20px;
+    padding: 24px 10px;
     align-items: flex-start;
     background: #FBF7F2;
+}
+
+.catalog-anchor{
+    scroll-margin-top: 100px;
 }
 
 /* ── Sidebar ─────────────────────────────────────────── */
@@ -253,19 +245,10 @@ const selectCategory = (cat) => {
     position: sticky;
     top: 80px;
     background: #fff;
-    border-radius: 12px;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
-    overflow: hidden;
-    max-height: calc(100vh - 100px);
-    overflow-y: auto;
-}
-
-.catalog-sidebar::-webkit-scrollbar {
-    width: 4px;
-}
-.catalog-sidebar::-webkit-scrollbar-thumb {
-    background: #d4b896;
-    border-radius: 4px;
+    /* overflow: hidden;
+    max-height: calc(100vh - 100px); */
+    /* overflow-y: auto; */
 }
 
 .sidebar-close-btn {
@@ -296,8 +279,82 @@ const selectCategory = (cat) => {
     color: #9e8272;
     text-transform: uppercase;
     letter-spacing: 1.5px;
-    margin: 0 0 10px 0;
+    margin: 0;
 }
+
+.sidebar-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.sort-dropdown-wrapper {
+    position: relative;
+}
+
+.sort-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: 1.5px solid #e4d5c6;
+    border-radius: 6px;
+    background: transparent;
+    color: #9e8272;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.sort-btn:hover,
+.sort-btn.active {
+    background: #DD876E;
+    border-color: #DD876E;
+    color: #fff;
+}
+
+.sort-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 180px;
+    background: #fff;
+    border: 1px solid #f0e6da;
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    padding: 6px;
+    z-index: 300;
+}
+
+.sort-dropdown-option {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #5d4037;
+    border-radius: 7px;
+    transition: background 0.13s;
+}
+
+.sort-dropdown-option:hover {
+    background: #FDF3E6;
+}
+
+.sort-dropdown-option input[type="radio"] {
+    accent-color: #DD876E;
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.sort-drop-enter-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+.sort-drop-leave-active { transition: opacity 0.1s ease, transform 0.1s ease; }
+.sort-drop-enter-from, .sort-drop-leave-to { opacity: 0; transform: translateY(-4px); }
 
 /* ── Category list ───────────────────────────────────── */
 .sidebar-category-list {
@@ -336,6 +393,26 @@ const selectCategory = (cat) => {
     font-weight: 600;
 }
 
+.sidebar-cat-item.active:hover {
+    background: #DD876E;
+    color: #fff;
+}
+
+/* The category icons are external SVGs with #eb4034 baked in (floras strokes it
+   rather than filling), and ion-icon injects them into its shadow DOM — so
+   neither `color` nor a `fill` rule from out here can reach them. A filter can:
+   it works on the rendered pixels, so it flattens fill- and stroke-drawn icons
+   alike. Red on the terracotta active row reads as almost the same tone, so the
+   icon goes white to match its label. */
+.sidebar-cat-icon {
+    flex-shrink: 0;
+    transition: filter 0.18s;
+}
+
+.sidebar-cat-item.active .sidebar-cat-icon {
+    filter: brightness(0) invert(1);
+}
+
 .cat-icon {
     font-size: 16px;
     flex-shrink: 0;
@@ -351,35 +428,6 @@ const selectCategory = (cat) => {
     opacity: 0.7;
 }
 
-/* ── Sort options ────────────────────────────────────── */
-.sidebar-sort-options {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.sort-option {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 8px 6px;
-    cursor: pointer;
-    font-size: 13.5px;
-    color: #5d4037;
-    border-radius: 6px;
-    transition: background 0.15s;
-}
-
-.sort-option:hover {
-    background: #FDF3E6;
-}
-
-.sort-option input[type="radio"] {
-    accent-color: #DD876E;
-    width: 15px;
-    height: 15px;
-    cursor: pointer;
-}
 
 /* ── Main content ────────────────────────────────────── */
 .catalog-main {
@@ -432,12 +480,14 @@ const selectCategory = (cat) => {
 
     .catalog-sidebar {
         position: fixed;
-        top: 0;
+        /* Sit flush below the sticky navbar (which wraps to a taller, variable
+           height on mobile) instead of overflowing behind it. */
+        top: var(--nav-h, 80px);
         left: -290px;
         width: 280px;
-        height: 100vh;
-        max-height: 100vh;
-        border-radius: 0;
+        height: calc(100dvh - var(--nav-h, 80px));
+        max-height: calc(100dvh - var(--nav-h, 80px));
+        overflow-y: auto;
         z-index: 99;
         transition: left 0.28s ease;
         box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
@@ -453,23 +503,10 @@ const selectCategory = (cat) => {
 
     .catalog-layout {
         padding: 12px;
-    }
+    } 
 }
 
 @media (max-width: 768px) {
-    .catalog-header {
-        height: 40vh;
-        padding: 50px 5%;
-    }
-
-    .catalog-title {
-        font-size: 2.5rem;
-    }
-
-    .catalog-subtitle {
-        font-size: 1rem;
-    }
-
     .section-title {
         font-size: 36px;
     }

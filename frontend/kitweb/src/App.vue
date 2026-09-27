@@ -1,12 +1,14 @@
 <script setup>
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { useHead } from '@unhead/vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale } from './i18n'
 import { authStore } from './stores/authStore'
+import { cartStore } from './stores/cartStore'
 import { api, getUtilsUrl } from './services/api';
 import { localizedRoute, codeToPath, pathToCode } from './utils/localeRoutes'
+import { catalogGroups } from './utils/catalogCategories'
 import { absoluteUrl } from './utils/siteUrl'
 
 const SEO_LOCALES = ['en', 'th', 'zh', 'ja']
@@ -22,6 +24,7 @@ const pageTitleMap = {
   catalog: 'categories.title',
   'category-products': 'categories.title',
   contactus: 'contact.title',
+  about: 'about.title',
   login: 'admin.loginTitle',
   event: 'events.heroTagline',
   partners: 'partner.heroTitle',
@@ -35,6 +38,7 @@ const pageDescriptionMap = {
   catalog: 'home.heroSubtitle',
   'category-products': 'home.heroSubtitle',
   contactus: 'contact.subtitle',
+  about: 'about.subtitle',
   login: 'auth.signInSubtitle',
   event: 'events.heroSubtitle',
   partners: 'partner.heroSubtitle',
@@ -79,6 +83,8 @@ const pageSeoTitle = computed(() => {
       return 'ไหมพรม อุปกรณ์งานฝีมือ ขายส่งสำเพ็ง ราคาถูก | กิจเจริญ สำเพ็ง';
     case 'contactus':
       return 'ติดต่อสอบถาม สั่งซื้อไหมพรม ริบบิ้น ลูกปัด | กิจเจริญ สำเพ็ง';
+    case 'about':
+      return 'เกี่ยวกับเรา ร้านอุปกรณ์งานฝีมือ ตั้งแต่ปี 2527 | กิจเจริญ สำเพ็ง';
     case 'event':
       return 'เวิร์คช็อป DIY และกิจกรรมงานฝีมือ | กิจเจริญ สำเพ็ง';
     case 'partners':
@@ -101,6 +107,8 @@ switch (route) {
     return 'Wholesale Yarn & Craft Supplies Sampeng | Kitcharoen';
   case 'contactus':
     return 'Contact Us for Wholesale Yarn, Ribbons & Beads | Kitcharoen';
+  case 'about':
+    return 'About Us - Family Craft Supply Shop Since 1984 | Kitcharoen';
   case 'event':
     return 'DIY Craft Workshops & Events in Bangkok | Kitcharoen';
   case 'partners':
@@ -199,8 +207,13 @@ const changeLanguage = (langCode) => {
   }).catch(() => {})
 }
 
+// Hover to open, like the Catalog and Company menus. The click toggle stays: on a
+// touch screen there is no hover, and a tap fires mouseenter then click, so
+// without it the first tap would open the menu and the click would shut it again.
 const toggleLanguageMenu = () => {
   showLanguageMenu.value = !showLanguageMenu.value
+  showCatalogMenu.value = false
+  showCompanyMenu.value = false
 }
 
 const handleLogout = () => {
@@ -250,42 +263,168 @@ const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
 // ── Dropdown menus ────────────────────────────
 const showCatalogMenu = ref(false)
 const showCompanyMenu = ref(false)
+const showCartMenu = ref(false)
 let catalogTimer = null
 let companyTimer = null
+let cartTimer = null
+let languageTimer = null
 
-const navCategories = [
-  { key: 'yarn',       icon: 'color-wand-outline' },
-  { key: 'needles',    icon: 'cut-outline' },
-  { key: 'thread',     icon: 'git-network-outline' },
-  { key: 'tools',      icon: 'construct-outline' },
-  { key: 'beads',      icon: 'radio-button-on-outline' },
-  { key: 'decorative', icon: 'sparkles-outline' },
-  { key: 'flora',      icon: 'leaf-outline' },
-]
+// ── Mini-cart ─────────────────────────────────
+const cartItems = computed(() => cartStore.cart)
+const cartCount = computed(() => cartStore.cartItemCount)
+const cartTotal = computed(() => cartStore.cartTotal)
+const cartItemName = (item) => (locale.value === 'th' && item.name_th) ? item.name_th : item.name
 
-const openCatalog  = () => { clearTimeout(catalogTimer); showCatalogMenu.value = true }
-const closeCatalog = () => { catalogTimer = setTimeout(() => { showCatalogMenu.value = false }, 130) }
+// Shared with the catalog sidebar so the dropdown stays in sync with the
+// display groups (incl. merged groups like Thread & String / Scissors & Knives).
+const navCategories = catalogGroups
+
+const openCatalog  = () => {
+  if (!canHover()) return
+  clearTimeout(catalogTimer); showCatalogMenu.value = true
+}
+const closeCatalog = () => {
+  if (!canHover()) return
+  catalogTimer = setTimeout(() => { showCatalogMenu.value = false }, 130)
+}
 const toggleCatalog = () => { showCatalogMenu.value = !showCatalogMenu.value; showCompanyMenu.value = false }
 
-const openCompany  = () => { clearTimeout(companyTimer); showCompanyMenu.value = true }
-const closeCompany = () => { companyTimer = setTimeout(() => { showCompanyMenu.value = false }, 130) }
+const openCompany  = () => {
+  if (!canHover()) return
+  clearTimeout(companyTimer); showCompanyMenu.value = true
+}
+const closeCompany = () => {
+  if (!canHover()) return
+  companyTimer = setTimeout(() => { showCompanyMenu.value = false }, 130)
+}
 const toggleCompany = () => { showCompanyMenu.value = !showCompanyMenu.value; showCatalogMenu.value = false }
 
-const closeAllMenus = () => { showCatalogMenu.value = false; showCompanyMenu.value = false }
-const isCompanyActive = computed(() => ['partners', 'faq'].includes(String(route.name)))
+// Hover only where hover exists. On a touch device the pointer never leaves, so
+// mouseenter would latch the menu open with no way to close it but the toggle.
+const canHover = () => typeof window !== 'undefined'
+  && window.matchMedia?.('(hover: hover)').matches
+const openLanguage  = () => {
+  if (!canHover()) return
+  clearTimeout(languageTimer)
+  showLanguageMenu.value = true
+  showCatalogMenu.value = false
+  showCompanyMenu.value = false
+}
+const closeLanguage = () => {
+  if (!canHover()) return
+  languageTimer = setTimeout(() => { showLanguageMenu.value = false }, 130)
+}
+
+const openCart  = () => {
+  if (!canHover()) return
+  clearTimeout(cartTimer); showCartMenu.value = true
+}
+const closeCart = () => {
+  if (!canHover()) return
+  cartTimer = setTimeout(() => { showCartMenu.value = false }, 130)
+}
+
+const closeAllMenus = () => { showCatalogMenu.value = false; showCompanyMenu.value = false; showCartMenu.value = false; showLanguageMenu.value = false }
+const isCompanyActive = computed(() => ['about', 'partners', 'faq', 'contactus'].includes(String(route.name)))
+
+// ── Mobile drawer ─────────────────────────────
+// Below 1024px the navbar is a single 64px bar and everything else lives in a
+// slide-in panel. The desktop dropdowns are display:none there, so the drawer
+// re-uses their data (navCategories, languages) rather than a second source.
+const showMobileNav = ref(false)
+const drawerCatalogOpen = ref(false)
+const drawerEl = ref(null)
+const burgerEl = ref(null)
+
+const openMobileNav = () => {
+  closeAllMenus()
+  showMobileNav.value = true
+}
+const closeMobileNav = () => {
+  showMobileNav.value = false
+  drawerCatalogOpen.value = false
+}
+const toggleMobileNav = () => {
+  showMobileNav.value ? closeMobileNav() : openMobileNav()
+}
+
+// Language rows inside the drawer: switch, then dismiss the whole panel.
+const changeLanguageMobile = (code) => {
+  changeLanguage(code)
+  closeMobileNav()
+}
+
+// Any navigation closes the drawer, including taps on the route we are already on.
+watch(() => route.fullPath, closeMobileNav)
+
+// Lock the page behind the drawer. Storing the scroll position and restoring it
+// avoids the jump-to-top that a bare `overflow: hidden` on body causes on iOS.
+let lockedScrollY = 0
+watch(showMobileNav, (open) => {
+  if (typeof document === 'undefined') return
+  const body = document.body
+  if (open) {
+    lockedScrollY = window.scrollY
+    body.style.position = 'fixed'
+    body.style.top = `-${lockedScrollY}px`
+    body.style.left = '0'
+    body.style.right = '0'
+    body.style.overflow = 'hidden'
+    nextTick(() => {
+      drawerEl.value?.querySelector('a, button')?.focus()
+    })
+  } else {
+    body.style.position = ''
+    body.style.top = ''
+    body.style.left = ''
+    body.style.right = ''
+    body.style.overflow = ''
+    window.scrollTo(0, lockedScrollY)
+    burgerEl.value?.focus()
+  }
+})
+
+const handleNavKeydown = (e) => {
+  if (e.key === 'Escape' && showMobileNav.value) closeMobileNav()
+}
+
+// Publish the navbar's live height as a global --nav-h CSS variable. The navbar
+// wraps to a taller, variable height on mobile (and shifts with language), so
+// pages that overlay it (e.g. the catalog drawer) can offset by var(--nav-h)
+// instead of guessing a fixed pixel value.
+const navBarEl = ref(null)
+let navResizeObserver = null
+const syncNavHeight = () => {
+  const h = navBarEl.value?.offsetHeight
+  if (h) document.documentElement.style.setProperty('--nav-h', `${h}px`)
+}
 
 onMounted(() => {
   document.addEventListener('click', closeAllMenus)
+  document.addEventListener('keydown', handleNavKeydown)
+  syncNavHeight()
+  if (navBarEl.value && 'ResizeObserver' in window) {
+    navResizeObserver = new ResizeObserver(syncNavHeight)
+    navResizeObserver.observe(navBarEl.value)
+  }
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', closeAllMenus)
+  document.removeEventListener('keydown', handleNavKeydown)
+  navResizeObserver?.disconnect()
+  // The drawer locks body scroll; unmounting with it open would strand the page.
+  document.body.style.position = ''
+  document.body.style.top = ''
+  document.body.style.left = ''
+  document.body.style.right = ''
+  document.body.style.overflow = ''
 })
 </script>
 
 <template>
   <div>
-    <div class="NavBar">
+    <div class="NavBar" ref="navBarEl">
       <!-- Left: Logo -->
       <div class="nav-left">
         <router-link :to="{ name: 'home', params: { lang: currentLang } }"  @click="scrollToTop">
@@ -302,7 +441,7 @@ onUnmounted(() => {
         <!-- Catalog dropdown -->
         <div class="nav-item-wrap" @mouseenter="openCatalog" @mouseleave="closeCatalog" @click.stop>
           <router-link
-            :to="{ name: 'catalog', params: { lang: currentLang, category: 'needles' } }"
+            :to="{ name: 'catalog', params: { lang: currentLang, category: 'all' } }"
             class="nav-link nav-link-dd"
             active-class="active"
             @click="scrollToTop; closeAllMenus()"
@@ -323,8 +462,9 @@ onUnmounted(() => {
                   class="dd-cat-item"
                   @click="scrollToTop; closeAllMenus()"
                 >
-                  <ion-icon :name="cat.icon" class="dd-cat-icon"></ion-icon>
-                  <span>{{ $t(`categories.${cat.key}`) }}</span>
+                  <ion-icon v-if="cat.svgSrc" :src="cat.svgSrc"></ion-icon>
+                  <ion-icon v-else-if="cat.icon" :name="cat.icon"></ion-icon>
+                  <span style="text-align:left">{{ $t(`categories.${cat.key}`) }}</span>
                 </router-link>
               </div>
               <router-link
@@ -360,6 +500,18 @@ onUnmounted(() => {
           <Transition name="nav-dd">
             <div v-if="showCompanyMenu" class="dd-menu company-dd" @click.stop>
               <router-link
+                :to="{ name: 'about', params: { lang: currentLang } }"
+                class="dd-page-link"
+                active-class="dd-page-link-active"
+                @click="scrollToTop; closeAllMenus()"
+              >
+                <span class="dd-page-icon"><ion-icon name="storefront-outline"></ion-icon></span>
+                <span class="dd-page-text">
+                  <span class="dd-page-title">{{ $t('nav.about') }}</span>
+                  <span class="dd-page-desc">{{ $t('nav.aboutDesc') }}</span>
+                </span>
+              </router-link>
+              <router-link
                 :to="{ name: 'partners', params: { lang: currentLang } }"
                 class="dd-page-link"
                 active-class="dd-page-link-active"
@@ -383,12 +535,21 @@ onUnmounted(() => {
                   <span class="dd-page-desc">{{ $t('nav.faqDesc') || 'Common questions answered' }}</span>
                 </span>
               </router-link>
+              <router-link
+                :to="{ name: 'contactus', params: { lang: currentLang } }"
+                class="dd-page-link"
+                active-class="dd-page-link-active"
+                @click="scrollToTop; closeAllMenus()"
+              >
+                <span class="dd-page-icon"><ion-icon name="mail-outline"></ion-icon></span>
+                <span class="dd-page-text">
+                  <span class="dd-page-title">{{ $t('nav.contactUs') }}</span>
+                  <span class="dd-page-desc">{{ $t('nav.contactUsDesc') || 'Get in touch with our team' }}</span>
+                </span>
+              </router-link>
             </div>
           </Transition>
         </div>
-
-        <!-- Contact Us -->
-        <router-link :to="{ name: 'contactus', params: { lang: currentLang } }" @click="scrollToTop; closeAllMenus()" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.contactUs') }}</router-link>
 
       </div>
 
@@ -396,34 +557,103 @@ onUnmounted(() => {
       <div class="nav-right" style="justify-content: center; align-items: center; text-align: center;">
 
         <div class="action-icons">
-          <div class="lang-globe" @click="toggleLanguageMenu">
+          <!-- .stop so the document-level click handler that closes every menu
+               doesn't fire on the same click that just opened this one. -->
+          <div
+            class="lang-globe"
+            @mouseenter="openLanguage"
+            @mouseleave="closeLanguage"
+            @click.stop="toggleLanguageMenu"
+          >
             <ion-icon name="globe-outline"></ion-icon>
             <span class="current-lang-code">{{ currentLanguage }}</span>
 
-            <!-- Language Dropdown -->
-            <transition name="dropdown-fade">
-              <div v-if="showLanguageMenu" class="lang-popup">
-                <div v-for="lang in languages" :key="lang.code" class="lang-item"
-                  :class="{ active: currentLanguage === lang.code }" @click.stop="changeLanguage(lang.code)">
-                  <span class="lang-flag">{{ lang.flag }}</span>
-                  {{ lang.label }}
-                </div>
+            <!-- Language dropdown. Same shell and row treatment as the Catalog and
+                 Company menus (dd-menu / dd-page-link), so the navbar has one
+                 dropdown design rather than two. -->
+            <transition name="nav-dd">
+              <div v-if="showLanguageMenu" class="dd-menu lang-dd">
+                <button
+                  v-for="lang in languages"
+                  :key="lang.code"
+                  type="button"
+                  class="dd-page-link lang-item"
+                  :class="{ 'dd-page-link-active': currentLanguage === lang.code }"
+                  :aria-current="currentLanguage === lang.code ? 'true' : undefined"
+                  @click.stop="changeLanguage(lang.code)"
+                >
+                  <span class="dd-page-icon lang-code">{{ lang.flag }}</span>
+                  <span class="dd-page-text">
+                    <span class="dd-page-title">{{ lang.label }}</span>
+                  </span>
+                  <ion-icon
+                    v-if="currentLanguage === lang.code"
+                    class="lang-check"
+                    name="checkmark-outline"
+                  ></ion-icon>
+                </button>
               </div>
             </transition>
           </div>
           <!-- <template v-if="isDev"> -->
-            <router-link v-if="authStore.isAuthenticated" :to="{ name: 'orderpage', params: { lang: currentLang } }" @click="scrollToTop" class="order-capsule">
-              {{ $t('nav.startOrder') }}
-            </router-link>
+            <!-- Cart mini-dropdown -->
+            <div class="nav-item-wrap cart-wrap" @mouseenter="openCart" @mouseleave="closeCart">
+              <router-link
+                class="cart-trigger"
+                :to="{ name: 'orderpage', params: { lang: currentLang } }"
+                :aria-label="$t('nav.shoppingCart')"
+                @click="scrollToTop(); closeAllMenus()"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0" />
+                </svg>
+                <span v-if="cartCount > 0" class="cart-count-badge">{{ cartCount }}</span>
+              </router-link>
+              <Transition name="nav-dd">
+                <div v-if="showCartMenu" class="dd-menu cart-dd" @click.stop>
+                  <div class="cart-dd-header">{{ $t('nav.shoppingCart') }}</div>
+
+                  <!-- Empty state -->
+                  <div v-if="cartItems.length === 0" class="cart-dd-empty">
+                    {{ $t('order.cartEmpty') }}
+                  </div>
+
+                  <!-- Items -->
+                  <template v-else>
+                    <div class="cart-dd-items">
+                      <div v-for="item in cartItems" :key="item.cartItemKey" class="cart-dd-item">
+                        <img :src="item.image" :alt="cartItemName(item)" class="cart-dd-thumb" />
+                        <div class="cart-dd-info">
+                          <span class="cart-dd-name">{{ cartItemName(item) }}</span>
+                          <span class="cart-dd-specs">{{ item.selectedSize }} • {{ item.selectedColor }}</span>
+                          <span class="cart-dd-price">฿{{ item.price }}</span>
+                        </div>
+                        <span class="cart-dd-qty">× {{ item.quantity }}</span>
+                      </div>
+                    </div>
+
+                    <div class="cart-dd-footer">
+                      <div class="cart-dd-subtotal">
+                        <span>{{ $t('order.subtotal') }}</span>
+                        <span class="cart-dd-total">฿{{ cartTotal }}</span>
+                      </div>
+                      <router-link
+                        :to="{ name: 'orderpage', params: { lang: currentLang } }"
+                        class="cart-dd-btn"
+                        @click="scrollToTop(); closeAllMenus()"
+                      >
+                        {{ $t('nav.goToCart') }}
+                      </router-link>
+                    </div>
+                  </template>
+                </div>
+              </Transition>
+            </div>
 
             <router-link v-if="!authStore.isAuthenticated" :to="{ name: 'login', params: { lang: currentLang } }" @click="scrollToTop" class="login-capsule">
               {{ $t('nav.login') }}
             </router-link>
             <div v-else class="logged-in-actions">
-              <router-link :to="{ name: 'orderpage', params: { lang: currentLang } }" @click="scrollToTop" class="login-capsule account-link">
-                <ion-icon name="person-circle-outline"></ion-icon>
-                <span>{{ authStore.user?.businessName || authStore.user?.ownerName || $t('nav.account') }}</span>
-              </router-link>
               <button class="logout-btn-nav" @click="handleLogout" :title="$t('order.logout')">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -435,7 +665,164 @@ onUnmounted(() => {
           <!-- </template> -->
         </div>
       </div>
+
+      <!-- Mobile: cart and hamburger. Its own row so .nav-right (which carries
+           the desktop dropdowns) can be hidden wholesale below 1024px. -->
+      <div class="nav-mobile-actions">
+        <router-link
+          class="cart-trigger mobile-cart"
+          :to="{ name: 'orderpage', params: { lang: currentLang } }"
+          :aria-label="$t('nav.shoppingCart')"
+          @click="closeMobileNav()"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0" />
+          </svg>
+          <span v-if="cartCount > 0" class="cart-count-badge">{{ cartCount }}</span>
+        </router-link>
+
+        <button
+          ref="burgerEl"
+          class="nav-burger"
+          type="button"
+          :class="{ open: showMobileNav }"
+          :aria-expanded="showMobileNav ? 'true' : 'false'"
+          aria-controls="mobile-drawer"
+          :aria-label="showMobileNav ? $t('nav.closeMenu') : $t('nav.openMenu')"
+          @click.stop="toggleMobileNav"
+        >
+          <span class="burger-line"></span>
+          <span class="burger-line"></span>
+          <span class="burger-line"></span>
+        </button>
+      </div>
     </div>
+
+    <!-- Scrim -->
+    <Transition name="drawer-fade">
+      <div v-if="showMobileNav" class="drawer-scrim" aria-hidden="true" @click="closeMobileNav"></div>
+    </Transition>
+
+    <!-- Mobile drawer -->
+    <Transition name="drawer-slide">
+      <nav
+        v-if="showMobileNav"
+        id="mobile-drawer"
+        ref="drawerEl"
+        class="mobile-drawer"
+        :aria-label="$t('nav.menu')"
+        @click.stop
+      >
+        <router-link
+          :to="{ name: 'home', params: { lang: currentLang } }"
+          class="drawer-link"
+          active-class="drawer-link-active"
+          exact-active-class="drawer-link-active"
+          @click="closeMobileNav"
+        >
+          <span class="dd-page-icon"><ion-icon name="home-outline"></ion-icon></span>
+          <span class="dd-page-title">{{ $t('nav.home') }}</span>
+        </router-link>
+
+        <!-- Products: accordion over the same 12 groups as the desktop dropdown -->
+        <button
+          type="button"
+          class="drawer-link drawer-accordion-trigger"
+          :aria-expanded="drawerCatalogOpen ? 'true' : 'false'"
+          @click="drawerCatalogOpen = !drawerCatalogOpen"
+        >
+          <span class="dd-page-icon"><ion-icon name="grid-outline"></ion-icon></span>
+          <span class="dd-page-title">{{ $t('nav.products') }}</span>
+          <svg class="drawer-chevron" :class="{ open: drawerCatalogOpen }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        <div v-show="drawerCatalogOpen" class="drawer-sublist">
+          <router-link
+            v-for="cat in navCategories"
+            :key="cat.key"
+            :to="{ name: 'catalog', params: { lang: currentLang, category: cat.key } }"
+            class="drawer-sublink"
+            @click="closeMobileNav"
+          >
+            <ion-icon v-if="cat.svgSrc" :src="cat.svgSrc"></ion-icon>
+            <ion-icon v-else-if="cat.icon" :name="cat.icon"></ion-icon>
+            <span>{{ $t(`categories.${cat.key}`) }}</span>
+          </router-link>
+          <router-link
+            :to="{ name: 'catalog', params: { lang: currentLang, category: 'all' } }"
+            class="drawer-sublink drawer-sublink-all"
+            @click="closeMobileNav"
+          >
+            {{ $t('nav.viewAll') }}
+            <ion-icon name="arrow-forward-outline"></ion-icon>
+          </router-link>
+        </div>
+
+        <router-link :to="{ name: 'event', params: { lang: currentLang } }" class="drawer-link" active-class="drawer-link-active" @click="closeMobileNav">
+          <span class="dd-page-icon"><ion-icon name="calendar-outline"></ion-icon></span>
+          <span class="dd-page-title">{{ $t('nav.events') }}</span>
+        </router-link>
+
+        <router-link :to="{ name: 'institutional-catalog', params: { lang: currentLang } }" class="drawer-link" active-class="drawer-link-active" @click="closeMobileNav">
+          <span class="dd-page-icon"><ion-icon name="business-outline"></ion-icon></span>
+          <span class="dd-page-title">{{ $t('nav.b2bCatalog') }}</span>
+        </router-link>
+
+        <div class="drawer-divider"></div>
+
+        <router-link :to="{ name: 'about', params: { lang: currentLang } }" class="drawer-link" active-class="drawer-link-active" @click="closeMobileNav">
+          <span class="dd-page-icon"><ion-icon name="storefront-outline"></ion-icon></span>
+          <span class="dd-page-title">{{ $t('nav.about') }}</span>
+        </router-link>
+        <router-link :to="{ name: 'partners', params: { lang: currentLang } }" class="drawer-link" active-class="drawer-link-active" @click="closeMobileNav">
+          <span class="dd-page-icon"><ion-icon name="people-outline"></ion-icon></span>
+          <span class="dd-page-title">{{ $t('nav.partners') }}</span>
+        </router-link>
+        <router-link :to="{ name: 'faq', params: { lang: currentLang } }" class="drawer-link" active-class="drawer-link-active" @click="closeMobileNav">
+          <span class="dd-page-icon"><ion-icon name="help-circle-outline"></ion-icon></span>
+          <span class="dd-page-title">{{ $t('nav.faq') }}</span>
+        </router-link>
+        <router-link :to="{ name: 'contactus', params: { lang: currentLang } }" class="drawer-link" active-class="drawer-link-active" @click="closeMobileNav">
+          <span class="dd-page-icon"><ion-icon name="mail-outline"></ion-icon></span>
+          <span class="dd-page-title">{{ $t('nav.contactUs') }}</span>
+        </router-link>
+
+        <div class="drawer-divider"></div>
+
+        <!-- Language: same rows as the desktop .lang-dd, same handler -->
+        <div class="drawer-section-label">{{ $t('nav.language') }}</div>
+        <div class="drawer-langs">
+          <button
+            v-for="lang in languages"
+            :key="lang.code"
+            type="button"
+            class="drawer-lang"
+            :class="{ 'drawer-lang-active': currentLanguage === lang.code }"
+            :aria-current="currentLanguage === lang.code ? 'true' : undefined"
+            @click="changeLanguageMobile(lang.code)"
+          >
+            <span class="drawer-lang-code">{{ lang.flag }}</span>
+            <span>{{ lang.label }}</span>
+          </button>
+        </div>
+
+        <div class="drawer-divider"></div>
+
+        <router-link
+          v-if="!authStore.isAuthenticated"
+          :to="{ name: 'login', params: { lang: currentLang } }"
+          class="drawer-login"
+          @click="closeMobileNav"
+        >
+          {{ $t('nav.login') }}
+        </router-link>
+        <button v-else type="button" class="drawer-login drawer-logout" @click="closeMobileNav(); handleLogout()">
+          {{ $t('order.logout') }}
+        </button>
+      </nav>
+    </Transition>
 
     <RouterView />
 
@@ -450,7 +837,7 @@ onUnmounted(() => {
   <h4>{{ $t('footer.quickLinks') }}</h4>
   <ul>
     <li>
-      <router-link :to="{ name: 'home', params: { lang: currentLang } }" @click="scrollToTop">
+      <router-link :to="{ name: 'about', params: { lang: currentLang } }" @click="scrollToTop">
         {{ $t('footer.aboutUs') }}
       </router-link>
     </li>
@@ -546,6 +933,54 @@ onUnmounted(() => {
 <style>
 @import url('https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@100;200;300;400;500;600;700&display=swap');
+/* Latin pairing for the English UI: Crimson Pro for headings, Work Sans for text.
+   Loaded here rather than per-component so one copy serves the whole app. */
+@import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;600;700&family=Work+Sans:wght@300;400;500;600;700&display=swap');
+
+/* Sao Chingcha — Thai UI face, self-hosted from /public/fonts.
+   Three real cuts are mapped to 300/400/700 so existing font-weight rules pick a
+   drawn weight instead of a browser-synthesised bold. Only downloaded on pages
+   that actually reference the family (i.e. Thai). */
+@font-face {
+  font-family: 'SaoChingcha';
+  src: url('/fonts/SaoChingcha-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SaoChingcha';
+  src: url('/fonts/SaoChingcha-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SaoChingcha';
+  src: url('/fonts/SaoChingcha-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Declared but unused — available for display/heading treatments. */
+@font-face {
+  font-family: 'BKKDraft5';
+  src: url('/fonts/BKKDraft5-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 'The Seasons' was declared here as the English display face, but it is a
+   licensed family and the .otf files were never committed. Every request fell
+   through to the SPA's index.html, which the browser then failed to parse as a
+   font — six discarded downloads and a console error per page, while headings
+   rendered in Crimson Pro regardless. Removed; Crimson Pro is now stated
+   directly. To reinstate it, add the files under public/fonts/ and restore the
+   @font-face blocks plus the family in the heading stack below. */
 
 html, body {
   width: 100%;
@@ -562,14 +997,54 @@ html, body {
   box-sizing: border-box;
 }
 
-/* Override font for Thai language */
-body.thai-font * {
-  font-family: 'Kanit', sans-serif !important;
-  /* font-family: 'Prompt', sans-serif !important; */
+/* Override font for Thai language.
+   Two selectors on purpose:
+     - html[lang="th"] is present in the pre-rendered SSG markup, so Thai pages
+       paint in Sao Chingcha immediately instead of flashing the Latin face and
+       swapping once the body class is attached on hydration.
+     - body.thai-font keeps the existing runtime language switch working.
+   Each is doubled to reach specificity 0-2-1. Scoped component styles compile
+   their `!important` font rules to 0-2-0 (e.g. products-stock.vue
+   .category-title-text), which would otherwise win and leave those elements in
+   the Latin face on Thai pages.
+   Kanit stays as fallback for the few codepoints Sao Chingcha doesn't cover. */
+html[lang="th"][lang="th"] *,
+html[lang="th"][lang="th"] *::before,
+html[lang="th"][lang="th"] *::after,
+body.thai-font.thai-font *,
+body.thai-font.thai-font *::before,
+body.thai-font.thai-font *::after {
+  font-family: 'SaoChingcha', 'Kanit', sans-serif !important;
 }
 
 body.chinese-font * {
   font-family: 'Noto Sans SC', sans-serif !important;
+}
+
+/* English.
+   The global `*` rule above sets ZCOOL XiaoWei — a Chinese display serif — for
+   every language that has no override, so English has been rendering in a face
+   drawn for Han characters. Thai and Chinese each opt out; this is English's.
+
+   Same doubled-attribute trick as the Thai rule (0-2-1) so it outranks scoped
+   component styles, which compile their `!important` font rules to 0-2-0. The
+   heading rule is 0-2-2 and so wins over the body rule below it.
+
+   Work Sans and Crimson Pro are the pairing every component built for this site
+   already asks for by name; until now the global rule was overriding all of them. */
+html[lang="en"][lang="en"] *,
+html[lang="en"][lang="en"] *::before,
+html[lang="en"][lang="en"] *::after {
+  font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+
+/* Headings get the serif; body copy stays Work Sans. Scoped to h1-h4 because a
+   high-contrast serif is built for large type and goes thin at paragraph sizes. */
+html[lang="en"][lang="en"] h1,
+html[lang="en"][lang="en"] h2,
+html[lang="en"][lang="en"] h3,
+html[lang="en"][lang="en"] h4 {
+  font-family: 'Crimson Pro', 'Georgia', serif !important;
 }
 
 body {
@@ -669,11 +1144,20 @@ body {
   font-size: 16px;
 }
 
+/* The Catalog trigger is a router-link, so hover opens the menu on a mouse. Where
+   there is no hover — a tablet wide enough to still get the desktop nav — this
+   overlay makes the first tap open the menu instead of navigating away. */
 .dd-trigger-area {
   position: absolute;
   inset: 0;
   cursor: pointer;
   display: none;
+}
+
+@media (hover: none) {
+  .dd-trigger-area {
+    display: block;
+  }
 }
 
 .dd-chevron {
@@ -809,6 +1293,7 @@ body {
   flex-direction: column;
   gap: 2px;
   padding-top: 2px;
+  text-align: left;
 }
 
 .dd-page-title {
@@ -816,6 +1301,7 @@ body {
   font-weight: 600;
   color: #3d2b1f;
   display: block;
+  text-align: left;
 }
 
 .dd-page-desc {
@@ -843,11 +1329,22 @@ body {
   cursor: pointer;
   display: flex;
   align-items: center;
+  transition: transform 0.2s ease;
+}
+
+.lang-globe:hover {
+  transform: translateY(-1px);
+}
+
+.lang-globe:hover ion-icon,
+.lang-globe:hover .current-lang-code {
+  color: #DD876E;
 }
 
 .lang-globe ion-icon {
   font-size: 24px;
   color: #5d4037;
+  transition: color 0.2s ease;
 }
 
 .current-lang-code {
@@ -855,52 +1352,71 @@ body {
   font-weight: 700;
   color: #5d4037;
   margin-left: 4px;
+  transition: color 0.2s ease;
 }
 
-.lang-popup {
-  position: absolute;
-  top: 45px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+/* Language dropdown: shell, shadow and row treatment all come from .dd-menu and
+   .dd-page-link above. Only what a language row needs differently lives here. */
+.lang-dd {
+  width: 200px;
+  max-width: calc(100vw - 32px);
   padding: 8px;
-  min-width: 140px;
-  z-index: 100;
-  border: 1px solid #f0f0f0;
 }
 
+/* The globe sits at the right end of the navbar, so a centred menu runs off the
+   screen on narrow viewports. Anchor it to the right edge instead, and drop the
+   shared centering transform from the transition — same treatment as .cart-dd. */
+@media (max-width: 768px) {
+  .dd-menu.lang-dd {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+
+  .lang-dd.nav-dd-enter-from,
+  .lang-dd.nav-dd-leave-to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* The rows are buttons, not links, so reset what the browser adds. */
 .lang-item {
-  padding: 10px 14px;
-  font-size: 14px;
-  color: #2d3436;
-  border-radius: 8px;
-  transition: all 0.2s;
-  display: flex;
+  width: 100%;
   align-items: center;
-  gap: 10px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
 }
 
-.lang-item:hover {
-  background: #f8f3ee;
-  color: #8b6f47;
-}
-
-.lang-item.active {
-  background: #008080;
-  color: white;
-}
-
-.lang-flag {
-  font-size: 10px;
+/* The old rows used a teal (#008080) active state that appears nowhere else in
+   the site; the shared terracotta/cream treatment marks the current one now. */
+.lang-code {
+  font-size: 11px;
   font-weight: 800;
-  background: #f0f2f5;
-  color: #3D2B1F;
-  padding: 3px 6px;
-  border-radius: 4px;
-  min-width: 32px;
-  text-align: center;
+  letter-spacing: 0.4px;
+  color: #DD876E;
+  /* Narrower than .dd-page-icon's 36px square: a two-letter code, not an icon. */
+  width: 34px;
+  height: 28px;
+}
+
+.dd-page-link-active .lang-code {
+  color: #fff;
+}
+
+/* Scoped through .lang-globe to outrank `.lang-globe ion-icon`, which sets the
+   globe's own 24px/brown and would otherwise capture this tick too. */
+.lang-globe .lang-check {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 15px;
+  color: #DD876E;
+}
+
+.lang-globe .dd-page-link-active .lang-check {
+  color: #b4614a;
 }
 
 .lang-item.active .lang-flag {
@@ -947,16 +1463,6 @@ body {
   background-color: #f8f8f8;
 }
 
-.account-link {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.account-link ion-icon {
-  font-size: 20px;
-}
-
 .logged-in-actions {
   display: flex;
   align-items: center;
@@ -974,18 +1480,199 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .logout-btn-nav:hover {
   background-color: #fff;
-  border-color: #008080;
-  color: #008080;
+  border-color: #DD876E;
+  color: #DD876E;
   transform: translateY(-1px);
 }
 
 .logout-btn-nav ion-icon {
   font-size: 20px;
+}
+
+/* ── Mini-cart dropdown ──────────────────────── */
+.cart-wrap {
+  margin-right: 4px;
+}
+
+.cart-trigger {
+  position: relative;
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: #5d4037;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.cart-trigger:hover {
+  color: #DD876E;
+  transform: translateY(-1px);
+}
+
+.cart-count-badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: #DD876E;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  border-radius: 9px;
+  box-shadow: 0 1px 4px rgba(221, 135, 110, 0.5);
+}
+
+/* Right-align the panel so it stays within the viewport edge */
+.dd-menu.cart-dd {
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  left: auto;
+  right: 0;
+  transform: none;
+  padding: 0;
+}
+
+/* Neutralise the shared nav-dd centering transform for the right-aligned panel */
+.cart-dd.nav-dd-enter-from,
+.cart-dd.nav-dd-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.cart-dd-header {
+  padding: 15px 18px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #3D2B1F;
+  border-bottom: 1px solid #f2e8de;
+  text-align: left;
+}
+
+.cart-dd-empty {
+  padding: 30px 18px;
+  text-align: center;
+  color: #9e8272;
+  font-size: 14px;
+}
+
+.cart-dd-items {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.cart-dd-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 10px;
+  transition: background 0.14s;
+}
+
+.cart-dd-item:hover {
+  background: #FDF3E6;
+}
+
+.cart-dd-thumb {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #F9F5F0;
+}
+
+.cart-dd-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.cart-dd-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #3D2B1F;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cart-dd-specs {
+  font-size: 11.5px;
+  color: #9e8272;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cart-dd-price {
+  font-size: 13px;
+  font-weight: 700;
+  color: #3D2B1F;
+}
+
+.cart-dd-qty {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8C7B6E;
+  white-space: nowrap;
+}
+
+.cart-dd-footer {
+  padding: 14px 18px;
+  border-top: 1px solid #f2e8de;
+}
+
+.cart-dd-subtotal {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #5d4037;
+}
+
+.cart-dd-total {
+  font-size: 18px;
+  font-weight: 700;
+  color: #3D2B1F;
+}
+
+.cart-dd-btn {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #DD876E, #e6957c);
+  color: #fff;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  transition: transform 0.2s, opacity 0.3s;
+}
+
+.cart-dd-btn:hover {
+  transform: translateY(-1px);
+  opacity: 0.92;
 }
 
 /* ===== FOOTER ===== */
@@ -1085,6 +1772,15 @@ body {
   opacity: 0.6;
 }
 
+/* ── Mobile bar actions ───────────────────────── */
+/* Declared before the responsive block below, so the media query that flips it
+   to flex is the later rule and wins. */
+.nav-mobile-actions {
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+
 /* Responsive Design */
 @media (max-width: 1280px) {
   .NavBar {
@@ -1120,55 +1816,310 @@ body {
   }
 }
 
-@media (max-width: 992px) {
+/* Below 1024px the desktop nav (links + hover dropdowns) is replaced wholesale by
+   a single 64px bar plus the slide-in drawer. The fixed height matters beyond
+   looks: pages offset themselves by --nav-h, and the old wrapped layout made that
+   150-180px and dependent on the active language. */
+@media (max-width: 1024px) {
   .NavBar {
-    height: auto;
-    padding: 15px 3%;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.1rem;
+    height: 64px;
+    padding: 0 16px;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: 0;
   }
 
   .nav-left {
-    width: 100%;
-    justify-content: center;
-    height: 50px;
+    flex: 0 0 auto;
   }
+
   .main-logo {
-    height: 40px;
+    height: 38px;
   }
 
-  .nav-center {
-    width: 100%;
-    justify-content: center;
-    order: 3;
-    gap: 25px;
-  }
-
+  .nav-center,
   .nav-right {
-    width: 100%;
-    justify-content: center;
-    order: 2;
+    display: none;
+  }
+
+  .nav-mobile-actions {
+    display: flex;
   }
 }
 
-@media (max-width: 640px) {
-  .nav-center {
-    gap: 15px;
+@media (max-width: 380px) {
+  .NavBar {
+    padding: 0 12px;
   }
 
-  .nav-link {
-    font-size: 13px;
+  .main-logo {
+    height: 32px;
   }
 
-  .action-icons {
-    gap: 10px;
+  .nav-mobile-actions {
+    gap: 4px;
   }
+}
 
-  .login-capsule,
-  .order-capsule {
-    padding: 8px 16px;
-    font-size: 12px;
+.mobile-cart {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  color: #5d4037;
+  text-decoration: none;
+}
+
+.nav-burger {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.burger-line {
+  display: block;
+  width: 22px;
+  height: 2px;
+  border-radius: 2px;
+  background: #5d4037;
+  transition: transform 0.24s ease, opacity 0.18s ease;
+}
+
+.nav-burger.open .burger-line:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.nav-burger.open .burger-line:nth-child(2) {
+  opacity: 0;
+}
+
+.nav-burger.open .burger-line:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* ── Mobile drawer ────────────────────────────── */
+.drawer-scrim {
+  position: fixed;
+  inset: 0;
+  top: var(--nav-h, 64px);
+  background: rgba(45, 30, 20, 0.42);
+  z-index: 900;
+}
+
+.mobile-drawer {
+  position: fixed;
+  top: var(--nav-h, 64px);
+  right: 0;
+  width: min(86vw, 360px);
+  height: calc(100dvh - var(--nav-h, 64px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 12px calc(24px + env(safe-area-inset-bottom, 0px)) 12px;
+  background: #fff;
+  box-shadow: -8px 0 32px rgba(60, 35, 15, 0.18);
+  z-index: 950;
+}
+
+/* Rows borrow the dropdown contract (.dd-page-icon / .dd-page-title) so the
+   drawer reads as the same design language as the desktop menus. */
+.drawer-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: #5d4037;
+  font-size: 15px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+
+.drawer-link .dd-page-title {
+  font-size: 15px;
+}
+
+.drawer-link-active {
+  background: #FDF3E6;
+}
+
+.drawer-link-active .dd-page-icon {
+  background: #DD876E;
+  color: #fff;
+}
+
+.drawer-link-active .dd-page-icon ion-icon {
+  color: #fff;
+}
+
+.drawer-accordion-trigger .drawer-chevron {
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.drawer-accordion-trigger .drawer-chevron.open {
+  transform: rotate(180deg);
+}
+
+.drawer-sublist {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 4px 4px 10px 4px;
+}
+
+.drawer-sublink {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: #5d4037;
+  font-size: 13px;
+  line-height: 1.25;
+  text-decoration: none;
+}
+
+.drawer-sublink ion-icon {
+  flex-shrink: 0;
+  font-size: 17px;
+  color: #DD876E;
+}
+
+.drawer-sublink-all {
+  grid-column: 1 / -1;
+  justify-content: center;
+  background: #FDF3E6;
+  font-weight: 600;
+}
+
+.drawer-divider {
+  height: 1px;
+  margin: 10px 4px;
+  background: rgba(220, 195, 165, 0.5);
+}
+
+.drawer-section-label {
+  padding: 0 12px 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #9e8272;
+}
+
+.drawer-langs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 0 4px;
+}
+
+.drawer-lang {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1.5px solid #e4d5c6;
+  border-radius: 10px;
+  background: #fff;
+  color: #5d4037;
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.drawer-lang-code {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  color: #DD876E;
+}
+
+.drawer-lang-active {
+  background: #DD876E;
+  border-color: #DD876E;
+  color: #fff;
+}
+
+.drawer-lang-active .drawer-lang-code {
+  color: #fff;
+}
+
+.drawer-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 4px;
+  border: none;
+  border-radius: 50px;
+  background: #DD876E;
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.drawer-logout {
+  background: #fff;
+  border: 1.5px solid #e4d5c6;
+  color: #5d4037;
+}
+
+/* Transitions */
+.drawer-slide-enter-active,
+.drawer-slide-leave-active {
+  transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.drawer-slide-enter-from,
+.drawer-slide-leave-to {
+  transform: translateX(100%);
+}
+
+.drawer-fade-enter-active,
+.drawer-fade-leave-active {
+  transition: opacity 0.26s ease;
+}
+
+.drawer-fade-enter-from,
+.drawer-fade-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer-slide-enter-active,
+  .drawer-slide-leave-active,
+  .drawer-fade-enter-active,
+  .drawer-fade-leave-active,
+  .burger-line {
+    transition: none;
   }
 }
 </style>
@@ -1206,17 +2157,8 @@ body {
   }
 }
 
-/* Language dropdown animation */
-.dropdown-fade-enter-active,
-.dropdown-fade-leave-active {
-  transition: all 0.3s ease;
-}
-
-.dropdown-fade-enter-from,
-.dropdown-fade-leave-to {
-  opacity: 0;
-  transform: translateX(-50%) translateY(10px);
-}
+/* The language dropdown used to have its own `dropdown-fade` animation; it uses
+   nav-dd with the other menus now. AdminDashboard defines its own copy. */
 
 /* Nav dropdown animation */
 .nav-dd-enter-active,

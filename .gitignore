@@ -14,3 +14,7 @@ dist-ssr/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Agent scratch: worktrees and subagent-driven-development workspaces
+.claude/worktrees/
+.superpowers/

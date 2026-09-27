@@ -20,12 +20,13 @@ export const cartStore = {
     set cart(value) {
         state.cart = value;
     },
-    addToCart(product, selection) {
+    addToCart(product, selection, quantity = 1) {
         const cartItemKey = `${product.id}-${selection.size}-${selection.color}`;
         const existingItem = state.cart.find(item => item.cartItemKey === cartItemKey);
+        const unitPrice = (selection.price !== undefined && selection.price !== null) ? selection.price : product.price;
 
         if (existingItem) {
-            existingItem.quantity++;
+            existingItem.quantity += quantity;
         } else {
             state.cart.push({
                 ...product,
@@ -33,7 +34,8 @@ export const cartStore = {
                 cartItemKey,
                 selectedSize: selection.size,
                 selectedColor: selection.color,
-                quantity: 1
+                price: unitPrice,
+                quantity
             });
         }
     },

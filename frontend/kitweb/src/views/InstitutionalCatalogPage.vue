@@ -1,8 +1,11 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { api, API_URL} from '../services/api';
+import { groupByDisplayGroup } from '@/utils/catalogCategories';
+import { rollUpSet } from '@/utils/setPricing';
+import RfqModal from '../components/rfq-modal.vue';
 
 const { t, locale } = useI18n();
 const route = useRoute();
@@ -15,21 +18,21 @@ const error = ref(null);
 const selectedItems = ref(new Set()); // set of product IDs
 const rfqQuantities = ref({}); // product ID -> quantity
 
+// Section navigator (right-side mini-map rail)
+const activeSection = ref(null);
+const catalogSections = computed(() => Object.keys(categoriesGrouped.value));
+let sectionObserver = null;
+
 // RFQ Modal State
 const showRfqModal = ref(false);
-const submittingRfq = ref(false);
-const rfqSuccess = ref(false);
-const rfqError = ref(null);
-const submittedOrderId = ref('');
 
-const rfqForm = ref({
-  customerName: '',
-  organization: '',
-  email: '',
-  phoneNumber: '',
-  shippingAddress: '',
-  notes: ''
-});
+// Locale-aware product field accessors (mirrors tProduct in CategoryView.vue).
+// Show Thai name/description when the Thai locale is active, fall back to English.
+const tName = (p) =>
+  (locale.value === 'th' && p.name_th) ? p.name_th : p.title;
+
+const tDesc = (p) =>
+  (locale.value === 'th' && p.description_th) ? p.description_th : p.description;
 
 const getImageUrl = (key, variant = 'large') => {
   if (!key) return 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg';
@@ -39,23 +42,24 @@ const getImageUrl = (key, variant = 'large') => {
   return `${API_URL}/images/${keyStr}-${variant}.webp`;
 };
 
-// Category mapping helper (maps standard database categories to institutional B2B categories)
-const mapCategoryToInstitutional = (catId) => {
-  if (!catId) return 'General Sourcing & Craft Materials';
-  
-  const lower = catId.toLowerCase().trim();
-  if (lower === 'yarn' || lower === 'thread' || lower === 'knitting-yarn' || lower === 'crochet-thread' || lower === 'threads') {
-    return 'Fiber Arts & Yarn Crafts';
-  } else if (lower === 'beads' || lower === 'beads-sequins') {
-    return 'Fine Motor Skills & Beadwork';
-  } else if (lower === 'tools' || lower === 'needles') {
-    return 'Advanced Crafting & Tools';
-  } else if (lower === 'decorative' || lower === 'flora') {
-    return 'Institutional Events & DIY Activities';
+// Resolves a display-group key (e.g. 'threadString') to its translated heading,
+// mirroring the headings used on the retail catalog. Falls back to the raw key
+// (title-cased) for any slug not part of a defined group.
+const groupLabel = (key) => {
+  if (!key) return '';
+  return t(`categories.${key}`, key.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
+};
+
+const businessSets = ref([]);
+
+const loadBusinessSets = async () => {
+  try {
+    const sets = await api.getBusinessSets();
+    businessSets.value = sets.map(s => ({ ...s, rollUp: rollUpSet(s) }));
+  } catch {
+    // The band is supplementary; a failure here must not blank the catalog.
+    businessSets.value = [];
   }
-  
-  // Format nicely if custom category
-  return catId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 };
 
 // Fetch data
@@ -66,17 +70,9 @@ const fetchCatalog = async () => {
     const response = await api.getInstitutionalCatalog();
     if (response && response.success) {
       products.value = response.products || [];
-      
-      // Regroup products locally using B2B mapping
-      const grouped = {};
-      products.value.forEach(p => {
-        const instCat = mapCategoryToInstitutional(p.category_id);
-        if (!grouped[instCat]) {
-          grouped[instCat] = [];
-        }
-        grouped[instCat].push(p);
-      });
-      categoriesGrouped.value = grouped;
+
+      // Regroup products into the same display groups used on the retail catalog
+      categoriesGrouped.value = groupByDisplayGroup(products.value, p => p.category_id);
       
       // Initialize default quantities
       products.value.forEach(p => {
@@ -93,9 +89,47 @@ const fetchCatalog = async () => {
   }
 };
 
+// ── Section navigator: click-to-scroll + track the section currently in view ──
+const scrollToSection = (groupName) => {
+  const el = document.getElementById(`catalog-section-${groupName}`);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+const setupSectionObserver = () => {
+  if (sectionObserver) sectionObserver.disconnect();
+  // A section becomes "active" once it crosses into the middle band of the viewport.
+  sectionObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) activeSection.value = entry.target.dataset.section;
+      });
+    },
+    { rootMargin: '-40% 0px -55% 0px', threshold: 0 }
+  );
+
+  catalogSections.value.forEach((name) => {
+    const el = document.getElementById(`catalog-section-${name}`);
+    if (el) sectionObserver.observe(el);
+  });
+
+  // Default the highlight to the first section until the user scrolls.
+  if (!activeSection.value) activeSection.value = catalogSections.value[0] || null;
+};
+
+// Rebuild the observers whenever the grouped catalog changes (i.e. after data loads).
+watch(categoriesGrouped, async () => {
+  await nextTick();
+  setupSectionObserver();
+});
+
+onBeforeUnmount(() => {
+  if (sectionObserver) sectionObserver.disconnect();
+});
+
 onMounted(() => {
   fetchCatalog();
-  
+  loadBusinessSets();
+
   // Set B2B SEO metadata
   document.title = locale.value === 'th' 
     ? 'รายการแคตตาล็อกสถาบันและองค์กร | KitCraft B2B' 
@@ -133,53 +167,9 @@ const selectedProductsList = computed(() => {
   return products.value.filter(p => selectedItems.value.has(p.id));
 });
 
-// Submit RFQ Form
-const handleRfqSubmit = async () => {
-  if (selectedItems.value.size === 0) return;
-  
-  submittingRfq.value = true;
-  rfqError.value = null;
-  
-  const payload = {
-    customerName: rfqForm.value.customerName,
-    organization: rfqForm.value.organization,
-    email: rfqForm.value.email,
-    phoneNumber: rfqForm.value.phoneNumber,
-    shippingAddress: rfqForm.value.shippingAddress,
-    notes: rfqForm.value.notes,
-    items: selectedProductsList.value.map(p => ({
-      id: p.id,
-      sku: p.sku,
-      title: p.title,
-      quantity: rfqQuantities.value[p.id] || 10
-    }))
-  };
-  
-  try {
-    const res = await api.submitRfq(payload);
-    if (res && res.success) {
-      rfqSuccess.value = true;
-      submittedOrderId.value = res.orderId;
-      clearRfqList();
-      // Reset form
-      rfqForm.value = {
-        customerName: '',
-        organization: '',
-        email: '',
-        phoneNumber: '',
-        shippingAddress: '',
-        notes: ''
-      };
-    } else {
-      throw new Error(res.error || 'Failed to submit RFQ');
-    }
-  } catch (err) {
-    console.error('Error submitting RFQ:', err);
-    rfqError.value = err.message || 'An error occurred during submission. Please try again.';
-  } finally {
-    submittingRfq.value = false;
-  }
-};
+const rfqItems = computed(() => selectedProductsList.value.map(p => ({
+  id: p.id, sku: p.sku, title: p.title, quantity: rfqQuantities.value[p.id] || 10
+})));
 
 // Generate Print-Friendly Sourcing Checklist (Save to PDF)
 const handlePdfDownload = () => {
@@ -303,19 +293,12 @@ const handlePdfDownload = () => {
   `;
   
   // Group products locally for print view
-  const printGroups = {};
-  products.value.forEach(p => {
-    const instCat = mapCategoryToInstitutional(p.category_id);
-    if (!printGroups[instCat]) {
-      printGroups[instCat] = [];
-    }
-    printGroups[instCat].push(p);
-  });
-  
+  const printGroups = groupByDisplayGroup(products.value, p => p.category_id);
+
   Object.keys(printGroups).forEach(category => {
     html += `
       <div class="category-section">
-        <div class="category-title">${category}</div>
+        <div class="category-title">${groupLabel(category)}</div>
         <table>
           <thead>
             <tr>
@@ -334,8 +317,8 @@ const handlePdfDownload = () => {
         <tr>
           <td style="text-align: center;"><div class="check-box"></div></td>
           <td class="sku-col">${p.sku || 'N/A'}</td>
-          <td><strong>${p.title}</strong></td>
-          <td style="color: #5d4037;">${p.description || 'Suitable for institutional art projects and workshops.'}</td>
+          <td><strong>${tName(p)}</strong></td>
+          <td style="color: #5d4037;">${tDesc(p) || 'Suitable for institutional art projects and workshops.'}</td>
           <td>___________</td>
         </tr>
       `;
@@ -436,14 +419,14 @@ const handleDocxDownload = async () => {
   // ── header row for each category table ───────────────────────────────────
   // Columns:  Image | SKU | Product Title | Description | Qty
   // Widths (DXA, total = 9360 for 1-inch margins on Letter):
-  const COL = { img: 1100, sku: 1200, title: 2500, desc: 3560, qty: 1000 };
+  const COL = { img: 1800, sku: 900, title: 2500, desc: 3560, qty: 1000 };
   // sum = 9360 ✓
 
   const headerRow = () =>
     new TableRow({
       tableHeader: true,
       children: [
-        makeCell([para(txt('Image',         { bold: true, size: 18, color: '604539' }))], { width: COL.img,   shading: LIGHT }),
+        makeCell([para(txt('Image',         { bold: true, size: 28, color: '604539' }))], { width: COL.img,   shading: LIGHT }),
         makeCell([para(txt('SKU / ID',      { bold: true, size: 18, color: '604539' }))], { width: COL.sku,   shading: LIGHT }),
         makeCell([para(txt('Product Title', { bold: true, size: 18, color: '604539' }))], { width: COL.title, shading: LIGHT }),
         makeCell([para(txt('Description',   { bold: true, size: 18, color: '604539' }))], { width: COL.desc,  shading: LIGHT }),
@@ -452,11 +435,7 @@ const handleDocxDownload = async () => {
     });
 
   // ── group products same as PDF ────────────────────────────────────────────
-  const printGroups = {};
-  products.value.forEach(p => {
-    const cat = mapCategoryToInstitutional(p.category_id);
-    (printGroups[cat] = printGroups[cat] || []).push(p);
-  });
+  const printGroups = groupByDisplayGroup(products.value, p => p.category_id);
 
   // ── pre-fetch ALL images in parallel ─────────────────────────────────────
   const allProducts = products.value;
@@ -517,7 +496,7 @@ const handleDocxDownload = async () => {
       new Paragraph({
         spacing: { before: 280, after: 100 },
         border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: BORDER_COLOR, space: 2 } },
-        children: [txt(category, { bold: true, size: 26, color: '604539' })],
+        children: [txt(groupLabel(category), { bold: true, size: 26, color: '604539' })],
       })
     );
 
@@ -531,7 +510,7 @@ const handleDocxDownload = async () => {
         ? [para(new ImageRun({
             data: imgBuf.data,
             type: imgBuf.type,
-            transformation: { width: 60, height: 60 },
+            transformation: { width: 120, height: 120 },
           }))]
         : [para(txt('—', { color: 'AAAAAA' }))];
 
@@ -540,8 +519,8 @@ const handleDocxDownload = async () => {
           children: [
             makeCell(imgCellChildren, { width: COL.img }),
             makeCell([para(txt(p.sku || 'N/A', { size: 18, color: '604539', italics: true }))], { width: COL.sku }),
-            makeCell([para(txt(p.title, { bold: true, size: 20 }))], { width: COL.title }),
-            makeCell([para(txt(p.description || 'Suitable for institutional art projects and workshops.', { size: 18, color: '5d4037' }))], { width: COL.desc }),
+            makeCell([para(txt(tName(p), { bold: true, size: 20 }))], { width: COL.title }),
+            makeCell([para(txt(tDesc(p) || 'Suitable for institutional art projects and workshops.', { size: 18, color: '5d4037' }))], { width: COL.desc }),
             // Empty qty box — user fills in manually
             makeCell([para(txt('', { size: 20 }), { align: AlignmentType.CENTER })], { width: COL.qty }),
           ],
@@ -602,8 +581,8 @@ const handleDocxDownload = async () => {
     <!-- Informational Top Banner -->
     <div class="info-banner">
       <div class="banner-content">
-        <span class="banner-badge">B2B Portal</span>
-        <span class="banner-text">Net-30 Purchase Orders Accepted &nbsp;|&nbsp; Tax-Exempt Accounts Supported</span>
+        <span class="banner-badge">{{ t('institutional.bannerBadge') }}</span>
+        <span class="banner-text">{{ t('institutional.bannerText') }}</span>
       </div>
     </div>
 
@@ -611,22 +590,23 @@ const handleDocxDownload = async () => {
     <div class="b2b-hero">
       <div class="b2b-hero-overlay"></div>
       <div class="b2b-hero-content">
-        <h1 class="hero-title">Institutional Master Catalog</h1>
+        <h1 class="hero-title">{{ t('institutional.heroTitle') }}</h1>
         <p class="hero-subtitle">
-          Designed specifically for schools, teachers, community centers, and non-profits. 
-          Browse project offerings and build a Request for Quote (RFQ) without MOQ constraints or consumer pricing tags.
+          {{ t('institutional.heroSubtitle') }}
         </p>
-        <div class="hero-actions">
-          <button @click="handlePdfDownload" class="btn-primary" :disabled="loading || products.length === 0">
-            <ion-icon name="document-text-outline" class="btn-icon"></ion-icon>
-            Download Full Sourcing Checklist (PDF)
-          </button>
-        </div>
-        <div class="hero-actions">
-          <button @click="handleDocxDownload" class="btn-primary" :disabled="loading || products.length === 0">
-            <ion-icon name="document-text-outline" class="btn-icon"></ion-icon>
-            Download Sourcing Checklist (DOCX)
-          </button>
+        <div class="hero-actions-wrapper">
+          <div class="hero-actions">
+            <button @click="handlePdfDownload" class="btn-primary" :disabled="loading || products.length === 0">
+              <ion-icon name="document-text-outline" class="btn-icon"></ion-icon>
+              {{ t('institutional.downloadPdf') }}
+            </button>
+          </div>
+          <div class="hero-actions">
+            <button @click="handleDocxDownload" class="btn-primary" :disabled="loading || products.length === 0">
+              <ion-icon name="document-text-outline" class="btn-icon"></ion-icon>
+              {{ t('institutional.downloadDocx') }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -635,21 +615,45 @@ const handleDocxDownload = async () => {
       <!-- Loading State -->
       <div v-if="loading" class="state-container">
         <div class="spinner"></div>
-        <p class="state-text">Loading master catalog materials dynamically...</p>
+        <p class="state-text">{{ t('institutional.loading') }}</p>
       </div>
 
       <!-- Error State -->
       <div v-else-if="error" class="state-container error-card">
         <ion-icon name="alert-circle-outline" class="error-icon"></ion-icon>
         <p class="state-text">{{ error }}</p>
-        <button @click="fetchCatalog" class="btn-retry">Retry Fetching</button>
+        <button @click="fetchCatalog" class="btn-retry">{{ t('institutional.retry') }}</button>
       </div>
 
       <!-- Catalog Main Content -->
       <div v-else class="catalog-grid-wrapper">
-        <div v-for="(groupProducts, groupName) in categoriesGrouped" :key="groupName" class="category-block">
+        <!-- Ready-made bundles, offered before the shop starts picking SKUs. -->
+        <section v-if="businessSets.length" class="sets-band">
+          <h2>{{ t('businessSets.title') }}</h2>
+          <p class="sets-band-sub">{{ t('businessSets.subtitle') }}</p>
+          <div class="sets-band-grid">
+            <router-link
+              v-for="s in businessSets"
+              :key="s.id"
+              :to="{ name: 'business-set', params: { lang: $route.params.lang, slug: s.slug } }"
+              class="sets-band-card"
+            >
+              <span class="sets-band-name">{{ locale === 'th' && s.name_th ? s.name_th : s.name }}</span>
+              <span class="sets-band-count">{{ t('businessSets.itemCount', { count: s.items.length }) }}</span>
+              <span class="sets-band-price">฿{{ s.rollUp.total.toFixed(2) }}</span>
+            </router-link>
+          </div>
+        </section>
+
+        <div
+          v-for="(groupProducts, groupName) in categoriesGrouped"
+          :key="groupName"
+          :id="`catalog-section-${groupName}`"
+          :data-section="groupName"
+          class="category-block"
+        >
           <div class="category-block-header">
-            <h2 class="category-block-title">{{ groupName }}</h2>
+            <h2 class="category-block-title">{{ groupLabel(groupName) }}</h2>
             <div class="title-line"></div>
           </div>
 
@@ -661,9 +665,9 @@ const handleDocxDownload = async () => {
               :class="{ 'card-selected': selectedItems.has(product.id) }"
             >
               <div class="card-img-wrap">
-                <img 
-                  :src="resolveProductImage(product.image_url)" 
-                  :alt="product.title"
+                <img
+                  :src="resolveProductImage(product.image_url)"
+                  :alt="tName(product)"
                   class="card-img"
                   loading="lazy"
                 />
@@ -674,16 +678,16 @@ const handleDocxDownload = async () => {
 
               <div class="card-info">
                 <span class="card-sku">SKU: {{ product.sku || 'N/A' }}</span>
-                <h3 class="card-title">{{ product.title }}</h3>
+                <h3 class="card-title">{{ tName(product) }}</h3>
                 <p class="card-desc">
-                  {{ product.description || 'Excellent for motor skill development, creative art activities, and school craft workshops.' }}
+                  {{ tDesc(product) || t('institutional.descFallback') }}
                 </p>
               </div>
 
               <div class="card-footer">
                 <!-- RFQ Quantity selector inside card when checked -->
                 <div v-if="selectedItems.has(product.id)" class="qty-control">
-                  <span class="qty-label">Qty:</span>
+                  <span class="qty-label">{{ t('institutional.qty') }}</span>
                   <input 
                     type="number" 
                     v-model.number="rfqQuantities[product.id]" 
@@ -699,7 +703,7 @@ const handleDocxDownload = async () => {
                   :class="{ 'btn-rfq-added': selectedItems.has(product.id) }"
                 >
                   <span class="rfq-btn-text">
-                    {{ selectedItems.has(product.id) ? 'Added to RFQ' : 'Add to RFQ' }}
+                    {{ selectedItems.has(product.id) ? t('institutional.addedToRfq') : t('institutional.addToRfq') }}
                   </span>
                   <input 
                     type="checkbox" 
@@ -716,6 +720,26 @@ const handleDocxDownload = async () => {
       </div>
     </div>
 
+    <!-- Section Navigator: slim right-side mini-map rail -->
+    <nav
+      v-if="!loading && !error && catalogSections.length > 1"
+      class="section-nav"
+      aria-label="Catalog sections"
+    >
+      <button
+        v-for="groupName in catalogSections"
+        :key="groupName"
+        type="button"
+        class="section-nav-item"
+        :class="{ 'is-active': activeSection === groupName }"
+        :title="groupLabel(groupName)"
+        @click="scrollToSection(groupName)"
+      >
+        <span class="section-nav-label">{{ groupLabel(groupName) }}</span>
+        <span class="section-nav-dot"></span>
+      </button>
+    </nav>
+
     <!-- Floating RFQ List Drawer (Bottom Sheet) -->
     <Transition name="drawer-slide">
       <div v-if="selectedItems.size > 0" class="rfq-drawer">
@@ -723,17 +747,17 @@ const handleDocxDownload = async () => {
           <div class="drawer-left">
             <ion-icon name="cart-outline" class="drawer-cart-icon"></ion-icon>
             <div class="drawer-info">
-              <span class="drawer-count">{{ selectedItems.size }} items selected for quotation</span>
-              <span class="drawer-help">Quantities can be adjusted in the checklist overview.</span>
+              <span class="drawer-count">{{ t('institutional.drawerCount', { count: selectedItems.size }) }}</span>
+              <span class="drawer-help">{{ t('institutional.drawerHelp') }}</span>
             </div>
           </div>
           <div class="drawer-right">
             <button @click="clearRfqList" class="btn-secondary">
               <ion-icon name="trash-outline"></ion-icon>
-              Clear List
+              {{ t('institutional.clearList') }}
             </button>
             <button @click="showRfqModal = true" class="btn-accent">
-              Request Quote
+              {{ t('institutional.requestQuote') }}
               <ion-icon name="arrow-forward-outline"></ion-icon>
             </button>
           </div>
@@ -741,132 +765,12 @@ const handleDocxDownload = async () => {
       </div>
     </Transition>
 
-    <!-- RFQ Submission Modal Form -->
-    <Transition name="modal-fade">
-      <div v-if="showRfqModal" class="modal-overlay" @click.self="showRfqModal = false">
-        <div class="modal-card">
-          <div class="modal-header">
-            <h3>Request For Quote Submission</h3>
-            <button @click="showRfqModal = false" class="btn-close-modal">
-              <ion-icon name="close-outline"></ion-icon>
-            </button>
-          </div>
-
-          <!-- Successful Submission State -->
-          <div v-if="rfqSuccess" class="modal-body success-state">
-            <ion-icon name="checkmark-circle-outline" class="success-icon"></ion-icon>
-            <h4>Quote Request Submitted Successfully!</h4>
-            <p class="success-subtitle">We will review your inquiry and get back to you within 24-48 business hours.</p>
-            <div class="order-ref-box">
-              <span class="ref-label">Quotation ID Reference:</span>
-              <span class="ref-id">{{ submittedOrderId }}</span>
-            </div>
-            <p class="success-footer">A copy of your submission has been forwarded to our wholesale sourcing desk.</p>
-            <button @click="showRfqModal = false; rfqSuccess = false;" class="btn-modal-close-action">
-              Done
-            </button>
-          </div>
-
-          <!-- Submission Form -->
-          <form v-else @submit.prevent="handleRfqSubmit" class="modal-body">
-            <div v-if="rfqError" class="modal-error-banner">
-              <ion-icon name="warning-outline"></ion-icon>
-              <span>{{ rfqError }}</span>
-            </div>
-
-            <p class="modal-intro-text">
-              Enter your organization details below. Our sourcing specialist will draft a formal quotation sheet and contact you via email.
-            </p>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label for="orgName">School / Organization Name *</label>
-                <input 
-                  type="text" 
-                  id="orgName" 
-                  v-model="rfqForm.organization" 
-                  placeholder="e.g. Bangkok International School" 
-                  required 
-                />
-              </div>
-              <div class="form-group">
-                <label for="custName">Contact Person Name *</label>
-                <input 
-                  type="text" 
-                  id="custName" 
-                  v-model="rfqForm.customerName" 
-                  placeholder="e.g. Ms. Sarah Jane" 
-                  required 
-                />
-              </div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label for="custEmail">Email Address *</label>
-                <input 
-                  type="email" 
-                  id="custEmail" 
-                  v-model="rfqForm.email" 
-                  placeholder="e.g. sarah@school.org" 
-                  required 
-                />
-              </div>
-              <div class="form-group">
-                <label for="custPhone">Phone Number</label>
-                <input 
-                  type="tel" 
-                  id="custPhone" 
-                  v-model="rfqForm.phoneNumber" 
-                  placeholder="e.g. 081-234-5678" 
-                />
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label for="shippingAddr">Shipping / Delivery Address</label>
-              <textarea 
-                id="shippingAddr" 
-                v-model="rfqForm.shippingAddress" 
-                placeholder="Where should the materials be dispatched if the quote is approved?"
-                rows="2"
-              ></textarea>
-            </div>
-
-            <div class="form-group">
-              <label for="rfqNotes">Special Sourcing Notes / Target Delivery Date</label>
-              <textarea 
-                id="rfqNotes" 
-                v-model="rfqForm.notes" 
-                placeholder="Do you have custom tax needs, Net-30 purchase order formats, or specific color splits?"
-                rows="2"
-              ></textarea>
-            </div>
-
-            <!-- Preview items in quote -->
-            <div class="quote-preview-section">
-              <span class="preview-section-title">Selected Items in Request ({{ selectedProductsList.length }})</span>
-              <div class="preview-items-list">
-                <div v-for="item in selectedProductsList" :key="item.id" class="preview-item-row">
-                  <span class="item-title-col"><strong>{{ item.title }}</strong> &nbsp;<span class="item-sku">({{ item.sku }})</span></span>
-                  <span class="item-qty-col">Qty: {{ rfqQuantities[item.id] || 10 }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="modal-footer-actions">
-              <button type="button" @click="showRfqModal = false" class="btn-cancel" :disabled="submittingRfq">
-                Cancel
-              </button>
-              <button type="submit" class="btn-submit-rfq" :disabled="submittingRfq">
-                <span v-if="submittingRfq" class="mini-spinner"></span>
-                <span v-else>Submit Quote Request</span>
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </Transition>
+    <RfqModal
+      :open="showRfqModal"
+      :items="rfqItems"
+      @close="showRfqModal = false"
+      @submitted="clearRfqList()"
+    />
   </div>
 </template>
 
@@ -954,6 +858,13 @@ const handleDocxDownload = async () => {
   margin-bottom: 25px;
 }
 
+.hero-actions-wrapper {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
 .hero-actions {
   display: flex;
   justify-content: center;
@@ -1002,8 +913,90 @@ const handleDocxDownload = async () => {
 }
 
 /* Category Block */
+/* Business Sets band */
+.sets-band { margin: 0 0 40px; padding: 24px; background: #faf7f2; border-radius: 12px; }
+.sets-band h2 { margin: 0 0 4px; font-size: 1.4rem; }
+.sets-band-sub { margin: 0 0 16px; color: #666; }
+.sets-band-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.sets-band-card { display: flex; flex-direction: column; gap: 4px; padding: 14px; background: #fff; border: 1px solid #e8e2d8; border-radius: 10px; text-decoration: none; color: inherit; }
+.sets-band-name { font-weight: 600; }
+.sets-band-count { font-size: 0.85rem; color: #777; }
+.sets-band-price { font-weight: 700; }
+
 .category-block {
   margin-bottom: 50px;
+  scroll-margin-top: 90px; /* Keep heading clear of any fixed header when scrolled to */
+}
+
+/* Section Navigator (right-side mini-map rail) */
+.section-nav {
+  position: fixed;
+  top: 50%;
+  right: 18px;
+  transform: translateY(-50%);
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 10px 8px;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--b2b-border);
+  border-radius: 30px;
+  box-shadow: 0 4px 16px rgba(96, 69, 57, 0.1);
+}
+
+.section-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 5px 4px;
+}
+
+.section-nav-label {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--b2b-primary);
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-width 0.3s ease, opacity 0.3s ease;
+}
+
+/* Reveal all labels while hovering the rail */
+.section-nav:hover .section-nav-label {
+  max-width: 200px;
+  opacity: 1;
+}
+
+.section-nav-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--b2b-border);
+  transition: transform 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+}
+
+.section-nav-item:hover .section-nav-dot {
+  background: var(--b2b-secondary);
+}
+
+.section-nav-item.is-active .section-nav-dot {
+  background: var(--b2b-accent);
+  transform: scale(1.4);
+  box-shadow: 0 0 0 4px rgba(221, 135, 110, 0.18);
+}
+
+.section-nav-item.is-active .section-nav-label {
+  color: var(--b2b-accent);
 }
 
 .category-block-header {
@@ -1029,7 +1022,7 @@ const handleDocxDownload = async () => {
 /* Dense structured card grid */
 .dense-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 25px;
 }
 
@@ -1112,9 +1105,10 @@ const handleDocxDownload = async () => {
 
 .card-title {
   color: var(--b2b-primary);
-  font-size: 1.1rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 600;
   line-height: 1.3;
+  margin-top: 0;
   margin-bottom: 8px;
   min-height: 2.6rem; /* Lock title height for alignment */
   display: -webkit-box;
@@ -1311,278 +1305,6 @@ const handleDocxDownload = async () => {
   transform: translateY(-2px);
 }
 
-/* 5. Modal Overlay & Cards */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(45, 36, 30, 0.6);
-  backdrop-filter: blur(4px);
-  z-index: 1000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
-  animation: fadeIn 0.3s ease;
-}
-
-.modal-card {
-  background-color: #FFFFFF;
-  border-radius: 12px;
-  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
-  width: 100%;
-  max-width: 650px;
-  max-height: 90vh;
-  overflow-y: auto;
-  animation: scaleUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.modal-header {
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--b2b-border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background-color: var(--b2b-beige);
-}
-
-.modal-header h3 {
-  margin: 0;
-  color: var(--b2b-primary);
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-
-.btn-close-modal {
-  background: transparent;
-  border: none;
-  font-size: 24px;
-  color: var(--b2b-primary);
-  cursor: pointer;
-}
-
-.modal-body {
-  padding: 24px;
-}
-
-.modal-intro-text {
-  font-size: 13.5px;
-  color: #6B5D54;
-  line-height: 1.5;
-  margin-bottom: 20px;
-}
-
-.form-row {
-  display: flex;
-  gap: 15px;
-  flex-wrap: wrap;
-  margin-bottom: 15px;
-}
-
-.form-row .form-group {
-  flex: 1;
-  min-width: 250px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 15px;
-}
-
-.form-group label {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--b2b-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.form-group input,
-.form-group textarea {
-  border: 1px solid var(--b2b-border);
-  border-radius: 6px;
-  padding: 10px 12px;
-  font-size: 14px;
-  color: var(--b2b-dark);
-  background-color: var(--b2b-light);
-  transition: border-color 0.3s;
-}
-
-.form-group input:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: var(--b2b-accent);
-  background-color: #FFFFFF;
-}
-
-.modal-error-banner {
-  background-color: #fcebeb;
-  border: 1px solid #f7c8c8;
-  color: #b03a3a;
-  padding: 12px;
-  border-radius: 6px;
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-/* Quote preview list */
-.quote-preview-section {
-  margin-top: 25px;
-  border: 1px solid var(--b2b-border);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.preview-section-title {
-  display: block;
-  background-color: var(--b2b-beige);
-  color: var(--b2b-primary);
-  font-size: 11px;
-  font-weight: 700;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--b2b-border);
-  text-transform: uppercase;
-}
-
-.preview-items-list {
-  max-height: 140px;
-  overflow-y: auto;
-  padding: 5px 0;
-  background-color: #FFFFFF;
-}
-
-.preview-item-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 12px;
-  font-size: 13px;
-  border-bottom: 1px dashed var(--b2b-beige);
-}
-
-.preview-item-row:last-child {
-  border-bottom: none;
-}
-
-.item-sku {
-  color: var(--b2b-secondary);
-  font-family: monospace;
-}
-
-.item-qty-col {
-  font-weight: 600;
-  color: var(--b2b-primary);
-}
-
-.modal-footer-actions {
-  margin-top: 25px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-.btn-cancel {
-  background-color: transparent;
-  color: #6B5D54;
-  border: 1px solid var(--b2b-border);
-  padding: 10px 20px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.btn-cancel:hover {
-  background-color: var(--b2b-light);
-}
-
-.btn-submit-rfq {
-  background-color: var(--b2b-primary);
-  color: #FFFFFF;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-submit-rfq:hover:not(:disabled) {
-  background-color: #4a3429;
-}
-
-.btn-submit-rfq:disabled {
-  background-color: var(--b2b-border);
-  color: var(--b2b-mute);
-  cursor: not-allowed;
-}
-
-/* Success state modal styling */
-.success-state {
-  text-align: center;
-  padding: 40px 20px;
-}
-
-.success-icon {
-  font-size: 64px;
-  color: #2e9a52;
-  margin-bottom: 15px;
-}
-
-.success-subtitle {
-  font-size: 14px;
-  color: #6B5D54;
-  margin-top: 8px;
-}
-
-.order-ref-box {
-  background-color: var(--b2b-beige);
-  border: 1px solid var(--b2b-border);
-  padding: 12px;
-  border-radius: 6px;
-  display: inline-flex;
-  flex-direction: column;
-  margin: 20px 0;
-}
-
-.ref-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  color: var(--b2b-secondary);
-  font-weight: 600;
-}
-
-.ref-id {
-  font-size: 16px;
-  font-weight: bold;
-  color: var(--b2b-primary);
-  font-family: monospace;
-  margin-top: 4px;
-}
-
-.success-footer {
-  font-size: 12px;
-  color: var(--b2b-mute);
-}
-
-.btn-modal-close-action {
-  background-color: var(--b2b-primary);
-  color: #FFFFFF;
-  border: none;
-  padding: 10px 30px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-  margin-top: 15px;
-}
-
 /* 6. Utility States */
 .state-container {
   display: flex;
@@ -1599,15 +1321,6 @@ const handleDocxDownload = async () => {
   border-top-color: var(--b2b-primary);
   border-radius: 50%;
   animation: spin 1s infinite linear;
-}
-
-.mini-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--b2b-border);
-  border-top-color: #FFFFFF;
-  border-radius: 50%;
-  animation: spin 0.8s infinite linear;
 }
 
 .state-text {
@@ -1652,16 +1365,6 @@ const handleDocxDownload = async () => {
   transform: translateY(100%);
 }
 
-.modal-fade-enter-active,
-.modal-fade-leave-active {
-  transition: opacity 0.25s ease;
-}
-
-.modal-fade-enter-from,
-.modal-fade-leave-to {
-  opacity: 0;
-}
-
 /* Keyframes */
 @keyframes spin {
   0% { transform: rotate(0deg); }
@@ -1678,11 +1381,6 @@ const handleDocxDownload = async () => {
   to { opacity: 1; }
 }
 
-@keyframes scaleUp {
-  from { transform: scale(0.95); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-
 /* Responsive adjustment */
 @media (max-width: 768px) {
   .hero-title { font-size: 2.2rem; }
@@ -1690,5 +1388,10 @@ const handleDocxDownload = async () => {
   .drawer-container { flex-direction: column; text-align: center; }
   .drawer-left { flex-direction: column; gap: 5px; }
   .drawer-right { width: 100%; justify-content: center; }
+}
+
+/* The mini-map rail needs horizontal room; hide it on smaller screens */
+@media (max-width: 1024px) {
+  .section-nav { display: none; }
 }
 </style>

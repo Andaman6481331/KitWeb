@@ -2,6 +2,8 @@
 import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { getUtilsUrl } from '@/services/api';
+import VideoCard from '../components/video-card.vue';
+import InfoBanner from '../components/info-banner.vue';
 
 const { t } = useI18n();
 
@@ -99,6 +101,10 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 </script>
 
 <template>
+    <!-- Info Banner. The shared component, same as Home and Events — this page
+         used to hand-roll its own in a different palette. -->
+    <InfoBanner :badge="t('contact.bannerBadge')" :text="t('contact.bannerText')" />
+
     <!-- Page Header -->
     <img :src="getUtilsUrl('shop04-large.webp')" fetchpriority="high" aria-hidden="true"
         style="position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1;">
@@ -350,21 +356,33 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
             </div>
         </div>
     </section>
+
+    <!-- The shop, on video. Someone deciding whether to visit or write to us has
+         just read about the place; this is the closest thing to seeing it. -->
+    <section class="contact-videos">
+        <VideoCard />
+    </section>
 </template>
 
 <style scoped>
-/* Catalog Header */
+/* The announcement strip's styles now live in components/info-banner.vue. */
+
+/* Catalog Header — same contract as the Events hero: fill the box, never tile,
+   height from the viewport. `contain` without `background-repeat` meant that on
+   a phone the image shrank to about 200px tall and then repeated down the rest
+   of the 600px. */
 .catalog-header {
-    /* background: url('../assets/shop04.png'); */
-    background-size: contain;
+    background-size: cover;
+    background-repeat: no-repeat;
     background-position: center;
-    min-height: 600px;
+    min-height: 60svh;
     display: flex;
     justify-content: center;
     flex-direction: column;
     align-items: center;
     text-align: center;
     position: relative;
+    padding: 40px 20px;
 }
 
 .catalog-header::before {
@@ -417,16 +435,24 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 }
 
 @media (max-width: 768px) {
+    .catalog-header {
+        min-height: 52svh;
+        padding: 32px 18px;
+    }
+
     .catalog-title {
-        font-size: 2.5rem;
+        font-size: clamp(1.9rem, 8vw, 2.5rem);
     }
 
     .catalog-subtitle {
         font-size: 1rem;
     }
-}
 
-@media (max-width: 768px) {
+    .since-badge {
+        font-size: 12px;
+        letter-spacing: 3px;
+    }
+
     .mobile-only {
         display: block;
     }
@@ -438,6 +464,13 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
     padding: 50px 0 100px;
     position: relative;
     overflow: hidden;
+}
+
+/* VideoCard owns its heading and inner spacing; this only sets the ground it
+   sits on, so it reads as part of the page rather than a pasted-in block. */
+.contact-videos {
+    background-color: #FBF7F2;
+    border-top: 1px solid #f0e6da;
 }
 
 .wave-top {
@@ -656,7 +689,9 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 
 .contact-grid {
     display: grid;
-    grid-template-columns: 500px 1fr;
+    /* minmax(0, …) rather than a flat 500px: a fixed track cannot shrink, so it
+       overflows the container instead of giving way. */
+    grid-template-columns: minmax(0, 500px) minmax(0, 1fr);
     /* gap: 30px; */
     align-items: stretch;
 }
@@ -907,6 +942,9 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
     /* border-radius: 20px; */
     box-shadow: 0 4px 30px rgba(94, 69, 53, 0.05);
     border: 1px solid rgba(94, 69, 53, 0.1);
+    /* Grid items default to min-content width; without this the form's own
+       contents can push the column wider than its track. */
+    min-width: 0;
 }
 
 .form-title {
@@ -951,13 +989,21 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 .form-group input,
 .form-group select,
 .form-group textarea {
+    width: 100%;
+    max-width: 100%;
     padding: 14px 18px;
     background: #FDFBFA;
     border: 1px solid #e8e0d5;
     border-radius: 12px;
-    font-size: 1rem;
+    /* 16px exactly: anything smaller makes iOS Safari zoom the page on focus. */
+    font-size: 16px;
     color: #2d2d2d;
     transition: all 0.3s ease;
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 120px;
 }
 
 .form-group input:focus,
@@ -1045,8 +1091,11 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
         grid-template-columns: 1fr;
     }
 
+    /* minmax(0, 1fr), not 1fr: a bare `1fr` track has an implicit `auto`
+       minimum, so it refuses to shrink below its content's min-content width
+       and the card spills out of the container. */
     .contact-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .heritage-hub {
@@ -1089,12 +1138,33 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
         padding: 12px 16px;
     }
 
+    .contact-inquiry-container {
+        margin-top: 40px;
+    }
+}
+
+/* The form stacks a step earlier than the rest of the page: two inputs side by
+   side are already cramped well before 640px. */
+@media (max-width: 768px) {
+    .contact-inquiry-container {
+        padding: 0 16px;
+    }
+
     .form-row {
         grid-template-columns: 1fr;
+        gap: 0;
     }
 
     .inquiry-form-card {
-        padding: 30px 20px;
+        padding: 24px 18px;
+    }
+
+    .form-title {
+        font-size: 1.8rem;
+    }
+
+    .form-subtitle {
+        margin-bottom: 24px;
     }
 
     .form-actions {
@@ -1105,15 +1175,12 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
 
     .submit-btn {
         width: 100%;
+        min-height: 48px;
         justify-content: center;
     }
 
     .response-time {
         text-align: center;
-    }
-
-    .contact-inquiry-container {
-        margin-top: 40px;
     }
 }
 </style>
