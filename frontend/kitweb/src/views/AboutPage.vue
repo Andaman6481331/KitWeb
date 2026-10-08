@@ -52,7 +52,7 @@ const currentLang = computed(() => route.params.lang || defaultLang);
                 </div>
                 <div class="visit-item">
                     <dt>{{ $t('about.visitEmail') }}</dt>
-                    <dd><a href="mailto:kitsampeng@gmail.com">kitsampeng@gmail.com</a></dd>
+                    <dd><a href="mailto:andaman@kitcharoensampeng.com">andaman@kitcharoensampeng.com</a></dd>
                 </div>
             </dl>
             <router-link :to="{ name: 'contactus', params: { lang: currentLang } }" class="visit-cta">

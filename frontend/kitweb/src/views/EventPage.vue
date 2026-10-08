@@ -352,9 +352,9 @@ const submitForm = async () => {
                                 <span class="icon">📞</span>
                                 +66 2 221 1414
                             </a>
-                            <a href="mailto:kitsampeng@gmail.com" class="contact-link">
+                            <a href="mailto:andaman@kitcharoensampeng.com" class="contact-link">
                                 <span class="icon">✉️</span>
-                                kitsampeng@gmail.com
+                                andaman@kitcharoensampeng.com
                             </a>
                             <a href="#" class="contact-link">
                                 <span class="icon">💬</span>

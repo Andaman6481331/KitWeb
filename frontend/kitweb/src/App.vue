@@ -47,7 +47,7 @@ const pageDescriptionMap = {
 }
 
 const contactInfo = {
-    email:'kitsampeng@gmail.com',
+    email:'andaman@kitcharoensampeng.com',
     lineUrl: 'https://line.me/ti/p/@oar4837p',
     lineQrThumb: 'LineOfficialQR-large.webp',
     lineId: '@oar4837p',
