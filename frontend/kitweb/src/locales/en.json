@@ -26,7 +26,7 @@
   },
   "footer": {
     "companyName": "Kitcharoen",
-    "companyDesc": "Your trusted source for premium yarn and sewing supplies since 1995.",
+    "companyDesc": "Your trusted source for premium yarn and sewing supplies since 1984.",
     "quickLinks": "Quick Links",
     "aboutUs": "About Us",
     "products": "Products",
@@ -146,6 +146,9 @@
     "subtitle": "Your Trusted Handicraft Partner Since 1984",
     "description": "Kitcharoen is a family-run craft supply shop located in Sampeng Market, Bangkok, near Yaowarat (Chinatown). Founded in 1984, our business has been passed down through three generations, from my grandfather to my father and now to me. The name Kitcharoen comes from Thai words meaning business and prosperity, reflecting our belief in honest, steady growth.",
     "mission": "We offer a wide range of craft supplies and sewing materials, including yarns, ribbons, needles, beads, crochet supplies, artificial flowers, and more. Our products are good, reliable quality with wholesale-friendly prices, and we take pride in our kind service, honesty, and long-term trust with customers.",
+    "nextChapterEyebrow": "What's next",
+    "nextChapterTitle": "Our Next Chapter",
+    "nextChapterBody": "I'm the third generation of Kitcharoen, and I'm now building the shop's online future: a modern ordering and inventory platform, with AI assistants to help with logistics and customer questions. The goal is simple: keep what my grandfather and father built (honest wholesale prices, reliable quality, personal service) and make it easy for craft makers anywhere to order from Sampeng.",
     "readStory": "Read our story",
     "visitTitle": "Visit the shop",
     "visitAddress": "Address",

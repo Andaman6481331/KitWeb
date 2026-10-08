@@ -19,6 +19,15 @@ const currentLang = computed(() => route.params.lang || defaultLang);
 
         <AboutKitcharoen />
 
+        <!-- The third generation's own chapter: the history above ends with "now to
+             me", this says what "me" is doing with it. Written in first person on
+             purpose, so visitors see one person building this rather than a firm. -->
+        <section v-reveal class="next-chapter">
+            <div class="next-chapter-eyebrow">{{ $t('about.nextChapterEyebrow') }}</div>
+            <h2 class="next-chapter-title">{{ $t('about.nextChapterTitle') }}</h2>
+            <p class="next-chapter-body">{{ $t('about.nextChapterBody') }}</p>
+        </section>
+
         <!-- The story, shown rather than told. Sits between the written history
              and the address, which is the order someone reads this page in. -->
         <section class="about-videos">
@@ -58,6 +67,52 @@ const currentLang = computed(() => route.params.lang || defaultLang);
 
 .about-page {
     background-color: #FBF7F2;
+}
+
+/* ── Our next chapter ───────────────────────────────── */
+/* Same 1300px / 40px container as the story above; the copy itself is capped at
+   a readable measure rather than stretching across the full width. */
+.next-chapter {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 24px 40px 56px 40px;
+}
+
+.next-chapter-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-family: 'Work Sans', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #8b6f47;
+}
+
+.next-chapter-eyebrow::before {
+    content: '';
+    width: 40px;
+    height: 2px;
+    background: #E7C9A2;
+}
+
+.next-chapter-title {
+    margin: 0 0 16px 0;
+    font-family: 'Crimson Pro', serif;
+    font-size: clamp(1.7rem, 4vw, 2.2rem);
+    font-weight: 600;
+    line-height: 1.2;
+    color: #604539;
+}
+
+.next-chapter-body {
+    max-width: 760px;
+    margin: 0;
+    font-size: 1.1rem;
+    line-height: 1.8;
+    color: #555;
 }
 
 /* ── Video showcase ─────────────────────────────────── */
@@ -152,6 +207,10 @@ const currentLang = computed(() => route.params.lang || defaultLang);
 @media (max-width: 640px) {
     /* Matches .container's 20px gutter in AboutKitcharoen at the same breakpoint. */
     .about-page-title { padding: 28px 20px 0 20px; }
+
+    .next-chapter { padding: 16px 20px 40px 20px; }
+
+    .next-chapter-body { font-size: 1rem; }
 
     .visit-section { padding: 20px 20px 60px 20px; }
 }
