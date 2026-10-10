@@ -83,7 +83,7 @@ The project is deployed using **Cloudflare** (Pages for frontend and Workers for
   ```sh
   cd frontend/kitweb
   npm run build
-  npx wrangler pages deploy dist
+  npx wrangler pages deploy dist --project-name kitweb --branch main
   ```
 
 ### Backend (Cloudflare Workers)
@@ -99,4 +99,3 @@ The project is deployed using **Cloudflare** (Pages for frontend and Workers for
 - **Node Version**: If you encounter issues with package installation, ensure your Node.js version is up to date.
 - **Port Conflicts**: If port `5173` is in use, Vite will automatically try the next available port.
 - **Wrangler Login**: If deployment fails, ensure you are logged into Cloudflare via `npx wrangler login`.
-

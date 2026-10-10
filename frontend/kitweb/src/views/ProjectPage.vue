@@ -78,7 +78,7 @@ watch(() => route.params.slug, loadProject);
 const crumbs = computed(() => {
     const items = [
         { label: t('nav.home'), to: { name: 'home', params: { lang: currentLang.value } } },
-        { label: t('projects.sectionTitle'), to: { name: 'event', params: { lang: currentLang.value } } }
+        { label: t('projects.sectionTitle'), to: { name: 'kitcraft', params: { lang: currentLang.value } } }
     ];
     if (project.value) items.push({ label: tp('title') });
     return items;
@@ -100,7 +100,7 @@ useHead(() => ({
 
         <div v-else-if="notFound" class="project-state">
             <p>{{ $t('projects.notFound') }}</p>
-            <router-link :to="{ name: 'event', params: { lang: currentLang } }" class="project-cta">
+            <router-link :to="{ name: 'kitcraft', params: { lang: currentLang } }" class="project-cta">
                 {{ $t('projects.viewAll') }}
             </router-link>
         </div>
@@ -149,7 +149,7 @@ useHead(() => ({
                 </div>
             </section>
 
-            <router-link :to="{ name: 'event', params: { lang: currentLang } }" class="project-cta">
+            <router-link :to="{ name: 'kitcraft', params: { lang: currentLang } }" class="project-cta">
                 {{ $t('projects.viewAll') }}
             </router-link>
         </article>

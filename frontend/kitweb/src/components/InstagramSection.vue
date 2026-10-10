@@ -49,7 +49,7 @@ const handleStartCrafting = () => {
 
             <div class="cta-group">
                 <router-link :to="{ name: 'contactus', params: { lang: currentLang } }" class="btn-primary">{{ $t('kitcraft.startCrafting') }}</router-link>
-                <router-link :to="{ name: 'event', params: { lang: currentLang } }" class="btn-secondary">{{ $t('kitcraft.learnMore') }}</router-link>
+                <router-link :to="{ name: 'kitcraft', params: { lang: currentLang } }" class="btn-secondary">{{ $t('kitcraft.learnMore') }}</router-link>
             </div>
         </div>
 

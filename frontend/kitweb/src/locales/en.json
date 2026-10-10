@@ -264,7 +264,10 @@
     "mediaGallery": "Event Media Gallery",
     "sendFailed": "Something went wrong. Please try again.",
     "followTitle": "Follow along",
-    "followSubtitle": "New projects, workshop dates and behind-the-scenes on Instagram."
+    "followSubtitle": "New projects, workshop dates and behind-the-scenes on Instagram.",
+    "descriptionEyebrow": "Make Something You Love",
+    "descriptionTitle": "What is Kitcraft?",
+    "descriptionBody": "Kitcraft is the DIY and workshop brand of Kitcharoen, a Thai handicraft-materials supplier serving makers since 1984. We’re building a home for all handicraft DIY, where anyone can start a project, learn a new craft, and finish something they’re proud of, whether they’ve never held a needle or have crafted for years."
   },
   "catalog": {
     "nav": {

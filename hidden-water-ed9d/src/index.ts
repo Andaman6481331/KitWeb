@@ -902,7 +902,7 @@ export default {
 			// ── Workshops & market appearances ────────────────────────────
 			// Chronological, with anything flagged upcoming pushed to the end so the
 			// grid finishes on what is next rather than what is over.
-			if (url.pathname === "/events" && request.method === "GET") {
+			if (url.pathname === "/kitcraft" && request.method === "GET") {
 				const includeHidden = url.searchParams.get("include_hidden") === "1";
 
 				let query = "SELECT * FROM events";
@@ -1843,7 +1843,7 @@ export default {
 
 			// ── Workshops: create / update ────────────────────────────────
 			// Sending an id updates that row; omitting it inserts a new one.
-			if (url.pathname === "/events" && request.method === "POST") {
+			if (url.pathname === "/kitcraft" && request.method === "POST") {
 				const body = await request.json() as any;
 				const title = (body.title || "").trim();
 				if (!title) return corsResponse({ error: "title is required" }, { status: 400 });
@@ -1888,7 +1888,7 @@ export default {
 				return corsResponse(mapEventRow(created));
 			}
 
-			if (url.pathname === "/events/delete" && request.method === "POST") {
+			if (url.pathname === "/kitcraft/delete" && request.method === "POST") {
 				const body = await request.json() as any;
 				if (!body.id) return corsResponse({ error: "id is required" }, { status: 400 });
 				await env.DB.prepare("DELETE FROM events WHERE id = ?").bind(body.id).run();

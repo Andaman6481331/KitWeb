@@ -26,7 +26,7 @@ const pageTitleMap = {
   contactus: 'contact.title',
   about: 'about.title',
   login: 'admin.loginTitle',
-  event: 'events.heroTagline',
+  kitcraft: 'events.heroTagline',
   partners: 'partner.heroTitle',
   orderpage: 'order.title',
   faq: 'faq.title',
@@ -40,7 +40,7 @@ const pageDescriptionMap = {
   contactus: 'contact.subtitle',
   about: 'about.subtitle',
   login: 'auth.signInSubtitle',
-  event: 'events.heroSubtitle',
+  kitcraft: 'events.heroSubtitle',
   partners: 'partner.heroSubtitle',
   orderpage: 'order.heroSubtitle',
   admin: 'auth.signInSubtitle'
@@ -85,7 +85,7 @@ const pageSeoTitle = computed(() => {
       return 'ติดต่อสอบถาม สั่งซื้อไหมพรม ริบบิ้น ลูกปัด | กิจเจริญ สำเพ็ง';
     case 'about':
       return 'เกี่ยวกับเรา ร้านอุปกรณ์งานฝีมือ ตั้งแต่ปี 2527 | กิจเจริญ สำเพ็ง';
-    case 'event':
+    case 'kitcraft':
       return 'เวิร์คช็อป DIY และกิจกรรมงานฝีมือ | กิจเจริญ สำเพ็ง';
     case 'partners':
       return 'ตัวแทนจำหน่ายและลูกค้าขายส่ง อุปกรณ์งานฝีมือ | กิจเจริญ สำเพ็ง';
@@ -109,7 +109,7 @@ switch (route) {
     return 'Contact Us for Wholesale Yarn, Ribbons & Beads | Kitcharoen';
   case 'about':
     return 'About Us - Family Craft Supply Shop Since 1984 | Kitcharoen';
-  case 'event':
+  case 'kitcraft':
     return 'DIY Craft Workshops & Events in Bangkok | Kitcharoen';
   case 'partners':
     return 'Our Partners & Wholesale Craft Supply Clients | Kitcharoen';
@@ -480,7 +480,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Events -->
-        <router-link :to="{ name: 'event', params: { lang: currentLang } }" @click="scrollToTop; closeAllMenus()" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.events') }}</router-link>
+        <router-link :to="{ name: 'kitcraft', params: { lang: currentLang } }" @click="scrollToTop; closeAllMenus()" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.events') }}</router-link>
 
         <!-- B2B Catalog -->
         <router-link :to="{ name: 'institutional-catalog', params: { lang: currentLang } }" @click="scrollToTop; closeAllMenus()" class="nav-link" active-class="active" exact-active-class="active">{{ $t('nav.b2bCatalog') }}</router-link>
@@ -760,7 +760,7 @@ onUnmounted(() => {
           </router-link>
         </div>
 
-        <router-link :to="{ name: 'event', params: { lang: currentLang } }" class="drawer-link" active-class="drawer-link-active" @click="closeMobileNav">
+        <router-link :to="{ name: 'kitcraft', params: { lang: currentLang } }" class="drawer-link" active-class="drawer-link-active" @click="closeMobileNav">
           <span class="dd-page-icon"><ion-icon name="calendar-outline"></ion-icon></span>
           <span class="dd-page-title">{{ $t('nav.events') }}</span>
         </router-link>
@@ -864,7 +864,8 @@ onUnmounted(() => {
             <li>📍 376 Wanich 1 Chakkrawat</li>
             <li>📍 Samphantawong Bangkok</li>
             <li>📞 +66 (0)2-221-1414, (0)2-622-6573</li>
-            <li>✉️ kitsampeng@gmail.com</li>
+            <li>✉️ andaman@kitcharoensampeng.com</li>
+            <li>✉️ similan@kitcharoensampeng.com</li>
           </ul>
         </div>
         <div class="footer-column">

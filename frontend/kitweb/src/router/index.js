@@ -4,7 +4,7 @@ import Catalog from '../views/CatalogPage.vue'
 import OrderPage from '../views/OrderPage.vue'
 import ContactUsPage from '../views/ContactUsPage.vue'
 import Login from '../views/Login.vue'
-import EventPage from '../views/EventPage.vue'
+import KitCraftPage from '../views/KitCraftPage.vue'
 import PartnerPage from '../views/PartnerPage.vue'
 import AdminDashboard from '../views/AdminDashboard.vue'
 import FaqPage from '../views/FaqPage.vue'
@@ -31,7 +31,7 @@ export const routes = [
       { path: 'project/:slug', name: 'project', component: () => import('../views/ProjectPage.vue') },
       { path: 'contactus', name: 'contactus', component: ContactUsPage },
       { path: 'login', name: 'login', component: Login },
-      { path: 'event', name: 'event', component: EventPage },
+      { path: 'kitcraft', name: 'kitcraft', component: KitCraftPage },
       { path: 'partners', name: 'partners', component: PartnerPage },
       { path: 'faq', name: 'faq', component: FaqPage },
       { path: 'admin', name: 'admin', component: AdminDashboard, meta: { requiresAuth: true } },

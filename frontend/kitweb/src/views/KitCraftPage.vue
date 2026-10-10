@@ -201,7 +201,56 @@ const submitForm = async () => {
         </section>
 
 
-        <AutoScrollEvent />
+        <!-- <AutoScrollEvent /> -->
+
+        
+        <section v-reveal class="kitcraft-section">
+            <div class="kitcraft-section-eyebrow">{{ $t('events.descriptionEyebrow') }}</div>
+            <h2 class="kitcraft-section-title">{{ $t('events.descriptionTitle') }}</h2>
+
+            <div class="kitcraft-copy">
+                <p class="kitcraft-section-body">
+                    Kitcraft is the DIY and workshop brand of Kitcharoen, a Thai handicraft-materials supplier serving makers since 1984.
+                    We’re building a home for all handicraft DIY, where anyone can start a project, learn a new craft, and finish something they’re proud of,
+                    whether they’ve never held a needle or have crafted for years.
+                </p>
+            </div>
+
+            <div class="kitcraft-offer-block">
+                <h3 class="kitcraft-subheading">What we offer</h3>
+                <div class="kitcraft-offer-grid">
+                    <a href="#event-articles" class="kitcraft-offer-card">
+                        <strong>DIY Kits.</strong>
+                        Everything you need in one box: chenille pipe cleaner flowers, plastic canvas, yarn puppies, beaded bracelets and necklaces, and keychains.
+                    </a>
+                    <a href="#event-past" class="kitcraft-offer-card">
+                        <strong>Workshops.</strong>
+                        Hands-on, beginner-friendly sessions where you make your project with guidance. We’ve been running them since 2025. See photos and upcoming dates below.
+                    </a>
+                    <a href="#event-contact" class="kitcraft-offer-card">
+                        <strong>Online Store.</strong>
+                        Quality craft materials and kits from a supplier with decades of experience, available to order online.
+                    </a>
+                </div>
+            </div>
+
+            <div class="kitcraft-story-grid">
+                <div class="kitcraft-story-panel">
+                    <h3 class="kitcraft-subheading">Why Kitcraft</h3>
+                    <p>
+                        We’ve supplied craft materials for over 40 years, so we know what works. Kitcraft takes that knowledge and turns it into projects,
+                        kits, and classes that are easy to start and fun to finish.
+                    </p>
+                </div>
+
+                <div class="kitcraft-story-panel">
+                    <h3 class="kitcraft-subheading">Our story</h3>
+                    <p>
+                        Kitcraft is led by the second generation of the Kitcharoen family. We’re expanding from supplying materials to helping people make things with them.
+                    </p>
+                </div>
+            </div>
+        </section>
 
         <!-- This week's inspiration: the post flagged in the admin panel. Same
              component as the homepage band, different eyebrow — it is the one
@@ -352,9 +401,9 @@ const submitForm = async () => {
                                 <span class="icon">📞</span>
                                 +66 2 221 1414
                             </a>
-                            <a href="mailto:andaman@kitcharoensampeng.com" class="contact-link">
+                            <a href="mailto:kitcraft@kitcharoensampeng.com" class="contact-link">
                                 <span class="icon">✉️</span>
-                                andaman@kitcharoensampeng.com
+                                kitcraft@kitcharoensampeng.com
                             </a>
                             <a href="#" class="contact-link">
                                 <span class="icon">💬</span>
@@ -480,10 +529,122 @@ const submitForm = async () => {
 </template>
 
 <style scoped>
+
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+}
+
+.kitcraft-section {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 24px 40px 56px 40px;
+}
+
+.kitcraft-section-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-family: 'Work Sans', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #8b6f47;
+}
+
+.kitcraft-section-eyebrow::before {
+    content: '';
+    width: 40px;
+    height: 2px;
+    background: #E7C9A2;
+}
+
+.kitcraft-section-title {
+    margin: 0 0 16px 0;
+    font-family: 'Crimson Pro', serif;
+    font-size: clamp(1.7rem, 4vw, 2.2rem);
+    font-weight: 600;
+    line-height: 1.2;
+    color: #604539;
+}
+
+.kitcraft-section-body {
+    max-width: 760px;
+    margin: 0;
+    font-size: 1.1rem;
+    line-height: 1.8;
+    color: #555;
+}
+
+.kitcraft-copy {
+    margin-bottom: 32px;
+}
+
+.kitcraft-offer-block {
+    margin: 24px 0 32px;
+}
+
+.kitcraft-subheading {
+    margin: 0 0 18px;
+    font-family: 'Crimson Pro', serif;
+    font-size: clamp(1.45rem, 2vw, 1.9rem);
+    color: #604539;
+    font-weight: 600;
+}
+
+.kitcraft-offer-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+}
+
+.kitcraft-offer-card {
+    display: block;
+    background: linear-gradient(180deg, #fff9f4, #fff);
+    border: 1px solid rgba(139, 111, 71, 0.12);
+    border-radius: 18px;
+    padding: 22px 20px;
+    color: #47352d;
+    text-decoration: none;
+    box-shadow: 0 10px 26px rgba(64, 41, 31, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    line-height: 1.7;
+}
+
+.kitcraft-offer-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 30px rgba(64, 41, 31, 0.08);
+    border-color: rgba(139, 111, 71, 0.22);
+}
+
+.kitcraft-offer-card strong {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 1.1rem;
+    color: #3e2d26;
+}
+
+.kitcraft-story-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+    margin-top: 18px;
+}
+
+.kitcraft-story-panel {
+    background: #f9f2ea;
+    border: 1px solid rgba(139, 111, 71, 0.1);
+    border-radius: 18px;
+    padding: 22px 20px;
+}
+
+.kitcraft-story-panel p {
+    margin: 0;
+    color: #555;
+    line-height: 1.8;
 }
 
 .diy-page {
@@ -1110,6 +1271,11 @@ const submitForm = async () => {
 @media (max-width: 1024px) {
     .events-grid {
         grid-template-columns: 1fr 1fr;
+    }
+
+    .kitcraft-offer-grid,
+    .kitcraft-story-grid {
+        grid-template-columns: 1fr;
     }
 }
 

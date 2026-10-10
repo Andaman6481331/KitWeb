@@ -32,7 +32,7 @@ const teasers = computed(() =>
                 <p class="lp-eyebrow">{{ $t('projects.latestEyebrow') }}</p>
                 <h2 class="lp-title">{{ $t('projects.latestTitle') }}</h2>
             </div>
-            <router-link :to="{ name: 'event', params: { lang: currentLang } }" class="lp-viewall">
+            <router-link :to="{ name: 'kitcraft', params: { lang: currentLang } }" class="lp-viewall">
                 {{ $t('projects.viewAll') }}
                 <span aria-hidden="true">&rarr;</span>
             </router-link>

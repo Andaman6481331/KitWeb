@@ -204,6 +204,7 @@ const mapUrl = ref('https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d242.22
                                     </button>
                                     <span v-if="gmailCopied" class="copy-feedback">Copied</span>
                                 </div>
+                                <p><a class="contact-link" href="mailto:similan@kitcharoensampeng.com">similan@kitcharoensampeng.com</a></p>
                             </div>
                         </div>
                         
