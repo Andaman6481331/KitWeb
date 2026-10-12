@@ -7,6 +7,7 @@ import { ref, computed, onMounted, onServerPrefetch, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useHead } from '@unhead/vue';
+import PriceNotice from '../components/price-notice.vue';
 import { api, getProjectImageUrl } from '../services/api';
 import AddToOrderModal from '../components/add-to-order-modal.vue';
 import BreadcrumbBar from '../components/breadcrumb-bar.vue';
@@ -364,6 +365,7 @@ const crumbs = computed(() => {
                             </div>
                         </div>
                         <p class="product-moq" v-if="product.moq">{{ $t('catalog.moq') }}: {{ product.moq }}</p>
+                        <PriceNotice inline class="product-price-note" />
                     </div>
 
                     <button class="add-btn add-btn-lg" @click="productForCart = product">
@@ -747,6 +749,10 @@ const crumbs = computed(() => {
     color: #8b6f47;
     text-transform: uppercase;
     letter-spacing: 0.3px;
+}
+
+.product-price-note {
+    margin: 10px 0 0;
 }
 
 .product-moq {

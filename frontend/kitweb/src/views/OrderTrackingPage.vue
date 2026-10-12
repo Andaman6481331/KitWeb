@@ -1,139 +1,151 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { api, API_URL, getDiyImageUrl } from '../services/api'
-import { useProducts } from '../composables/useProducts'
+import { api } from '../services/api'
 import { authStore } from '../stores/authStore'
 import { defaultLang } from '@/utils/localeRoutes'
-import OrderConfirmActions from '../components/order-confirm-actions.vue'
+import OrderDetail from '../components/order-detail.vue'
+import {
+    formatBaht, isAwaitingCustomer, orderStateKey, orderViewFromRow, parseDbDate,
+} from '../utils/orderView'
+
+// One place to look at an order, whoever you are:
+//  - logged in  -> your orders, newest first
+//  - a guest    -> order number + phone (or the private link from LINE / the
+//                  thank-you page, which opens the order straight away)
+// Both end in the same detail panel.
 
 const route = useRoute()
 const router = useRouter()
-const currentLang = computed(() => route.params.lang || defaultLang)
 const { t, locale } = useI18n()
+const currentLang = computed(() => route.params.lang || defaultLang)
+const isLoggedIn = computed(() => authStore.isAuthenticated)
 
-// Local inline placeholder (no external network dependency)
-const placeholderImg = (label = '') => {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#F9F5F0"/><text x="50" y="54" font-family="Work Sans, Arial, sans-serif" font-size="11" fill="#3D2B1F" text-anchor="middle">${label}</text></svg>`
-    return `data:image/svg+xml,${encodeURIComponent(svg)}`
+const orders = ref([])
+const selected = ref(null)
+const isLoadingList = ref(false)
+const isLookingUp = ref(false)
+const lookupError = ref('')
+
+const lookupOrderId = ref('')
+const lookupPhone = ref('')
+const showGuestLookup = ref(false)
+
+// What proved the selected order, kept so it can be refreshed without asking again.
+let proof = null
+const detailEl = ref(null)
+
+const dateTag = computed(() => ({ th: 'th-TH', ja: 'ja-JP', zh: 'zh-CN' }[locale.value] || 'en-GB'))
+const shortDate = (value) => {
+    const d = parseDbDate(value)
+    return d ? d.toLocaleDateString(dateTag.value, { day: 'numeric', month: 'short', year: 'numeric' }) : ''
 }
 
-// Products list — only used to resolve order thumbnails
-const { products: rawProducts, fetchProducts: revalidateProducts } = useProducts()
-const rawDiyProducts = ref([])
+const amountLabel = (order) => {
+    if (order.grand_total !== null) return formatBaht(order.grand_total)
+    if (order.items_total !== null) return formatBaht(order.items_total)
+    return t('orderTotals.itemsPending')
+}
 
-const products = computed(() => {
-    const regularMapped = rawProducts.value.map(p => ({
-        ...p,
-        image: p.image_key ? `${API_URL}/images/${p.image_key}-thumb.webp` : placeholderImg('Product')
-    }))
+const itemSummary = (order) => {
+    if (!order.items.length) return ''
+    const first = order.items[0].product_name
+    return order.items.length > 1 ? `${first} +${order.items.length - 1}` : first
+}
 
-    const diyMapped = rawDiyProducts.value.map(p => ({
-        ...p,
-        id: `diy-${p.id}`,
-        image: getDiyImageUrl(p.images && p.images.length > 0 ? p.images[0] : '', 'thumb')
-    }))
-
-    return [...regularMapped, ...diyMapped]
-})
-
-// Helper to get image for a product ID
-const getProductImage = (productId) => {
-    const product = products.value.find(p => p.id === productId);
-    const key = product ? (product.image_key || product.image) : null;
-
-    if (!key) {
-        if (typeof productId === 'string' && productId.startsWith('diy-')) {
-            return 'https://m.media-amazon.com/images/I/610a5LpNbTL.jpg';
-        }
-        return placeholderImg('Product');
-    }
-
-    const keyStr = String(key);
-    if (keyStr.startsWith('http')) return keyStr;
-    if (keyStr.includes('.')) {
-        if (typeof productId === 'string' && productId.startsWith('diy-')) {
-            return `${API_URL}/kit-image/${keyStr}`;
-        }
-        return `${API_URL}/images/${keyStr}`;
-    }
-    if (typeof productId === 'string' && productId.startsWith('diy-')) {
-        return `${API_URL}/kit-image/${keyStr}-thumb.webp`;
-    }
-    return `${API_URL}/images/${keyStr}-thumb.webp`;
-};
-
-// Order history data
-const orders = ref([])
-const isFetchingOrders = ref(false)
-
-// Fetch orders from database
 const fetchOrders = async () => {
-    isFetchingOrders.value = true
+    if (!isLoggedIn.value) return
+    isLoadingList.value = true
     try {
-        // Only fetch orders for the logged-in customer if applicable
-        const data = await api.getOrders(authStore.user?.id)
-        orders.value = data.map(order => ({
-            ...order,
-            date: new Date(order.created_at).toLocaleDateString(locale.value === 'th' ? 'th-TH' : 'en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-            }),
-            price: order.total_amount,
-            // Fallback for UI if items list is empty but count is needed
-            itemsCount: order.items ? order.items.length : 0,
-            image: order.items && order.items.length > 0 ? getProductImage(order.items[0].product_id) : placeholderImg('Order')
-        }))
+        const rows = await api.getOrders(authStore.user?.id)
+        orders.value = rows.map(orderViewFromRow)
+        if (selected.value) {
+            const fresh = orders.value.find(o => o.id === selected.value.id)
+            if (fresh) selected.value = fresh
+        }
     } catch (error) {
         console.error('Error fetching orders:', error)
     } finally {
-        isFetchingOrders.value = false
+        isLoadingList.value = false
     }
 }
 
-// Fetch products purely so order thumbnails can be resolved
-const fetchProductsForImages = async () => {
-    await revalidateProducts()
+const runLookup = async (credentials) => {
+    isLookingUp.value = true
+    lookupError.value = ''
     try {
-        rawDiyProducts.value = await api.getDiyProducts()
+        const found = await api.lookupOrder(credentials)
+        if (found) {
+            selected.value = found
+            proof = credentials
+            return true
+        }
+        return false
     } catch (error) {
-        console.error('Failed to fetch DIY products:', error)
+        console.error('Order lookup failed:', error)
+        lookupError.value = t('orderLookup.failed')
+        return null
+    } finally {
+        isLookingUp.value = false
     }
 }
 
-onMounted(() => {
-    fetchProductsForImages()
-    fetchOrders()
-})
-
-// Recommendations data
-const recommendations = ref([])
-
-// Order details sidebar
-const showOrderDetails = ref(false)
-const selectedOrder = ref(null)
-
-const selectOrderDetails = (order) => {
-    selectedOrder.value = order
-    showOrderDetails.value = true
+// Arriving from the thank-you page or a LINE receipt: the key in the link is the proof.
+const openFromLink = async () => {
+    const orderId = String(route.query.orderId || '').trim()
+    const key = String(route.query.key || '').trim()
+    if (!orderId || !key) return
+    lookupOrderId.value = orderId
+    const ok = await runLookup({ orderId, key })
+    if (ok === false) lookupError.value = t('orderLookup.invalidLink')
 }
 
-const closeOrderDetails = () => {
-    showOrderDetails.value = false
-    selectedOrder.value = null
+const submitLookup = async () => {
+    const orderId = lookupOrderId.value.trim().toUpperCase()
+    const phone = lookupPhone.value.trim()
+    if (!orderId || !phone) return
+    const ok = await runLookup({ orderId, phone })
+    if (ok === false) lookupError.value = t('orderLookup.notFound')
 }
 
-// Strictly null: the column is NULL until staff mark the customer's message as
-// received. An order that predates the column (undefined) or was cancelled is
-// not waiting on anything.
-const awaitingMessage = (order) =>
-    order?.contact_confirmed_at === null && order.status !== 'CANCELLED'
+const selectOrder = (order) => {
+    selected.value = order
+    // proof only matters for orders opened by lookup; list orders refresh via the list
+    proof = null
+    // In a single column the panel sits below the list.
+    if (window.matchMedia?.('(max-width: 1100px)').matches) {
+        requestAnimationFrame(() => detailEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    }
+}
+
+// The customer comes back from LINE after sending their message: refresh whatever
+// is open so it flips without a manual reload.
+const refreshSelected = async () => {
+    if (!selected.value || !isAwaitingCustomer(selected.value)) return
+    if (proof) await runLookup(proof)
+    else if (isLoggedIn.value) await fetchOrders()
+}
+const onVisible = () => { if (!document.hidden) refreshSelected() }
 
 const goToNewOrder = () => {
     router.push({ name: 'orderpage', params: { lang: currentLang.value } })
 }
+const goToLogin = () => {
+    router.push({ path: `/${currentLang.value}/login` })
+}
+
+onMounted(async () => {
+    document.addEventListener('visibilitychange', onVisible)
+    await openFromLink()
+    await fetchOrders()
+    // A single glance should show something: the newest order if none was asked for.
+    if (!selected.value && orders.value.length) selected.value = orders.value[0]
+})
+
+onBeforeUnmount(() => document.removeEventListener('visibilitychange', onVisible))
+
+watch(() => [route.query.orderId, route.query.key], openFromLink)
 </script>
 
 <template>
@@ -144,11 +156,9 @@ const goToNewOrder = () => {
                 <div class="header-content">
                     <h1 v-reveal>{{ t('order.title') }}</h1>
                     <p v-reveal class="delay2">
-                        {{ authStore.isAuthenticated ? t('order.welcomeBack', {
-                            name: authStore.user?.businessName ||
-                                authStore.user?.ownerName
-                        }) :
-                            t('order.heroSubtitle') }}
+                        {{ isLoggedIn
+                            ? t('order.welcomeBack', { name: authStore.user?.businessName || authStore.user?.ownerName })
+                            : t('orderLookup.subtitle') }}
                     </p>
                 </div>
 
@@ -166,127 +176,91 @@ const goToNewOrder = () => {
             </div>
         </div>
 
-        <!-- Main Content -->
         <div class="content-wrapper">
+            <!-- Left: who you are decides what you see -->
             <div class="history-section">
-                <div class="history-header">
-                    <div class="history-title">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2"></svg>
-                        <h2>{{ t('order.orderHistory') }}</h2>
+                <template v-if="isLoggedIn">
+                    <div class="history-header">
+                        <h2>{{ t('orderLookup.yourOrders') }}</h2>
                     </div>
-                    <button class="download-statements">{{ t('order.downloadStatements') }}</button>
-                </div>
 
-                <div class="orders-history-list">
-                    <div v-if="orders.length === 0" class="empty-orders-state">
-                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="1" style="opacity: 0.3; margin-bottom: 20px;">
+                    <p v-if="isLoadingList" class="muted">{{ t('orderLookup.loading') }}</p>
+
+                    <div v-else-if="orders.length === 0" class="empty-orders-state">
+                        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1" aria-hidden="true">
                             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
                             <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
                         </svg>
                         <h3>{{ t('order.noOrdersFound') }}</h3>
                         <p>{{ t('order.noOrdersSubtitle') }}</p>
-                        <button class="checkout-btn-modern" style="max-width: 200px; margin-top: 20px;"
-                            @click="goToNewOrder">{{ t('order.shopNow') }}</button>
+                        <button class="primary-btn" @click="goToNewOrder">{{ t('order.shopNow') }}</button>
                     </div>
-                    <div v-else v-for="order in orders" :key="order.id" class="order-history-card">
-                        <div class="order-main-info">
-                            <div class="order-img-container">
-                                <img :src="order.image" :alt="order.name">
-                            </div>
-                            <div class="order-text-info">
-                                <div class="order-id-status">
-                                    <span class="order-id">{{ t('order.orderNumber') }}{{ order.id }}</span>
-                                    <span v-if="order.status === 'SHIPPED'" class="status-tag shipped">{{
-                                        t('order.shipped') }}</span>
-                                    <span v-else class="status-tag pending">{{ order.status }}</span>
-                                    <span v-if="awaitingMessage(order)" class="status-tag awaiting">{{
-                                        t('order.awaitingConfirmTag') }}</span>
-                                </div>
-                                <h3 class="order-name">{{ order.items && order.items.length > 0 ?
-                                    order.items[0].product_name : 'New Order' }}</h3>
-                                <p class="order-meta">{{ t('order.placedOn') }} {{ order.date }} • {{
-                                    order.itemsCount }} {{ t('order.itemsCount') }} •
-                                    ฿{{
-                                        order.price.toLocaleString() }}</p>
-                            </div>
-                        </div>
 
-                        <!-- Tracking Bar (Only for Shipped) -->
-                        <div v-if="order.status === 'SHIPPED'" class="tracking-timeline">
-                            <div class="timeline-header">
-                                <span class="arrival-time">{{ order.deliveryStatus }}</span>
-                                <span class="current-location">{{ order.location }}</span>
-                            </div>
-                            <div class="timeline-bar">
-                                <div class="bar-progress" style="width: 70%"></div>
-                            </div>
-                        </div>
-
-                        <div class="order-card-actions">
-                            <button class="track-btn" v-if="order.status === 'SHIPPED'">{{ t('order.trackShipment')
-                            }}</button>
-                            <button class="order-details-btn" @click="selectOrderDetails(order)">{{
-                                t('order.orderDetails') }}</button>
-                            <button class="buy-again-btn" v-if="order.status === 'DELIVERED'">{{ t('order.buyAgain')
-                            }}</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Sidebar -->
-            <div class="history-sidebar">
-                <!-- Recommended For You (Default) -->
-                <div v-if="!showOrderDetails" class="recommendations-container">
-                    <h3>{{ t('order.recommendedForYou') }}</h3>
-                    <div class="rec-list">
-                        <div v-for="rec in recommendations" :key="rec.id" class="rec-item">
-                            <img :src="rec.image" :alt="rec.name">
-                            <div class="rec-info">
-                                <h4>{{ rec.name }}</h4>
-                                <p>฿{{ rec.price }}{{ rec.unit || '' }}</p>
-                            </div>
-                            <button class="add-rec-btn">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2">
-                                    <circle cx="9" cy="21" r="1" />
-                                    <circle cx="20" cy="21" r="1" />
-                                    <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
-                                </svg>
+                    <ul v-else class="order-list">
+                        <li v-for="order in orders" :key="order.id">
+                            <button class="order-row" :class="{ 'is-selected': selected && selected.id === order.id }"
+                                :aria-pressed="selected && selected.id === order.id" @click="selectOrder(order)">
+                                <span class="row-top">
+                                    <span class="row-id">{{ order.id }}</span>
+                                    <span class="row-state" :class="`is-${orderStateKey(order)}`">
+                                        {{ t(`orderDetail.state.${orderStateKey(order)}`) }}
+                                    </span>
+                                </span>
+                                <span class="row-name">{{ itemSummary(order) || t('orderDetail.noItems') }}</span>
+                                <span class="row-meta">
+                                    <span>{{ shortDate(order.created_at) }}</span>
+                                    <span class="row-amount">{{ amountLabel(order) }}</span>
+                                </span>
                             </button>
-                        </div>
-                    </div>
-                    <button class="view-all-recs">{{ t('order.viewRecommendations') }}</button>
-                </div>
+                        </li>
+                    </ul>
 
-                <!-- Order Details (Toggled) -->
-                <div v-else class="order-details-sidebar">
-                    <div class="details-header">
-                        <h3>{{ t('order.orderDetails') }}</h3>
-                        <button @click="closeOrderDetails" class="close-details">✕</button>
+                    <button class="text-btn" @click="showGuestLookup = !showGuestLookup">
+                        {{ t('orderLookup.guestToggle') }}
+                    </button>
+                </template>
+
+                <!-- The one lookup form: the whole left column for a guest, a folded
+                     extra for a logged-in customer with an older guest order. -->
+                <form v-if="!isLoggedIn || showGuestLookup" class="lookup" @submit.prevent="submitLookup">
+                    <div v-if="!isLoggedIn" class="history-header">
+                        <h2>{{ t('orderLookup.title') }}</h2>
                     </div>
-                    <div v-if="selectedOrder" class="details-content">
-                        <div class="order-summary-mini">
-                            <p><strong>{{ t('order.orderNumber') }}</strong> {{ selectedOrder.id }}</p>
-                            <p><strong>{{ t('order.status') }}:</strong> {{ selectedOrder.status }}</p>
-                            <p><strong>{{ t('order.total') }}:</strong> ฿{{ selectedOrder.price.toLocaleString() }}
-                            </p>
-                        </div>
-                        <!-- Still unverified: the customer has not sent us the order number yet. -->
-                        <OrderConfirmActions v-if="awaitingMessage(selectedOrder)" :order-id="selectedOrder.id"
-                            compact class="details-confirm" />
-                        <div class="order-items-mini">
-                            <div v-for="item in selectedOrder.items" :key="item.id" class="mini-item">
-                                <p><strong>{{ item.product_name }}</strong> x {{ item.quantity }}</p>
-                                <p class="mini-meta">{{ item.size }} | {{ item.color }}</p>
-                            </div>
-                        </div>
-                        <button class="checkout-btn-modern">{{ t('order.goCheckout') }}</button>
-                    </div>
-                </div>
+
+                    <label class="field">
+                        <span>{{ t('orderLookup.orderNumber') }}</span>
+                        <input v-model="lookupOrderId" type="text" autocomplete="off" autocapitalize="characters"
+                            :placeholder="t('orderLookup.orderNumberPlaceholder')" />
+                    </label>
+                    <label class="field">
+                        <span>{{ t('orderLookup.phone') }}</span>
+                        <input v-model="lookupPhone" type="tel" autocomplete="tel"
+                            :placeholder="t('orderLookup.phonePlaceholder')" />
+                    </label>
+
+                    <p v-if="lookupError" class="lookup-error" role="alert">{{ lookupError }}</p>
+
+                    <button class="primary-btn" type="submit"
+                        :disabled="isLookingUp || !lookupOrderId.trim() || !lookupPhone.trim()">
+                        {{ isLookingUp ? t('orderLookup.searching') : t('orderLookup.submit') }}
+                    </button>
+
+                    <button v-if="!isLoggedIn" class="text-btn" type="button" @click="goToLogin">
+                        {{ t('orderLookup.loginHint') }}
+                    </button>
+                </form>
             </div>
+
+            <!-- Right: the same detail panel for both -->
+            <aside class="history-sidebar" ref="detailEl">
+                <div v-if="selected" class="detail-card">
+                    <OrderDetail :order="selected" />
+                </div>
+                <div v-else class="detail-empty">
+                    <p>{{ t('orderLookup.selectHint') }}</p>
+                </div>
+            </aside>
         </div>
     </div>
 </template>
@@ -300,7 +274,7 @@ const goToNewOrder = () => {
     color: #3D2B1F;
 }
 
-/* Page Header */
+/* Page Header — same recipe as the order page */
 .page-header {
     padding: 16px 10% 0 5%;
     display: flex;
@@ -309,7 +283,7 @@ const goToNewOrder = () => {
     flex-wrap: wrap;
     gap: 4px 24px;
     border-bottom: 1px solid #EAE1D7;
-    margin-bottom: 12px;
+    margin-bottom: 20px;
 }
 
 .header-content {
@@ -336,38 +310,33 @@ const goToNewOrder = () => {
     display: block;
 }
 
-/* Content Wrapper */
-.content-wrapper {
-    padding: 0 5%;
-    display: grid;
-    grid-template-columns: 1fr 360px;
-    gap: 28px;
-    align-items: start;
-}
-
-/* Secondary Navbar */
+/* Segmented control — kept identical to OrderPage so switching tabs doesn't
+   change how the tabs look. */
 .secondary-navbar {
     display: flex;
-    gap: 28px;
-    padding: 0;
-    margin: 0;
+    gap: 4px;
+    padding: 4px;
+    margin: 0 0 12px;
     flex-shrink: 0;
+    background: #F1EAE3;
+    border-radius: 12px;
 }
 
 .nav-item {
     background: none;
     border: none;
-    padding: 11px 0;
+    padding: 9px 18px;
+    border-radius: 9px;
     font-family: 'Work Sans', sans-serif;
-    font-size: 20px;
-    font-weight: 600;
-    color: #A0917F;
+    font-size: 13px;
+    font-weight: 700;
+    color: #8C7B6E;
     cursor: pointer;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    position: relative;
-    transition: color 0.2s ease;
     text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    transition: color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
     display: inline-block;
 }
 
@@ -376,511 +345,307 @@ const goToNewOrder = () => {
 }
 
 .nav-item.active {
-    color: #3D2B1F;
-}
-
-.nav-item.active::after {
-    content: '';
-    position: absolute;
-    bottom: -1px;
-    left: 0;
-    width: 100%;
-    height: 2px;
     background: #3D2B1F;
-    border-radius: 2px 2px 0 0;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(61, 43, 31, 0.2);
 }
 
-.checkout-btn-modern {
-    width: 100%;
-    padding: 14px;
-    background: linear-gradient(135deg, #DD876E, #e6957c);
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-weight: 700;
-    font-size: 15px;
-    cursor: pointer;
-    transition: all 0.3s ease;
+/* Content — same 1fr + 360px split as the order page */
+.content-wrapper {
+    padding: 0 5%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 28px;
+    align-items: start;
 }
 
-.checkout-btn-modern:hover {
-    opacity: 0.92;
-    transform: translateY(-2px);
-}
-
-/* History Section */
 .history-section {
-    flex: 1;
-    background: white;
-    border-radius: 14px;
-    padding: 28px;
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
     box-shadow: 0 2px 10px rgba(61, 43, 31, 0.05);
 }
 
 .history-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-
-.history-title {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    color: #3D2B1F;
-}
-
-.history-title h2 {
-    font-family: 'Crimson Pro', serif;
-    font-size: 28px;
-    font-weight: 700;
-    margin: 0;
-}
-
-.download-statements {
-    background: none;
-    border: none;
-    color: #4DB6C1;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    text-decoration: underline;
-}
-
-/* Order History Cards */
-.orders-history-list {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.order-history-card {
-    background: #FBF7F2;
-    border: 1px solid #E6E0D9;
-    border-radius: 14px;
-    padding: 18px;
-    transition: all 0.3s ease;
-}
-
-.order-history-card:hover {
-    box-shadow: 0 4px 12px rgba(61, 43, 31, 0.08);
-    border-color: #D1C7BD;
-}
-
-@media (max-width: 600px) {
-    .order-main-info {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-    }
-
-    .order-img-container {
-        width: 140px;
-        height: 140px;
-    }
-
-    .order-card-actions {
-        flex-direction: column;
-    }
-
-    .order-card-actions button {
-        width: 100%;
-    }
-}
-
-.order-main-info {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 14px;
-}
-
-.order-img-container {
-    width: 84px;
-    height: 84px;
-    background: white;
-    border-radius: 12px;
-    overflow: hidden;
-    flex-shrink: 0;
-}
-
-.order-img-container img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.order-text-info {
-    flex: 1;
-}
-
-.order-id-status {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-}
-
-.order-id {
-    font-size: 13px;
-    font-weight: 600;
-    color: #8C7E71;
-}
-
-.status-tag {
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-}
-
-.status-tag.shipped {
-    background: #E0F7F9;
-    color: #4DB6C1;
-}
-
-.status-tag.pending {
-    background: #FFF9E6;
-    color: #B28900;
-}
-
-.status-tag.awaiting {
-    background: #FDECE6;
-    color: #B5472B;
-}
-
-.details-confirm {
     margin-bottom: 16px;
 }
 
-.order-name {
+.history-header h2 {
     font-family: 'Crimson Pro', serif;
-    font-size: 18px;
+    font-size: 26px;
     font-weight: 700;
-    color: #3D2B1F;
-    margin: 0 0 4px 0;
-}
-
-.order-meta {
-    font-size: 13px;
-    color: #8C7E71;
     margin: 0;
 }
 
-/* Tracking Timeline */
-.tracking-timeline {
-    background: white;
-    padding: 20px;
-    border-radius: 12px;
-    margin-bottom: 20px;
-}
-
-.timeline-header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 12px;
+.muted {
+    color: #8C7B6E;
     font-size: 14px;
-    font-weight: 600;
 }
 
-.arrival-time {
-    color: #3D2B1F;
-}
-
-.current-location {
-    color: #4DB6C1;
-}
-
-.timeline-bar {
-    height: 4px;
-    background: #F4EDE6;
-    border-radius: 2px;
-    position: relative;
-}
-
-.bar-progress {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    background: #4DB6C1;
-    border-radius: 2px;
-}
-
-/* Order Card Actions */
-.order-card-actions {
+/* Order list */
+.order-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
     display: flex;
-    gap: 12px;
+    flex-direction: column;
+    gap: 10px;
 }
 
-.track-btn {
-    flex: 1;
-    background: #006D77;
-    color: white;
-    border: none;
-    padding: 12px;
-    border-radius: 8px;
-    font-weight: 700;
-    font-size: 13px;
-    cursor: pointer;
-}
-
-.order-details-btn {
-    flex: 1;
-    background: white;
-    border: 1px solid #3D2B1F;
-    color: #3D2B1F;
-    padding: 12px;
-    border-radius: 8px;
-    font-weight: 700;
-    font-size: 13px;
-    cursor: pointer;
-}
-
-.buy-again-btn {
-    background: white;
+.order-row {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px 16px;
+    text-align: left;
+    background: #FBF7F2;
     border: 1px solid #E6E0D9;
-    color: #8C7E71;
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-weight: 700;
-    font-size: 13px;
-    cursor: pointer;
-}
-
-/* History Sidebar */
-.history-sidebar {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.recommendations-container {
-    background: white;
     border-radius: 14px;
-    padding: 20px;
-    box-shadow: 0 2px 10px rgba(61, 43, 31, 0.05);
-}
-
-.recommendations-container h3 {
-    font-size: 14px;
-    font-weight: 700;
-    color: #3D2B1F;
-    letter-spacing: 1px;
-    margin: 0 0 20px 0;
-}
-
-.rec-list {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    margin-bottom: 24px;
-}
-
-.rec-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px;
-    border-radius: 12px;
-    background: #FBF7F2;
-}
-
-.rec-item img {
-    width: 60px;
-    height: 60px;
-    border-radius: 8px;
-    object-fit: cover;
-}
-
-.rec-info {
-    flex: 1;
-}
-
-.rec-info h4 {
-    font-size: 14px;
-    font-weight: 600;
-    color: #3D2B1F;
-    margin: 0 0 4px 0;
-}
-
-.rec-info p {
-    font-size: 13px;
-    color: #4DB6C1;
-    font-weight: 700;
-    margin: 0;
-}
-
-.add-rec-btn {
-    background: none;
-    border: none;
-    color: #8C7E71;
+    font-family: inherit;
+    color: inherit;
     cursor: pointer;
-    padding: 8px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.view-all-recs {
-    width: 100%;
-    padding: 12px;
-    background: white;
-    border: 1px solid #4DB6C1;
-    color: #006D77;
-    border-radius: 8px;
-    font-weight: 700;
-    font-size: 13px;
-    cursor: pointer;
+.order-row:hover {
+    border-color: #D1C7BD;
+    box-shadow: 0 4px 12px rgba(61, 43, 31, 0.07);
 }
 
-/* Order Details Sidebar */
-.order-details-sidebar {
-    background: white;
-    border-radius: 14px;
-    padding: 20px;
-    box-shadow: 0 2px 10px rgba(61, 43, 31, 0.05);
+.order-row.is-selected {
+    border-color: #DD876E;
+    box-shadow: 0 0 0 3px rgba(221, 135, 110, 0.18);
 }
 
-.details-header {
+.row-top {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    gap: 10px;
 }
 
-.details-header h3 {
-    font-family: 'Crimson Pro', serif;
-    font-size: 20px;
-    font-weight: 700;
-    margin: 0;
-}
-
-.close-details {
-    background: none;
-    border: none;
-    font-size: 18px;
-    color: #8C7E71;
-    cursor: pointer;
-}
-
-.details-content {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.order-summary-mini {
-    background: #FBF7F2;
-    padding: 16px;
-    border-radius: 12px;
+.row-id {
     font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
 }
 
-.order-summary-mini p {
-    margin: 8px 0;
+.row-state {
+    flex-shrink: 0;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    background: #FFF3D6;
+    border: 1px solid #F2D58A;
+    color: #8A5A00;
+}
+
+.row-state.is-confirmed,
+.row-state.is-paid,
+.row-state.is-shipped,
+.row-state.is-delivered {
+    background: #EAF4EC;
+    border-color: #BFDCC5;
+    color: #2F6B3C;
+}
+
+.row-state.is-cancelled {
+    background: #F3EEE9;
+    border-color: #E6E0D9;
+    color: #8C7B6E;
+}
+
+.row-name {
+    font-size: 14px;
+    color: #5E4C40;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.row-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13px;
+    color: #8C7B6E;
+}
+
+.row-amount {
+    font-weight: 700;
     color: #3D2B1F;
 }
 
-.order-items-mini {
-    font-size: 13px;
-    color: #8C7E71;
-}
-
-.mini-item {
-    padding: 10px 0;
-    border-bottom: 1px solid #F0ECE7;
-}
-
-.mini-item:last-child {
-    border-bottom: none;
-}
-
-.mini-meta {
-    font-size: 11px;
-    opacity: 0.7;
-    margin-top: 2px;
-}
-
+/* Empty state */
 .empty-orders-state {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 80px 20px;
     text-align: center;
-    background: white;
-    border-radius: 12px;
-    border: 1px dashed #E6E0D9;
+    padding: 28px 8px;
+    color: #8C7B6E;
+}
+
+.empty-orders-state svg {
+    opacity: 0.3;
+    margin-bottom: 16px;
 }
 
 .empty-orders-state h3 {
-    font-family: 'ZCOOL XiaoWei', serif;
-    font-size: 24px;
+    margin: 0 0 6px;
     color: #3D2B1F;
-    margin-bottom: 10px;
 }
 
 .empty-orders-state p {
-    color: #8C7E71;
-    max-width: 400px;
-    line-height: 1.6;
+    margin: 0 0 18px;
+    font-size: 14px;
 }
 
-/* Responsive */
+/* Lookup form */
+.lookup {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 6px;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.field span {
+    font-size: 13px;
+    font-weight: 600;
+    color: #5E4C40;
+}
+
+.field input {
+    padding: 13px 14px;
+    border: 1px solid #E6E0D9;
+    border-radius: 10px;
+    background: #FBF7F2;
+    font-family: inherit;
+    font-size: 15px;
+    color: #3D2B1F;
+}
+
+.field input:focus {
+    outline: none;
+    border-color: #DD876E;
+    box-shadow: 0 0 0 3px rgba(221, 135, 110, 0.18);
+}
+
+.lookup-error {
+    margin: 0;
+    padding: 10px 12px;
+    background: #FCEDEA;
+    border: 1px solid #F0C4BB;
+    border-radius: 10px;
+    color: #9B2C1B;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.primary-btn {
+    padding: 14px;
+    background: #3D2B1F;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.primary-btn:hover:not(:disabled) {
+    background: #543D2F;
+}
+
+.primary-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.text-btn {
+    align-self: flex-start;
+    margin-top: 14px;
+    padding: 4px 0;
+    background: none;
+    border: none;
+    color: #8C7B6E;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.lookup .text-btn {
+    margin-top: 0;
+}
+
+.text-btn:hover {
+    color: #3D2B1F;
+}
+
+/* Detail panel */
+.history-sidebar {
+    position: sticky;
+    top: 24px;
+}
+
+.detail-card {
+    background: #F9F5F0;
+    border-radius: 16px;
+    padding: 20px;
+}
+
+.detail-empty {
+    padding: 28px 20px;
+    background: #F9F5F0;
+    border-radius: 16px;
+    text-align: center;
+    color: #8C7B6E;
+    font-size: 14px;
+    line-height: 1.55;
+}
+
+.detail-empty p {
+    margin: 0;
+}
+
 @media (max-width: 1100px) {
     .content-wrapper {
         grid-template-columns: 1fr;
     }
-}
 
-@media (max-width: 1024px) {
     .history-sidebar {
-        width: 100%;
+        position: static;
     }
 }
 
 @media (max-width: 768px) {
-    .secondary-navbar {
-        gap: 20px;
+    .page-header {
+        padding: 16px 20px 0;
     }
 
     .header-content h1 {
         font-size: 28px;
     }
 
-    .order-main-info {
-        flex-direction: column;
+    .content-wrapper {
+        padding: 0 20px;
     }
 
-    .order-img-container {
-        width: 100%;
-        height: 150px;
+    .history-section {
+        padding: 18px;
     }
-
-    .order-card-actions {
-        flex-direction: column;
-    }
-
-    .history-sidebar {
-        display: none;
-    }
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-    width: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: #F9F5F0;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #E6E0D9;
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: #D1C7BD;
 }
 </style>

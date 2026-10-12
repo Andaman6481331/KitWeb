@@ -1,7 +1,8 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
 import { api } from '../services/api';
 import { useI18n } from 'vue-i18n';
+import { reconcileDraft } from '../utils/manageOrderDrafts';
 
 const { t } = useI18n();
 
@@ -12,6 +13,21 @@ const loginError = ref(false);
 const orders = ref([]);
 const isLoading = ref(false);
 const loadError = ref('');
+
+// The sign-in gate is shown again when the Worker stops recognising the stored
+// admin token (expired after 12 h, ended elsewhere, or left over from the old
+// password-as-token login). api.js has already dropped the dead token.
+const sessionExpired = ref(false);
+
+const handleAuthError = (e) => {
+  if (e?.status !== 401) return false;
+  isAuthenticated.value = false;
+  sessionExpired.value = true;
+  loginError.value = false;
+  password.value = '';
+  orders.value = [];
+  return true;
+};
 
 // Per-order editable draft + UI state, keyed by order id.
 const drafts = reactive({});
@@ -40,12 +56,30 @@ const isContactConfirmed = (o) => !!o.contact_confirmed_at;
 // Order ids with a confirm/undo request in flight, to disable their button.
 const confirming = reactive({});
 
+// Which orders to list. "Awaiting" is the working view: those still need the
+// customer's message before anyone acts on them.
+const filter = ref('all');
+const FILTERS = ['all', 'awaiting', 'confirmed'];
+const matchesFilter = (o, f) =>
+  f === 'all' || (f === 'awaiting' ? awaitingCustomer(o) : !awaitingCustomer(o));
+const visibleOrders = computed(() => orders.value.filter((o) => matchesFilter(o, filter.value)));
+const filterCount = (f) => orders.value.filter((o) => matchesFilter(o, f)).length;
+const filterLabel = (f) =>
+  t(`manageOrders.filter${f === 'all' ? 'All' : f === 'awaiting' ? 'Awaiting' : 'Confirmed'}`);
+
 const setContactConfirmed = async (o, confirmed) => {
   confirming[o.id] = true;
   try {
     const res = await api.confirmOrderContact({ orderId: o.id, confirmed });
     o.contact_confirmed_at = res?.contact_confirmed_at ?? null;
+    o.contact_confirmed_via = confirmed ? 'staff' : null;
+    const d = drafts[o.id];
+    if (d) {
+      d.error = false;
+      d.message = confirmed && res?.customerNotified ? t('manageOrders.confirmedNotified') : '';
+    }
   } catch (e) {
+    if (handleAuthError(e)) return;
     const d = drafts[o.id];
     if (d) {
       d.error = true;
@@ -62,41 +96,57 @@ const lineState = (o) => {
   return Number(o.line_push_failed) === 1 ? 'unreachable' : 'reachable';
 };
 
-const loadOrders = async () => {
-  isLoading.value = true;
-  loadError.value = '';
+// Set while a background refresh is in flight, so refreshes never overlap.
+let refreshing = false;
+
+// silent = background refresh: keeps drafts staff are typing into (see
+// utils/manageOrderDrafts.js) and doesn't flash the loading state.
+
+const fetchOrders = async ({ silent }) => {
+  if (silent) {
+    if (refreshing) return;
+    refreshing = true;
+  } else {
+    isLoading.value = true;
+    loadError.value = '';
+  }
   try {
     const data = await api.getOrders();
-    orders.value = Array.isArray(data) ? data : [];
-    for (const o of orders.value) {
-      drafts[o.id] = {
-        status: o.status || 'PENDING',
-        trackingNumber: o.tracking_number || '',
-        editing: false,
-        customerName: o.customer_name || '',
-        phoneNumber: o.phone_number || '',
-        shippingAddress: o.shipping_address || '',
-        lineDisplayName: o.line_display_name || '',
-        note: o.note || '',
-        items: (o.items || []).map((it) => ({
-          id: it.product_id ?? null,
-          name: it.product_name || '',
-          selectedSize: it.size || '',
-          selectedColor: it.color || '',
-          quantity: Number(it.quantity) || 1,
-          price: Number(it.price) || 0,
-        })),
-        saving: false,
-        savingEdit: false,
-        message: '',
-        error: false,
-      };
+    const next = Array.isArray(data) ? data : [];
+    const previous = new Map(orders.value.map((o) => [o.id, o]));
+    for (const o of next) {
+      drafts[o.id] = reconcileDraft({
+        order: o,
+        previousOrder: previous.get(o.id),
+        current: drafts[o.id],
+        silent,
+      });
     }
+    orders.value = next;
   } catch (e) {
-    loadError.value = e?.message || t('manageOrders.loadFailed');
+    if (handleAuthError(e)) return;
+    // A failed background refresh keeps the list on screen; only a manual load reports it.
+    if (!silent) loadError.value = e?.message || t('manageOrders.loadFailed');
   } finally {
-    isLoading.value = false;
+    if (silent) refreshing = false;
+    else isLoading.value = false;
   }
+};
+
+const loadOrders = () => fetchOrders({ silent: false });
+
+// Keeps the list current without a button press, e.g. when a customer's LINE
+// message confirms an order while this page sits open.
+const REFRESH_MS = 30000;
+let refreshTimer = null;
+
+const refreshQuietly = () => {
+  if (!isAuthenticated.value || document.hidden || isLoading.value) return;
+  fetchOrders({ silent: true });
+};
+
+const onVisibilityChange = () => {
+  if (!document.hidden) refreshQuietly();
 };
 
 const handleLogin = async () => {
@@ -104,6 +154,7 @@ const handleLogin = async () => {
   if (result.success) {
     isAuthenticated.value = true;
     loginError.value = false;
+    sessionExpired.value = false;
     loadOrders();
   } else {
     loginError.value = true;
@@ -129,10 +180,41 @@ const updateOrder = async (order) => {
       ? t('manageOrders.savedNotified')
       : t('manageOrders.saved');
   } catch (e) {
+    if (handleAuthError(e)) return;
     draft.error = true;
     draft.message = e?.message || t('manageOrders.saveFailed');
   } finally {
     draft.saving = false;
+  }
+};
+
+// '' clears the quote; anything else is the carrier's real cost in baht.
+const deliveryPayload = (d) => (d.deliveryFee === '' || d.deliveryFee === null ? null : Number(d.deliveryFee));
+
+const saveDelivery = async (o) => {
+  const d = drafts[o.id];
+  if (!d) return;
+  const fee = deliveryPayload(d);
+  if (fee !== null && (!Number.isFinite(fee) || fee < 0)) {
+    d.error = true;
+    d.message = t('manageOrders.saveFailed');
+    return;
+  }
+  d.savingDelivery = true;
+  d.message = '';
+  d.error = false;
+  try {
+    const res = await api.updateOrder({ orderId: o.id, deliveryFee: fee });
+    o.delivery_fee = res?.deliveryFee ?? fee;
+    d.message = res?.customerNotified
+      ? t('manageOrders.deliverySavedNotified')
+      : t('manageOrders.deliverySaved');
+  } catch (e) {
+    if (handleAuthError(e)) return;
+    d.error = true;
+    d.message = e?.message || t('manageOrders.saveFailed');
+  } finally {
+    d.savingDelivery = false;
   }
 };
 
@@ -167,6 +249,7 @@ const saveFullOrder = async (o) => {
       note: d.note,
       status: d.status,
       trackingNumber: d.trackingNumber,
+      deliveryFee: deliveryPayload(d),
       items: d.items.map((it) => ({
         id: it.id,
         name: it.name,
@@ -187,6 +270,7 @@ const saveFullOrder = async (o) => {
         : t('manageOrders.saved');
     }
   } catch (e) {
+    if (handleAuthError(e)) return;
     d.error = true;
     d.message = e?.message || t('manageOrders.saveFailed');
     d.savingEdit = false;
@@ -195,6 +279,13 @@ const saveFullOrder = async (o) => {
 
 onMounted(() => {
   if (isAuthenticated.value) loadOrders();
+  refreshTimer = setInterval(refreshQuietly, REFRESH_MS);
+  document.addEventListener('visibilitychange', onVisibilityChange);
+});
+
+onBeforeUnmount(() => {
+  clearInterval(refreshTimer);
+  document.removeEventListener('visibilitychange', onVisibilityChange);
 });
 </script>
 
@@ -210,6 +301,7 @@ onMounted(() => {
         @keyup.enter="handleLogin"
       />
       <button @click="handleLogin">{{ t('manageOrders.signIn') }}</button>
+      <p v-if="sessionExpired" class="error">{{ t('manageOrders.sessionExpired') }}</p>
       <p v-if="loginError" class="error">{{ t('manageOrders.incorrectPassword') }}</p>
     </div>
 
@@ -227,8 +319,16 @@ onMounted(() => {
         {{ t('manageOrders.noOrders') }}
       </p>
 
+      <div v-if="orders.length" class="filter-bar" role="tablist">
+        <button v-for="f in FILTERS" :key="f" class="filter-chip" :class="{ active: filter === f }"
+          role="tab" :aria-selected="filter === f" @click="filter = f">
+          {{ filterLabel(f) }} <span class="filter-count">{{ filterCount(f) }}</span>
+        </button>
+      </div>
+      <p v-if="orders.length && visibleOrders.length === 0" class="empty">{{ t('manageOrders.noMatches') }}</p>
+
       <div class="order-list">
-        <article v-for="o in orders" :key="o.id" class="order-card">
+        <article v-for="o in visibleOrders" :key="o.id" class="order-card">
           <div class="order-top">
             <div class="order-id-block">
               <span class="order-id">{{ o.id }}</span>
@@ -249,6 +349,19 @@ onMounted(() => {
             <span class="total" v-else>฿{{ Number(o.total_amount || 0).toFixed(2) }}</span>
           </div>
 
+          <!-- Delivery is quoted per order at the carrier's cost; show what the customer owes. -->
+          <div v-if="!isQuote(o)" class="delivery-line">
+            <span>{{ t('orderTotals.delivery') }}:</span>
+            <span v-if="o.delivery_fee === null || o.delivery_fee === undefined" class="delivery-missing">
+              {{ t('manageOrders.deliveryNotQuoted') }}
+            </span>
+            <span v-else>
+              ฿{{ Number(o.delivery_fee).toFixed(2) }} ·
+              {{ t('manageOrders.amountToPay') }}
+              <strong>฿{{ (Number(o.total_amount || 0) + Number(o.delivery_fee)).toFixed(2) }}</strong>
+            </span>
+          </div>
+
           <!-- LINE reachability -->
           <div class="line-state" :class="'line-' + lineState(o)">
             <template v-if="lineState(o) === 'reachable'">🟢 {{ t('manageOrders.lineReachable') }}</template>
@@ -264,7 +377,11 @@ onMounted(() => {
             </button>
           </div>
           <div v-else-if="isContactConfirmed(o) && o.status !== 'CANCELLED'" class="confirm-row confirm-done">
-            <span>✅ {{ t('manageOrders.confirmedLabel') }}</span>
+            <span>✅ {{ t('manageOrders.confirmedLabel') }}
+              <span v-if="o.contact_confirmed_via" class="confirm-via">
+                · {{ o.contact_confirmed_via === 'line-webhook' ? t('manageOrders.confirmedViaLine') : t('manageOrders.confirmedViaStaff') }}
+              </span>
+            </span>
             <button class="undo-btn" :disabled="confirming[o.id]" @click="setContactConfirmed(o, false)">
               {{ t('manageOrders.undoConfirm') }}
             </button>
@@ -295,6 +412,19 @@ onMounted(() => {
             <button class="edit-toggle-btn" @click="toggleEdit(o)">
               {{ drafts[o.id].editing ? 'Close editor' : 'Edit details' }}
             </button>
+          </div>
+
+          <!-- Delivery: the carrier's real cost, no markup. Blank = not quoted yet. -->
+          <div v-if="drafts[o.id]" class="delivery-row">
+            <label class="delivery-label">
+              {{ t('manageOrders.deliveryLabel') }}
+              <input v-model="drafts[o.id].deliveryFee" type="number" min="0" step="1" inputmode="decimal"
+                class="delivery-input" :placeholder="t('manageOrders.deliveryPlaceholder')" />
+            </label>
+            <button class="update-btn" :disabled="drafts[o.id].savingDelivery" @click="saveDelivery(o)">
+              {{ drafts[o.id].savingDelivery ? t('manageOrders.saving') : t('manageOrders.saveDelivery') }}
+            </button>
+            <p class="delivery-hint">{{ t('manageOrders.deliveryHint') }}</p>
           </div>
 
           <!-- Full editor: customer info + line items -->
@@ -400,6 +530,21 @@ onMounted(() => {
 }
 .refresh-btn:disabled { opacity: 0.6; cursor: default; }
 
+/* Filter chips */
+.filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.filter-chip {
+  padding: 7px 14px;
+  border: 1px solid #ddd2c4;
+  background: #fff;
+  color: #604539;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.filter-chip.active { background: #3d2b1f; border-color: #3d2b1f; color: #fff; }
+.filter-count { margin-left: 4px; opacity: 0.7; font-weight: 500; }
+
 /* Cards */
 .order-list { display: flex; flex-direction: column; gap: 16px; }
 .order-card {
@@ -416,6 +561,28 @@ onMounted(() => {
   gap: 12px;
 }
 .order-id-block { display: flex; flex-direction: column; }
+
+/* Delivery */
+.delivery-line { margin-top: 6px; font-size: 0.88rem; color: #604539; display: flex; flex-wrap: wrap; gap: 6px; }
+.delivery-missing { color: #b26a00; font-weight: 600; }
+.confirm-via { color: #9e8272; font-weight: 400; }
+.delivery-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #ede4d9;
+}
+.delivery-label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; font-weight: 600; color: #604539; flex: 1 1 220px; }
+.delivery-input {
+  padding: 9px 12px;
+  border: 1px solid #ddd2c4;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+.delivery-hint { flex-basis: 100%; margin: 0; font-size: 0.78rem; color: #9e8272; }
 .order-id { font-weight: 700; color: #3d2b1f; }
 .order-date { font-size: 0.8rem; color: #9e8272; margin-top: 2px; }
 

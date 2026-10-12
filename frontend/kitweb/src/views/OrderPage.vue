@@ -11,7 +11,9 @@ import { cartHasUnpriced, isUnpricedItem, isPriced } from '../utils/cartPricing'
 import { parseMoq, toPerPiece, stepQty } from '../utils/productPricing';
 import AddToOrderModal from '../components/add-to-order-modal.vue';
 import LineConnectPanel from '../components/line-connect-panel.vue';
-import InfoBanner from '../components/info-banner.vue';
+import OrderProgress from '../components/order-progress.vue';
+import OrderTotals from '../components/order-totals.vue';
+import PriceNotice from '../components/price-notice.vue';
 import { validateContact } from '../utils/orderContact';
 
 const route = useRoute();
@@ -490,6 +492,7 @@ const submitOrder = async () => {
     formData.append('orderNote', orderNote.value)
     formData.append('lineUserId', lineUserId.value)
     formData.append('lineDisplayName', lineDisplayName.value)
+    formData.append('lang', currentLang.value)
     // Link the order to the account when logged in (so it appears under Track Orders).
     if (isLoggedIn.value && authStore.user?.id) {
         formData.append('customerId', authStore.user.id)
@@ -521,7 +524,13 @@ const submitOrder = async () => {
                 name: 'thank-you',
                 params: { lang: currentLang.value },
                 // The server decides whether this was a quote; trust its answer, not the cart.
-                query: { orderId: result.orderId, ...(result.isQuote ? { quote: '1' } : {}) }
+                query: {
+                    orderId: result.orderId,
+                    // The private half of the order link: lets the next page ask the
+                    // server for this order's live state.
+                    ...(result.viewKey ? { key: result.viewKey } : {}),
+                    ...(result.isQuote ? { quote: '1' } : {}),
+                }
             })
         } else {
             // Log the raw backend response so unmapped errors are diagnosable in the console.
@@ -590,15 +599,17 @@ const scrollToCart = () => {
 const isProductInCart = (productId) => {
     return cart.value.some(item => item.id === productId)
 }
+
+// Total quantity of a product across all its variants, for the "In cart" chip.
+const cartQtyFor = (productId) => {
+    return cart.value
+        .filter(item => item.id === productId)
+        .reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
+}
 </script>
 
 <template>
     <div class="order-page">
-        <!-- Sets the expectation up front: we never contact web customers first, so an
-             order only moves once they message us with its order number. -->
-        <InfoBanner :badge="tt('order.confirmBannerBadge', 'How ordering works')"
-            :text="tt('order.confirmBannerText', 'After you submit, send us your order number on LINE or WhatsApp to confirm it. Orders we don\'t hear about can\'t be processed.')" />
-
         <!-- Page Header -->
         <div class="headers-wrapper">
             <div class="page-header">
@@ -625,6 +636,12 @@ const isProductInCart = (productId) => {
                     </router-link>
                 </div>
             </div>
+
+            <!-- We never contact web customers first, so the rail also tells them up
+                 front that an order only moves once they message us (step 3). It
+                 marks step 1 while they pick items and step 2 once the form is open. -->
+            <OrderProgress class="order-progress" :current="isCheckoutView ? 2 : 1" />
+
             <!-- Search & Filter Bar (hidden while checking out) -->
             <div class="filter-bar" v-if="!isCheckoutView">
                 <div class="search-box">
@@ -689,7 +706,10 @@ const isProductInCart = (productId) => {
 
                                         <!-- Product Info -->
                                         <div class="td-details">
-                                            <span :class="['product-tag', { 'diy-tag': product.category === 'DIY Kit' }]">{{ product.category }}</span>
+                                            <div class="tag-row">
+                                                <span :class="['product-tag', { 'diy-tag': product.category === 'DIY Kit' }]">{{ product.category }}</span>
+                                                <span v-if="isProductInCart(product.id)" class="in-cart-chip">{{ t('order.inCartChip', { count: cartQtyFor(product.id) }) }}</span>
+                                            </div>
                                             <h3 class="product-name">{{ tProduct(product, 'name') }}</h3>
                                             <p class="product-desc">{{ tProduct(product, 'description') }}</p>
                                         </div>
@@ -740,7 +760,10 @@ const isProductInCart = (productId) => {
 
                                         <!-- Product Info -->
                                         <div class="td-details">
-                                            <span :class="['product-tag', { 'diy-tag': product.category === 'DIY Kit' }]">{{ product.category }}</span>
+                                            <div class="tag-row">
+                                                <span :class="['product-tag', { 'diy-tag': product.category === 'DIY Kit' }]">{{ product.category }}</span>
+                                                <span v-if="isProductInCart(product.id)" class="in-cart-chip">{{ t('order.inCartChip', { count: cartQtyFor(product.id) }) }}</span>
+                                            </div>
                                             <h3 class="product-name">{{ tProduct(product, 'name') }}</h3>
                                             <p class="product-desc">{{ tProduct(product, 'description') }}</p>
                                         </div>
@@ -807,14 +830,6 @@ const isProductInCart = (productId) => {
                         </svg>
                         {{ tt('order.backToShopping', 'Back to shopping') }}
                     </button>
-
-                    <!-- The left column silently becomes a form, so name the steps to
-                         show what just happened and what is left. -->
-                    <ol class="checkout-steps">
-                        <li class="step done">{{ t('order.stepItems') }}</li>
-                        <li class="step current">{{ t('order.stepDetails') }}</li>
-                        <li class="step">{{ t('order.stepConfirm') }}</li>
-                    </ol>
 
                     <!-- The cart's quote notice sits below the whole form under 1100px,
                          so repeat it here: nobody should fill this in without knowing
@@ -985,15 +1000,14 @@ const isProductInCart = (productId) => {
 
                     <!-- Cart Footer Modern -->
                     <div class="cart-footer-modern" v-if="cart.length > 0">
-                        <div class="cart-summary-modern">
-                            <div class="summary-row total">
-                                <span>{{ t('order.total') }}</span>
-                                <span v-if="isQuoteCart" class="total-tbc">{{ t('order.quoteTotalPending') }}</span>
-                                <span v-else>฿{{ cartTotal }}</span>
-                            </div>
-                        </div>
+                        <!-- Items only: delivery is quoted at the carrier's cost after the
+                             customer confirms, so there is deliberately no final "Total". -->
+                        <OrderTotals class="cart-summary-modern" :items-total="isQuoteCart ? null : cartTotal"
+                            :delivery-fee="null" />
 
                         <p class="quote-notice" v-if="isQuoteCart">{{ t('order.quoteNotice') }}</p>
+
+                        <PriceNotice class="cart-price-notice" />
 
                         <!-- Confirm what's about to be submitted at the point it's
                              committed: under 1100px the form is far above this button. -->
@@ -1020,6 +1034,9 @@ const isProductInCart = (productId) => {
                                 <span v-else>{{ slipRequired ? t('order.verifyAndOrder') : tt('order.placeOrder', 'Place Order') }}</span>
                             </button>
                         </div>
+
+                        <!-- Checkout is not the end: say what comes after it. -->
+                        <p class="cart-next-hint" v-if="!isCheckoutView">{{ t('order.cartNextHint') }}</p>
                     </div>
 
                     <!-- Bottom Trust Badges -->
@@ -1038,7 +1055,7 @@ const isProductInCart = (productId) => {
                                 <circle cx="12" cy="12" r="10" />
                                 <path d="M2 12h20M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z" />
                             </svg>
-                            {{ t('order.globalShipping') }}
+                            {{ t('order.deliveryAtCost') }}
                         </div>
                     </div>
                 </div>
@@ -1068,7 +1085,7 @@ const isProductInCart = (productId) => {
         <span class="mcb-count">{{ cartItemCount }}</span>
         <span class="mcb-label">{{ t('order.yourCart') }}</span>
         <span class="mcb-total" v-if="isQuoteCart">{{ t('order.quoteTotalPending') }}</span>
-        <span class="mcb-total" v-else>฿{{ cartTotal }}</span>
+        <span class="mcb-total" v-else>฿{{ cartTotal }} <small class="mcb-plus">{{ t('order.plusDelivery') }}</small></span>
     </button>
 
     <!-- Clear Cart Confirmation Modal -->
@@ -1238,9 +1255,42 @@ const isProductInCart = (productId) => {
 /* Products Section */
 .products-container {
     background: white;
-    /* border-radius: 20px; */
-    border: 1px solid #F4EDE6;
+    border-radius: 16px;
+    border: 1px solid #EAE1D7;
+    box-shadow: 0 2px 12px rgba(61, 43, 31, 0.04);
     overflow: hidden;
+}
+
+/* Progress rail sits between the page header and the filter bar. */
+.headers-wrapper .order-progress {
+    margin: 4px 0 16px;
+}
+
+.tag-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Rows already in the cart carry the terracotta bar; the chip says what it means. */
+.in-cart-chip {
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: #FBEDE7;
+    color: #B4573D;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.cart-next-hint {
+    margin: 12px 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    text-align: center;
+    color: #8C7B6E;
 }
 
 .table-header {
@@ -1390,23 +1440,27 @@ const isProductInCart = (productId) => {
     font-weight: 700;
 }
 
+/* Outline rather than solid: a screenful of heavy dark buttons made every row
+   shout equally. It fills on hover so it still reads as the row's action. */
 .add-to-cart-btn {
-    padding: 9px 16px;
-    background: #3D2B1F;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 14px;
+    padding: 8px 14px;
+    background: #fff;
+    color: #3D2B1F;
+    border: 1.5px solid #3D2B1F;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 13px;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 8px;
-    transition: all 0.3s ease;
+    gap: 6px;
+    transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .add-to-cart-btn:hover:not(:disabled) {
-    background: #543D2F;
+    background: #3D2B1F;
+    color: #fff;
+    box-shadow: 0 3px 10px rgba(61, 43, 31, 0.18);
 }
 
 .add-to-cart-btn:disabled {
@@ -1534,6 +1588,7 @@ const isProductInCart = (productId) => {
 /* Cart Sidebar Modern */
 .cart-sidebar {
     background: #F9F5F0;
+    border: 1px solid #EFE6DC;
     border-radius: 16px;
     padding: 20px;
     position: sticky;
@@ -1864,6 +1919,16 @@ const isProductInCart = (productId) => {
     color: #8C7B6E;
 }
 
+.cart-price-notice {
+    margin: 0 0 16px;
+}
+
+.mcb-plus {
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.85;
+}
+
 .summary-row.total {
     margin-top: 8px;
     padding-top: 12px;
@@ -1973,71 +2038,7 @@ const isProductInCart = (productId) => {
     margin: -2px 0 12px;
 }
 
-/* ---- Checkout legibility: step rail, quote banner, field errors, recap ---- */
-
-.checkout-steps {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    flex-wrap: wrap;
-}
-
-.step {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #B5A99D;
-    counter-increment: checkout-step;
-}
-
-.step::before {
-    content: counter(checkout-step);
-    display: grid;
-    place-items: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: #F1EAE3;
-    color: #8C7B6E;
-    font-size: 12px;
-}
-
-.step+.step::after {
-    /* Separator drawn on the gap between chips, not inside them. */
-    content: '';
-    order: -1;
-    width: 18px;
-    height: 1px;
-    background: #E6E0D9;
-}
-
-.checkout-steps {
-    counter-reset: checkout-step;
-}
-
-.step.done {
-    color: #8C7B6E;
-}
-
-.step.done::before {
-    content: '✓';
-    background: #DD876E;
-    color: white;
-}
-
-.step.current {
-    color: #3D2B1F;
-}
-
-.step.current::before {
-    background: #3D2B1F;
-    color: white;
-}
+/* ---- Checkout legibility: quote banner, field errors, recap ---- */
 
 .quote-banner {
     display: flex;
@@ -2202,27 +2203,33 @@ const isProductInCart = (productId) => {
    do not reach into a child component. */
 
 /* Secondary Navbar */
+/* Segmented control: NEW ORDER / TRACK ORDERS read as two views of the same
+   page, not as two underlined links. */
 .secondary-navbar {
     display: flex;
-    gap: 28px;
-    padding: 0;
-    margin: 0;
+    gap: 4px;
+    padding: 4px;
+    margin: 0 0 12px;
     flex-shrink: 0;
+    background: #F1EAE3;
+    border-radius: 12px;
 }
 
 .nav-item {
     background: none;
     border: none;
-    padding: 11px 0;
+    padding: 9px 18px;
+    border-radius: 9px;
     font-family: 'Work Sans', sans-serif;
-    font-size: 20px;
-    font-weight: 600;
-    color: #A0917F;
+    font-size: 13px;
+    font-weight: 700;
+    color: #8C7B6E;
     cursor: pointer;
+    text-decoration: none;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    position: relative;
-    transition: color 0.2s ease;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    transition: color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .nav-item:hover {
@@ -2230,18 +2237,9 @@ const isProductInCart = (productId) => {
 }
 
 .nav-item.active {
-    color: #3D2B1F;
-}
-
-.nav-item.active::after {
-    content: '';
-    position: absolute;
-    bottom: -1px;
-    left: 0;
-    width: 100%;
-    height: 2px;
     background: #3D2B1F;
-    border-radius: 2px 2px 0 0;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(61, 43, 31, 0.2);
 }
 
 /* Responsive Modern */
@@ -2257,7 +2255,12 @@ const isProductInCart = (productId) => {
 
 @media (max-width: 768px) {
     .secondary-navbar {
-        gap: 20px;
+        gap: 4px;
+    }
+
+    .nav-item {
+        padding: 8px 14px;
+        font-size: 12px;
     }
 
     .header-content h1 {

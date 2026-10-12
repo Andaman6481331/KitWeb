@@ -3,10 +3,16 @@
 // "coming soon" teaser card. These used to be a hardcoded array in EventPage.vue,
 // which meant a stale teaser could only be fixed by a developer.
 import { ref, computed, onMounted } from 'vue';
-import { api, API_URL, getEventMediaUrl } from '../services/api';
+import { api, API_URL, getEventMediaUrl, sessionExpiredError } from '../services/api';
 
 const events = ref([]);
 const loading = ref(true);
+const emit = defineEmits(['session-expired']);
+const handleAuthError = (err) => {
+  if (err?.status !== 401) return false;
+  emit('session-expired');
+  return true;
+};
 const saving = ref(false);
 const uploading = ref(false);
 const errorMessage = ref('');
@@ -40,6 +46,7 @@ const load = async () => {
     try {
         events.value = await api.getEvents({ includeHidden: true });
     } catch (err) {
+      if (handleAuthError(err)) return;
         errorMessage.value = err.message;
     } finally {
         loading.value = false;
@@ -85,6 +92,7 @@ const uploadMedia = async (file) => {
         headers: { 'Authorization': api.getToken() },
         body: fd
     });
+    if (res.status === 401) throw sessionExpiredError();
     if (!res.ok) throw new Error('Upload failed');
     const data = await res.json();
     return `${API_URL}/images/${data.key || key}`;
@@ -98,6 +106,7 @@ const onCoverPick = async (e) => {
     try {
         form.value.cover_image_key = await uploadMedia(file);
     } catch (err) {
+      if (handleAuthError(err)) return;
         errorMessage.value = err.message;
     } finally {
         uploading.value = false;
@@ -116,6 +125,7 @@ const onMediaPick = async (e, idx) => {
         form.value.gallery[idx].src = await uploadMedia(file);
         if (file.type.startsWith('video')) form.value.gallery[idx].type = 'video';
     } catch (err) {
+      if (handleAuthError(err)) return;
         errorMessage.value = err.message;
     } finally {
         uploading.value = false;
@@ -139,6 +149,7 @@ const save = async () => {
         await load();
         panelOpen.value = false;
     } catch (err) {
+      if (handleAuthError(err)) return;
         errorMessage.value = err.message;
     } finally {
         saving.value = false;
@@ -151,6 +162,7 @@ const remove = async (event) => {
         await api.deleteEvent(event.id);
         await load();
     } catch (err) {
+      if (handleAuthError(err)) return;
         errorMessage.value = err.message;
     }
 };

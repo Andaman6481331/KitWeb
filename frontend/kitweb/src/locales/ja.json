@@ -291,6 +291,7 @@
     "passwordPlaceholder": "パスワード",
     "signIn": "サインイン",
     "incorrectPassword": "パスワードが違います。もう一度お試しください。",
+    "sessionExpired": "セッションの有効期限が切れました。もう一度サインインしてください。",
     "dashboard": "管理ダッシュボード",
     "statsItems": "{count} アイテム",
     "statsCategories": "{count} カテゴリ",
@@ -680,10 +681,7 @@
     "quoteTotalPending": "確認中",
     "requestQuote": "見積もりを依頼",
     "quoteNotice": "カート内の一部の商品はまだ価格が設定されていません。発送前にスタッフが最終価格とお支払い方法をご連絡します。",
-    "stepItems": "商品",
     "optionCount": "{count} 種類",
-    "stepDetails": "お客様情報",
-    "stepConfirm": "確認",
     "fieldRequired": "この項目は必須です。",
     "lineQuoteReason": "LINEを連携すると、確定価格が決まり次第すぐにお知らせします。",
     "lineAddOa": "スキャンして LINE で友だち追加",
@@ -697,25 +695,37 @@
     "amountMismatch": "振込金額が注文合計と一致しません",
     "wrongAccount": "証明書が当社口座への振込ではありません",
     "duplicateSlip": "この証明書は他の注文に使用済みです",
-    "confirmBannerBadge": "ご注文の流れ",
-    "confirmBannerText": "ご注文後、LINEまたはWhatsAppで注文番号をお送りください。ご連絡がない場合、ご注文は処理できません。",
     "nextStepNote": "次のステップ：送信後、LINEまたはWhatsAppで注文番号を1通お送りください。当店からお客様へ先にご連絡することはありません。",
     "nameInvalid": "お名前（2文字以上）を入力してください。",
     "phoneInvalid": "有効な電話番号を入力してください（例：081-234-5678 または +66 81 234 5678）。",
     "addressInvalid": "配送先住所を詳しく入力してください（番地・通り・地区・県・郵便番号）。",
     "pleaseFixFields": "ハイライトされた項目をご確認ください。",
-    "awaitingConfirmTag": "メッセージをお待ちしています"
+    "awaitingConfirmTag": "メッセージをお待ちしています",
+    "inCartChip": "カート内 · {count}",
+    "cartNextHint": "送信後、LINEまたはWhatsAppで注文番号をお送りいただくとご注文が確定します。",
+    "deliveryAtCost": "送料は実費",
+    "plusDelivery": "+ 送料"
   },
   "thankYou": {
-    "title": "ご注文を受け付けました",
+    "title": "ご確認をお待ちしています",
     "subtitle": "ご注文ありがとうございます",
     "received": "注文番号 #{orderId} を受け付けました",
     "processing": "ご注文はまだ確定していません。下記の手順で注文番号をお送りください。",
     "lineCtaButton": "LINE OAでリアルタイム配送情報を受け取る",
-    "quoteTitle": "リクエストを受け付けました！",
+    "quoteTitle": "ご確認をお待ちしています",
     "quoteSubtitle": "ご依頼ありがとうございます。",
     "quoteProcessing": "価格未定の商品があります。下記から注文番号をお送りいただければ、スタッフが最終価格とお支払い方法をご案内します。",
-    "continueShopping": "ショッピングを続ける"
+    "continueShopping": "ショッピングを続ける",
+    "pendingBadge": "ご注文はまだ完了していません",
+    "summaryTitle": "ご注文内容",
+    "orderNumber": "注文番号",
+    "name": "お名前",
+    "status": "ステータス",
+    "statusWaiting": "メッセージ待ち",
+    "confirmedTitle": "メッセージを受け取りました",
+    "confirmedProcessing": "ありがとうございます。ご注文を確認しました。現在、価格と送料を確認しており、お支払い金額をご連絡します。",
+    "confirmedBadge": "メッセージ受信済み",
+    "statusConfirmed": "メッセージ受信済み"
   },
   "customerReview": {
     "eyebrow": "お客様の声",
@@ -726,6 +736,7 @@
     "passwordPlaceholder": "管理者パスワード",
     "signIn": "ログイン",
     "incorrectPassword": "パスワードが正しくありません",
+    "sessionExpired": "セッションの有効期限が切れました。もう一度サインインしてください。",
     "loading": "読み込み中...",
     "refresh": "更新",
     "noOrders": "注文はまだありません",
@@ -751,7 +762,22 @@
     "awaitingHint": "お客様のメッセージがOAチャットまたはWhatsAppに届くまで、発送や価格設定は行わないでください。",
     "markConfirmed": "確認済みにする",
     "confirmedLabel": "お客様確認済み",
-    "undoConfirm": "取り消し"
+    "undoConfirm": "取り消し",
+    "filterAll": "すべて",
+    "filterAwaiting": "お客様待ち",
+    "filterConfirmed": "確認済み",
+    "deliveryLabel": "送料 (฿)",
+    "deliveryPlaceholder": "配送業者の実費 — 空欄 = 未案内",
+    "saveDelivery": "送料を保存して通知",
+    "deliverySaved": "送料を保存しました。",
+    "deliverySavedNotified": "送料を保存し、LINEでお客様に通知しました。",
+    "deliveryNotQuoted": "送料は未案内",
+    "deliveryHint": "配送業者の実費をそのまま請求します（上乗せなし）。お客様のご希望（速い／遅いが安い）に合わせてください。",
+    "amountToPay": "お支払い金額",
+    "confirmedViaLine": "LINEから自動で確認",
+    "confirmedViaStaff": "スタッフが確認",
+    "confirmedNotified": "確認済みにし、LINEでお客様に通知しました。",
+    "noMatches": "このフィルターに該当する注文はありません。"
   },
   "gallery": {
     "title": "クリエイターギャラリー",
@@ -760,13 +786,80 @@
     "submitPrompt": "私たちの材料で作ったら、タグ付けしてください"
   },
   "orderConfirm": {
-    "title": "ステップ2：ご注文の確認",
+    "title": "ご注文の確認",
     "intro": "下のボタンから注文番号をお送りください。メッセージがない場合、ご注文を確認できず、処理されない可能性があります。",
     "orderNumber": "注文番号",
     "copyMessage": "メッセージをコピー",
     "copied": "コピーしました",
     "viaLine": "LINEで送る",
     "viaWhatsapp": "WhatsAppで送る",
-    "desktopHint": "パソコンではボタンでLINEが開かない場合があります。その場合はLINEで {lineId} を検索し、コピーしたメッセージを貼り付けてください。"
+    "desktopHint": "パソコンではボタンでLINEが開かない場合があります。その場合はLINEで {lineId} を検索し、コピーしたメッセージを貼り付けてください。",
+    "helpTitle": "やり方がわからない場合は",
+    "helpText": "LINE公式アカウントを友だち追加して、注文番号をお知らせください。あとはスタッフが対応します。",
+    "copyId": "IDをコピー",
+    "addOnLine": "LINEで友だち追加"
+  },
+  "orderSteps": {
+    "label": "ご注文の流れ",
+    "pick": "商品を選ぶ",
+    "details": "お客様情報",
+    "confirm": "LINE / WhatsAppでご確認",
+    "finish": "価格・お支払いのご案内"
+  },
+  "priceNotice": {
+    "prices": "サイト上の価格は最新でないものが多く、以前の価格のままの商品があります。お支払い前に最終価格をご確認いただきます。",
+    "delivery": "送料は含まれていません。配送業者の実費をそのまま（上乗せなし）ご注文に加算します。",
+    "short": "表示価格は最新でない場合があります。お支払い前に最終価格をご案内します。"
+  },
+  "orderTotals": {
+    "itemsSubtotal": "商品合計",
+    "itemsPending": "価格確認中",
+    "delivery": "送料",
+    "deliveryPending": "配送業者の実費でご案内します",
+    "deliveryFree": "送料なし",
+    "amountToPay": "お支払い金額",
+    "amountPending": "送料のご案内後に確定します"
+  },
+  "orderDetail": {
+    "placedOn": "{date} にご注文",
+    "items": "ご注文内容",
+    "noItems": "商品がありません。",
+    "tracking": "追跡番号",
+    "state": {
+      "awaiting": "メッセージ待ち",
+      "confirmed": "メッセージ受信済み",
+      "paid": "お支払い済み",
+      "shipped": "発送済み",
+      "delivered": "配達完了",
+      "cancelled": "キャンセル済み"
+    },
+    "next": {
+      "quote": "メッセージを受け取りました。商品の価格を確認中です。最終合計をご連絡します。",
+      "deliveryPending": "メッセージを受け取りました。価格を確認し、配送業者の実費で送料をご案内した後、お支払い金額をご連絡します。",
+      "pay": "最終金額は下記のとおりです。お支払い方法をご連絡します。",
+      "paid": "お支払いを確認しました。ご注文を準備しています。",
+      "shipped": "ご注文の商品を発送しました。",
+      "delivered": "商品をお届けしました。ありがとうございました。",
+      "cancelled": "このご注文はキャンセルされました。心当たりがない場合はご連絡ください。",
+      "awaiting": "ご注文を確定するため、注文番号をお送りください。"
+    }
+  },
+  "orderLookup": {
+    "title": "ご注文を探す",
+    "subtitle": "注文番号と、ご注文時の電話番号を入力してください。",
+    "orderNumber": "注文番号",
+    "orderNumberPlaceholder": "WH-2026-12345",
+    "phone": "電話番号",
+    "phonePlaceholder": "08x xxx xxxx",
+    "submit": "注文を検索",
+    "searching": "検索中...",
+    "notFound": "該当するご注文が見つかりません。注文番号とご注文時の電話番号をご確認ください。",
+    "invalidLink": "このリンクは使えません。注文番号と電話番号を入力してください。",
+    "failed": "エラーが発生しました。もう一度お試しください。",
+    "loginHint": "アカウントをお持ちですか？ログインするとすべてのご注文を確認できます。",
+    "guestToggle": "ゲストで注文しましたか？注文番号で検索",
+    "yourOrders": "ご注文一覧",
+    "selectHint": "ご注文を選ぶと、状況と次のステップを確認できます。",
+    "loading": "ご注文を読み込み中..."
   }
 }

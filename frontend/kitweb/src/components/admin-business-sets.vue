@@ -4,7 +4,7 @@
 // are always valid box multiples and the public pages never have to re-snap.
 import { ref, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { api, getProjectImageUrl, API_URL } from '../services/api';
+import { api, getProjectImageUrl, API_URL, sessionExpiredError } from '../services/api';
 import { parseMoq } from '../utils/productPricing';
 import { rollUpSet } from '../utils/setPricing';
 
@@ -13,6 +13,12 @@ const { t } = useI18n();
 const sets = ref([]);
 const products = ref([]);
 const loading = ref(true);
+const emit = defineEmits(['session-expired']);
+const handleAuthError = (err) => {
+  if (err?.status !== 401) return false;
+  emit('session-expired');
+  return true;
+};
 const saving = ref(false);
 const errorMessage = ref('');
 
@@ -59,6 +65,7 @@ const uploadCover = async () => {
             headers: { 'Authorization': api.getToken() },
             body: fd
         });
+        if (res.status === 401) throw sessionExpiredError();
         if (!res.ok) throw new Error('Cover upload failed');
         const data = await res.json();
         return data.key || key;
@@ -105,6 +112,7 @@ const load = async () => {
         sets.value = setRows;
         products.value = prods;
     } catch (err) {
+      if (handleAuthError(err)) return;
         errorMessage.value = err.message;
     } finally {
         loading.value = false;
@@ -168,6 +176,7 @@ const save = async () => {
         panelOpen.value = false;
         await load();
     } catch (err) {
+      if (handleAuthError(err)) return;
         errorMessage.value = err.message;
     } finally {
         saving.value = false;

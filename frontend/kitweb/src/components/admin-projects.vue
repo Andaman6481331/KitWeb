@@ -3,11 +3,17 @@
 // featured slot, the KitCraft archive, and the tutorial blocks on product pages.
 // Self-contained so AdminDashboard only has to render it under a tab.
 import { ref, computed, onMounted } from 'vue';
-import { api, getProjectImageUrl, API_URL } from '../services/api';
+import { api, getProjectImageUrl, API_URL, sessionExpiredError } from '../services/api';
 
 const projects = ref([]);
 const products = ref([]);
 const loading = ref(true);
+const emit = defineEmits(['session-expired']);
+const handleAuthError = (err) => {
+  if (err?.status !== 401) return false;
+  emit('session-expired');
+  return true;
+};
 const saving = ref(false);
 const errorMessage = ref('');
 
@@ -61,6 +67,7 @@ const load = async () => {
         projects.value = proj;
         products.value = prods;
     } catch (err) {
+      if (handleAuthError(err)) return;
         errorMessage.value = err.message;
     } finally {
         loading.value = false;
@@ -129,6 +136,7 @@ const uploadCover = async () => {
             headers: { 'Authorization': api.getToken() },
             body: fd
         });
+        if (res.status === 401) throw sessionExpiredError();
         if (!res.ok) throw new Error('Cover upload failed');
         const data = await res.json();
         return data.key || key;
@@ -156,6 +164,7 @@ const save = async () => {
         await load();
         panelOpen.value = false;
     } catch (err) {
+      if (handleAuthError(err)) return;
         errorMessage.value = err.message;
     } finally {
         saving.value = false;
@@ -168,6 +177,7 @@ const remove = async (p) => {
         await api.deleteProject(p.id);
         await load();
     } catch (err) {
+      if (handleAuthError(err)) return;
         errorMessage.value = err.message;
     }
 };

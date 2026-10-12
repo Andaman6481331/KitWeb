@@ -3,7 +3,7 @@
 // fills the homepage band; the rest are the archive of past months. Deliberately
 // lighter than the projects editor: a color, a sentence, and some products.
 import { ref, computed, onMounted } from 'vue';
-import { api } from '../services/api';
+import { api, sessionExpiredError } from '../services/api';
 // Bare product keys are served as `<key>-thumb.webp`; getImageUrl would 404.
 import { getProductImageUrl } from '../utils/productImages';
 
@@ -23,6 +23,12 @@ const PRESETS = [
 const spotlights = ref([]);
 const products = ref([]);
 const loading = ref(true);
+const emit = defineEmits(['session-expired']);
+const handleAuthError = (err) => {
+  if (err?.status !== 401) return false;
+  emit('session-expired');
+  return true;
+};
 const saving = ref(false);
 const errorMessage = ref('');
 
@@ -68,6 +74,7 @@ const load = async () => {
         spotlights.value = rows;
         products.value = prods;
     } catch (err) {
+      if (handleAuthError(err)) return;
         errorMessage.value = err.message;
     } finally {
         loading.value = false;
@@ -131,6 +138,7 @@ const save = async () => {
         await load();
         panelOpen.value = false;
     } catch (err) {
+      if (handleAuthError(err)) return;
         errorMessage.value = err.message;
     } finally {
         saving.value = false;
@@ -143,6 +151,7 @@ const remove = async (s) => {
         await api.deleteSpotlight(s.id);
         await load();
     } catch (err) {
+      if (handleAuthError(err)) return;
         errorMessage.value = err.message;
     }
 };

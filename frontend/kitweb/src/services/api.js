@@ -49,12 +49,16 @@ const isBrowser = typeof window !== 'undefined' && typeof window.localStorage !=
 // is a bug, and the stores already own their own caching.
 const ssrGetCache = isBrowser ? null : new Map();
 
-const getJson = (url, errorMessage) => {
+// `auth: true` is for the admin-only reads (include_hidden / include_unpublished):
+// the Worker answers those 401 unless the admin session token is sent.
+const getJson = (url, errorMessage, { auth = false } = {}) => {
   const cached = ssrGetCache?.get(url);
   if (cached) return cached;
 
   const request = (async () => {
-    const response = await fetch(url);
+    const token = auth ? api.getToken() : null;
+    const response = await fetch(url, token ? { headers: { 'Authorization': token } } : undefined);
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(errorMessage);
     return await response.json();
   })();
@@ -65,6 +69,17 @@ const getJson = (url, errorMessage) => {
   request.catch(() => ssrGetCache?.delete(url));
 
   return request;
+};
+
+// An admin session the Worker no longer recognises: it expired (12 h), was ended
+// elsewhere, or was issued by the old password-as-token login. The dead token is
+// dropped so the page can fall back to its sign-in form instead of failing on
+// every request, and the error carries `status` so callers can tell.
+export const sessionExpiredError = () => {
+  if (isBrowser) localStorage.removeItem('admin_token');
+  const err = new Error('Session expired');
+  err.status = 401;
+  return err;
 };
 
 const parseApiError = async (response, fallback) => {
@@ -97,6 +112,22 @@ export const api = {
       localStorage.setItem('admin_token', data.token);
     }
     return data;
+  },
+
+  // Ends the admin session: the Worker forgets the token, then the browser does.
+  // The local copy is dropped even if the call fails, so the UI never stays "in".
+  async adminLogout() {
+    const token = isBrowser ? localStorage.getItem('admin_token') : null;
+    if (isBrowser) localStorage.removeItem('admin_token');
+    if (!token) return;
+    try {
+      await fetch(`${API_URL}/admin/logout`, {
+        method: 'POST',
+        headers: { 'Authorization': token }
+      });
+    } catch {
+      // Offline or Worker down: the session simply expires on its own.
+    }
   },
 
   // POS in-store cash sale. payload: { total_amount, items: [{ product_type, input_price }] }
@@ -156,7 +187,8 @@ export const api = {
     if (limit) params.set('limit', String(limit));
     if (includeUnpublished) params.set('include_unpublished', '1');
     const qs = params.toString();
-    return getJson(qs ? `${API_URL}/projects?${qs}` : `${API_URL}/projects`, 'Failed to fetch projects');
+    return getJson(qs ? `${API_URL}/projects?${qs}` : `${API_URL}/projects`, 'Failed to fetch projects',
+      { auth: includeUnpublished });
   },
 
   async getProject(slug) {
@@ -170,6 +202,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
       body: JSON.stringify(payload)
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(await parseApiError(response, 'Failed to save project'));
     return await response.json();
   },
@@ -180,6 +213,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
       body: JSON.stringify({ id })
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(await parseApiError(response, 'Failed to delete project'));
     return await response.json();
   },
@@ -187,7 +221,7 @@ export const api = {
   // ── Business Sets (fixed wholesale bundles) ───────────────────
   async getBusinessSets({ includeUnpublished = false } = {}) {
     const qs = includeUnpublished ? '?include_unpublished=1' : '';
-    return getJson(`${API_URL}/business-sets${qs}`, 'Failed to fetch business sets');
+    return getJson(`${API_URL}/business-sets${qs}`, 'Failed to fetch business sets', { auth: includeUnpublished });
   },
 
   async getBusinessSet(slug) {
@@ -201,6 +235,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
       body: JSON.stringify(payload)
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(await parseApiError(response, 'Failed to save business set'));
     return await response.json();
   },
@@ -211,6 +246,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
       body: JSON.stringify({ id })
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(await parseApiError(response, 'Failed to delete business set'));
     return await response.json();
   },
@@ -228,6 +264,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
       body: JSON.stringify(payload)
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(await parseApiError(response, 'Failed to save color'));
     return await response.json();
   },
@@ -238,6 +275,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
       body: JSON.stringify({ id })
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(await parseApiError(response, 'Failed to delete color'));
     return await response.json();
   },
@@ -251,7 +289,8 @@ export const api = {
     if (limit) params.set('limit', String(limit));
     if (includeHidden) params.set('include_hidden', '1');
     const qs = params.toString();
-    return getJson(qs ? `${API_URL}/gallery?${qs}` : `${API_URL}/gallery`, 'Failed to fetch gallery');
+    return getJson(qs ? `${API_URL}/gallery?${qs}` : `${API_URL}/gallery`, 'Failed to fetch gallery',
+      { auth: includeHidden });
   },
 
   // Create when payload has no id, update when it does.
@@ -261,6 +300,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
       body: JSON.stringify(payload)
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(await parseApiError(response, 'Failed to save photo'));
     return await response.json();
   },
@@ -271,6 +311,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
       body: JSON.stringify({ id })
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(await parseApiError(response, 'Failed to delete photo'));
     return await response.json();
   },
@@ -279,7 +320,8 @@ export const api = {
   async getEvents({ includeHidden = false } = {}) {
     return getJson(
       includeHidden ? `${API_URL}/events?include_hidden=1` : `${API_URL}/events`,
-      'Failed to fetch events'
+      'Failed to fetch events',
+      { auth: includeHidden }
     );
   },
 
@@ -290,6 +332,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
       body: JSON.stringify(payload)
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(await parseApiError(response, 'Failed to save event'));
     return await response.json();
   },
@@ -300,6 +343,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
       body: JSON.stringify({ id })
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(await parseApiError(response, 'Failed to delete event'));
     return await response.json();
   },
@@ -309,7 +353,8 @@ export const api = {
     if (category) params.set('category', category);
     if (includeHidden) params.set('include_hidden', '1');
     const qs = params.toString();
-    return getJson(qs ? `${API_URL}/products?${qs}` : `${API_URL}/products`, 'Failed to fetch products');
+    return getJson(qs ? `${API_URL}/products?${qs}` : `${API_URL}/products`, 'Failed to fetch products',
+      { auth: includeHidden });
   },
 
   async addProduct(productData) {
@@ -321,6 +366,7 @@ export const api = {
       },
       body: JSON.stringify(productData)
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) {
       throw new Error(await parseApiError(response, `Add product failed: ${response.status} ${response.statusText}`));
     }
@@ -336,6 +382,7 @@ export const api = {
       },
       body: JSON.stringify(productData)
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) {
       throw new Error(await parseApiError(response, `Update product failed: ${response.status} ${response.statusText}`));
     }
@@ -349,6 +396,7 @@ export const api = {
         'Authorization': this.getToken()
       }
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(`Delete product failed: ${response.status} ${response.statusText}`);
     return await response.json();
   },
@@ -374,6 +422,7 @@ export const api = {
       headers: { 'Authorization': this.getToken() },
       body: formData
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
     return await response.json();
   },
@@ -392,6 +441,7 @@ export const api = {
       },
       body: JSON.stringify(categoryData)
     });
+    if (response.status === 401) throw sessionExpiredError();
     return await response.json();
   },
 
@@ -402,6 +452,7 @@ export const api = {
         'Authorization': this.getToken()
       }
     });
+    if (response.status === 401) throw sessionExpiredError();
     return await response.json();
   },
 
@@ -432,8 +483,26 @@ export const api = {
         'Authorization': this.getToken()
       }
     });
+    // With a customerId the caller is a customer, not an admin session.
+    if (response.status === 401 && !customerId) throw sessionExpiredError();
     if (!response.ok) throw new Error('Failed to fetch orders');
     return await response.json();
+  },
+
+  // Public: one order, proven by the private link key or the order's own phone
+  // number. Resolves null when nothing matches — the Worker answers every miss the
+  // same way, so "no such order" and "wrong key" are indistinguishable by design.
+  async lookupOrder({ orderId, key = '', phone = '' }) {
+    const response = await fetch(`${API_URL}/orders/lookup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId, key, phone })
+    });
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error(await parseApiError(response, 'Failed to look up order'));
+    }
+    return (await response.json()).order;
   },
 
   // Admin: update an order's status + tracking number. The backend also pushes a
@@ -447,6 +516,7 @@ export const api = {
       },
       body: JSON.stringify({ orderId, status, trackingNumber })
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) {
       throw new Error(await parseApiError(response, 'Failed to update order'));
     }
@@ -464,6 +534,7 @@ export const api = {
       },
       body: JSON.stringify({ orderId, confirmed })
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) {
       throw new Error(await parseApiError(response, 'Failed to update order'));
     }
@@ -481,6 +552,7 @@ export const api = {
       },
       body: JSON.stringify(payload)
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) {
       throw new Error(await parseApiError(response, 'Failed to update order'));
     }
@@ -513,6 +585,7 @@ export const api = {
       },
       body: JSON.stringify(productData)
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(`Add DIY product failed: ${response.status}`);
     return await response.json();
   },
@@ -526,6 +599,7 @@ export const api = {
       },
       body: JSON.stringify(productData)
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(`Update DIY product failed: ${response.status}`);
     return await response.json();
   },
@@ -537,6 +611,7 @@ export const api = {
         'Authorization': this.getToken()
       }
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(`Delete DIY product failed: ${response.status}`);
     return await response.json();
   },
@@ -554,6 +629,7 @@ export const api = {
       headers: { 'Authorization': this.getToken() },
       body: formData
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(`DIY Upload failed: ${response.status}`);
     return await response.json();
   },
@@ -562,6 +638,7 @@ export const api = {
     const response = await fetch(`${API_URL}/products/next-sku?category=${encodeURIComponent(category)}`, {
       headers: { 'Authorization': this.getToken() }
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error('Failed to fetch next SKU');
     return await response.json();
   },
@@ -570,6 +647,7 @@ export const api = {
     const response = await fetch(`${API_URL}/diy/products/next-sku`, {
       headers: { 'Authorization': this.getToken() }
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error('Failed to fetch next DIY SKU');
     return await response.json();
   },

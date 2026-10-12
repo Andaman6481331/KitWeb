@@ -6,7 +6,7 @@
 // Credits are a permissions question, not a data-entry one: only post a photo you
 // have been given permission to use, and credit the person who made it.
 import { ref, computed, onMounted } from 'vue';
-import { api, API_URL, getGalleryImageUrl } from '../services/api';
+import { api, API_URL, getGalleryImageUrl, sessionExpiredError } from '../services/api';
 // Bare product keys are served as `<key>-thumb.webp`; getImageUrl would 404.
 import { getProductImageUrl } from '../utils/productImages';
 
@@ -14,6 +14,12 @@ const items = ref([]);
 const products = ref([]);
 const projects = ref([]);
 const loading = ref(true);
+const emit = defineEmits(['session-expired']);
+const handleAuthError = (err) => {
+  if (err?.status !== 401) return false;
+  emit('session-expired');
+  return true;
+};
 const saving = ref(false);
 const uploading = ref(false);
 const errorMessage = ref('');
@@ -64,6 +70,7 @@ const load = async () => {
         products.value = prods;
         projects.value = posts;
     } catch (err) {
+      if (handleAuthError(err)) return;
         errorMessage.value = err.message;
     } finally {
         loading.value = false;
@@ -123,6 +130,7 @@ const uploadPhoto = async () => {
             headers: { 'Authorization': api.getToken() },
             body: fd
         });
+        if (res.status === 401) throw sessionExpiredError();
         if (!res.ok) throw new Error('Photo upload failed');
         const data = await res.json();
         return data.key || key;
@@ -141,6 +149,7 @@ const save = async () => {
         await load();
         panelOpen.value = false;
     } catch (err) {
+      if (handleAuthError(err)) return;
         errorMessage.value = err.message;
     } finally {
         saving.value = false;
@@ -153,6 +162,7 @@ const remove = async (item) => {
         await api.deleteGalleryItem(item.id);
         await load();
     } catch (err) {
+      if (handleAuthError(err)) return;
         errorMessage.value = err.message;
     }
 };

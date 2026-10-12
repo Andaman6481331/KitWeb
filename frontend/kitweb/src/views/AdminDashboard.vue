@@ -20,6 +20,18 @@ const categories = ref([]);
 const isAuthenticated = ref(!!api.getToken());
 const password = ref('');
 const loginError = ref(false);
+// Set when the Worker rejects the stored admin session (expired, ended elsewhere, or
+// the old password-as-token login). isAuthenticated starts from the token's presence,
+// so a dead token would otherwise leave the page stuck on failing requests.
+const sessionExpired = ref(false);
+const handleAuthError = (error) => {
+  if (error?.status !== 401) return false;
+  isAuthenticated.value = false;
+  sessionExpired.value = true;
+  loginError.value = false;
+  password.value = '';
+  return true;
+};
 const isEditing = ref(false);
 const editingId = ref(null);
 const formPanelOpen = ref(false);
@@ -198,6 +210,7 @@ const loadProducts = async () => {
   try {
     products.value = await api.getProducts(null, { includeHidden: true });
   } catch (error) {
+    if (handleAuthError(error)) return;
     console.error('Failed to load products', error);
   }
 };
@@ -206,6 +219,7 @@ const loadCategories = async () => {
   try {
     categories.value = await api.getCategories();
   } catch (error) {
+    if (handleAuthError(error)) return;
     console.error('Failed to load categories', error);
   }
 };
@@ -288,6 +302,7 @@ const handleLogin = async () => {
   if (result.success) {
     isAuthenticated.value = true;
     loginError.value = false;
+    sessionExpired.value = false;
     loadAll();
   } else {
     loginError.value = t('admin.incorrectPassword');
@@ -388,6 +403,7 @@ const deleteProduct = async (id) => {
       await api.deleteProduct(id);
       loadProducts();
     } catch (error) {
+      if (handleAuthError(error)) return;
       alert(t('admin.errorDeleteProduct', { message: error.message }));
     }
   }
@@ -400,6 +416,7 @@ const handleAddCategory = async () => {
     newCat.value = { name: '', name_th: '', path: '', default_usage: '', default_use_for: '' };
     loadCategories();
   } catch (error) {
+    if (handleAuthError(error)) return;
     alert(t('admin.errorDeleteCategory'));
   }
 };
@@ -410,6 +427,7 @@ const deleteCategory = async (id) => {
       await api.deleteCategory(id);
       loadCategories();
     } catch (error) {
+      if (handleAuthError(error)) return;
       alert(t('admin.errorDeleteCategory'));
     }
   }
@@ -526,6 +544,7 @@ const handleSubmit = async () => {
     loadProducts();
   } catch (error) {
     console.error('Submit error:', error);
+    if (handleAuthError(error)) return;
     if (!isEditing.value) {
       newProduct.value.sku = '';
     }
@@ -535,8 +554,8 @@ const handleSubmit = async () => {
   }
 };
 
-const logout = () => {
-  localStorage.removeItem('admin_token');
+const logout = async () => {
+  await api.adminLogout();
   isAuthenticated.value = false;
 };
 
@@ -612,6 +631,7 @@ const loadDiyProducts = async () => {
   try {
     diyProducts.value = await api.getDiyProducts();
   } catch (error) {
+    if (handleAuthError(error)) return;
     console.error('Failed to load DIY products', error);
   }
 };
@@ -686,6 +706,7 @@ const handleDiySubmit = async () => {
     await loadDiyProducts();
   } catch (error) {
     console.error('Submit error:', error);
+    if (handleAuthError(error)) return;
     alert('Error: ' + error.message);
   } finally {
     uploading.value = false;
@@ -724,6 +745,7 @@ const deleteDiyProduct = async (id) => {
       await api.deleteDiyProduct(id);
       await loadDiyProducts();
     } catch (error) {
+      if (handleAuthError(error)) return;
       alert('Failed to delete DIY product: ' + error.message);
     }
   }
@@ -737,6 +759,7 @@ const deleteDiyProduct = async (id) => {
       <input v-model="password" type="password" :placeholder="$t('admin.passwordPlaceholder')"
         @keyup.enter="handleLogin" />
       <button @click="handleLogin">{{ $t('admin.signIn') }}</button>
+      <p v-if="sessionExpired" class="error">{{ $t('admin.sessionExpired') }}</p>
       <p v-if="loginError" class="error">{{ loginError }}</p>
     </div>
 
@@ -785,11 +808,11 @@ const deleteDiyProduct = async (id) => {
 
       <!-- Editorial content lives in its own component; it shares nothing with the
            product form above beyond the tab it sits under. -->
-      <AdminProjects v-if="activeAdminSection === 'projects'" />
-      <AdminSpotlights v-if="activeAdminSection === 'colors'" />
-      <AdminGallery v-if="activeAdminSection === 'gallery'" />
-      <AdminEvents v-if="activeAdminSection === 'events'" />
-      <AdminBusinessSets v-if="activeAdminSection === 'sets'" />
+      <AdminProjects v-if="activeAdminSection === 'projects'" @session-expired="handleAuthError({ status: 401 })" />
+      <AdminSpotlights v-if="activeAdminSection === 'colors'" @session-expired="handleAuthError({ status: 401 })" />
+      <AdminGallery v-if="activeAdminSection === 'gallery'" @session-expired="handleAuthError({ status: 401 })" />
+      <AdminEvents v-if="activeAdminSection === 'events'" @session-expired="handleAuthError({ status: 401 })" />
+      <AdminBusinessSets v-if="activeAdminSection === 'sets'" @session-expired="handleAuthError({ status: 401 })" />
 
       <!-- Category Manager Section (Togglable) -->
       <transition name="slide-fade">

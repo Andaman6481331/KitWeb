@@ -1,0 +1,95 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// api.js decides "am I in a browser" once, at import time, so each test stubs the
+// browser globals first and imports a fresh copy of the module.
+const loadApi = async (store, status) => {
+  const localStorage = {
+    getItem: (k) => (k in store ? store[k] : null),
+    setItem: (k, v) => { store[k] = v; },
+    removeItem: (k) => { delete store[k]; },
+  };
+  vi.stubGlobal('window', { localStorage });
+  vi.stubGlobal('localStorage', localStorage);
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(status === 200 ? '[]' : 'Unauthorized', { status })));
+  vi.resetModules();
+  return (await import('./api.js')).api;
+};
+
+describe('admin session handling', () => {
+  beforeEach(() => vi.resetModules());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('drops a token the Worker no longer recognises and flags the 401', async () => {
+    // e.g. the password saved by the old password-as-token login
+    const store = { admin_token: 'old-password' };
+    const api = await loadApi(store, 401);
+
+    await expect(api.getOrders()).rejects.toMatchObject({ status: 401 });
+    expect(store.admin_token).toBeUndefined();
+  });
+
+  it('does the same for the admin order actions', async () => {
+    for (const call of [
+      (api) => api.updateOrderStatus({ orderId: 'WH-2026-00001', status: 'PAID', trackingNumber: '' }),
+      (api) => api.confirmOrderContact({ orderId: 'WH-2026-00001' }),
+      (api) => api.updateOrder({ orderId: 'WH-2026-00001', deliveryFee: 50 }),
+    ]) {
+      const store = { admin_token: 'stale' };
+      const api = await loadApi(store, 401);
+      await expect(call(api)).rejects.toMatchObject({ status: 401 });
+      expect(store.admin_token).toBeUndefined();
+    }
+  });
+
+  it("leaves a customer's own login alone when their order list is refused", async () => {
+    const store = { kitweb_auth_token: 'cust-1', admin_token: 'still-ok' };
+    const api = await loadApi(store, 401);
+
+    await expect(api.getOrders('cust-1')).rejects.toThrow('Failed to fetch orders');
+    expect(store.admin_token).toBe('still-ok');
+    expect(store.kitweb_auth_token).toBe('cust-1');
+  });
+
+  it('keeps the token when the request succeeds', async () => {
+    const store = { admin_token: 'valid-session' };
+    const api = await loadApi(store, 200);
+
+    await expect(api.getOrders()).resolves.toEqual([]);
+    expect(store.admin_token).toBe('valid-session');
+  });
+});
+
+describe('admin-only list reads', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('send the admin token, because the Worker answers these 401 without it', async () => {
+    const reads = [
+      (api) => api.getProducts(null, { includeHidden: true }),
+      (api) => api.getProjects({ includeUnpublished: true }),
+      (api) => api.getBusinessSets({ includeUnpublished: true }),
+      (api) => api.getGallery({ includeHidden: true }),
+      (api) => api.getEvents({ includeHidden: true }),
+    ];
+    for (const read of reads) {
+      const store = { admin_token: 'session-token' };
+      const api = await loadApi(store, 200);
+      await read(api);
+      expect(fetch.mock.calls[0][1]?.headers).toEqual({ Authorization: 'session-token' });
+    }
+  });
+
+  it('send nothing extra on the public storefront reads', async () => {
+    const store = { admin_token: 'session-token', kitweb_auth_token: 'cust-1' };
+    const api = await loadApi(store, 200);
+    await api.getProducts(null);
+    await api.getEvents();
+    for (const call of fetch.mock.calls) expect(call[1]).toBeUndefined();
+  });
+
+  it('turn a 401 into a session-expired error', async () => {
+    const store = { admin_token: 'old-password' };
+    const api = await loadApi(store, 401);
+    await expect(api.getProducts(null, { includeHidden: true })).rejects.toMatchObject({ status: 401 });
+    expect(store.admin_token).toBeUndefined();
+  });
+});

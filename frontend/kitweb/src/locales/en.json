@@ -470,6 +470,7 @@
     "passwordPlaceholder": "Password",
     "signIn": "Sign In",
     "incorrectPassword": "Incorrect password. Please try again.",
+    "sessionExpired": "Your session has expired. Please sign in again.",
     "dashboard": "Admin Dashboard",
     "statsItems": "{count} items",
     "statsCategories": "{count} categories",
@@ -799,10 +800,7 @@
     "quoteTotalPending": "To be confirmed",
     "requestQuote": "Request a Quote",
     "quoteNotice": "Some items in your cart aren't priced yet. Our staff will confirm the final price and payment with you before shipping.",
-    "stepItems": "Items",
     "optionCount": "{count} options",
-    "stepDetails": "Your details",
-    "stepConfirm": "Confirm",
     "fieldRequired": "This field is required.",
     "lineQuoteReason": "Connect LINE and we'll send you the confirmed price as soon as it's ready.",
     "lineAddOa": "Scan to add us on LINE",
@@ -822,25 +820,37 @@
     "amountMismatch": "Transfer amount does not match your order total.",
     "wrongAccount": "Slip was not transferred to our account.",
     "duplicateSlip": "This slip has already been used for another order.",
-    "confirmBannerBadge": "How ordering works",
-    "confirmBannerText": "After you submit, send us your order number on LINE or WhatsApp to confirm it. Orders we don't hear about can't be processed.",
     "nextStepNote": "Next step: after you submit, send us one message on LINE or WhatsApp with your order number. We don't contact customers first.",
     "nameInvalid": "Please enter your full name (at least 2 letters).",
     "phoneInvalid": "Enter a valid phone number, e.g. 081-234-5678 or +66 81 234 5678.",
     "addressInvalid": "Please enter your full shipping address (house no., street, district, province, postal code).",
     "pleaseFixFields": "Please check the highlighted fields.",
-    "awaitingConfirmTag": "Awaiting your message"
+    "awaitingConfirmTag": "Awaiting your message",
+    "inCartChip": "In cart · {count}",
+    "cartNextHint": "After you submit, send us your order number on LINE or WhatsApp to confirm.",
+    "deliveryAtCost": "DELIVERY AT ACTUAL COST",
+    "plusDelivery": "+ delivery"
   },
   "thankYou": {
-    "title": "Order Received",
+    "title": "Waiting for Your Confirmation",
     "subtitle": "Thank you for your order.",
     "received": "Order #{orderId} has been received.",
     "processing": "Your order is not confirmed yet. Please send us your order number as shown below.",
     "lineCtaButton": "Get Instant Tracking Updates on LINE OA",
-    "quoteTitle": "Request Received!",
+    "quoteTitle": "Waiting for Your Confirmation",
     "quoteSubtitle": "Thank you for your request.",
     "quoteProcessing": "Some items still need pricing. Send us your order number below and our staff will reply with the final price and payment details.",
-    "continueShopping": "Continue Shopping"
+    "continueShopping": "Continue Shopping",
+    "pendingBadge": "Order not completed yet",
+    "summaryTitle": "Your Order",
+    "orderNumber": "Order number",
+    "name": "Name",
+    "status": "Status",
+    "statusWaiting": "Waiting for your message",
+    "confirmedTitle": "We've got your message",
+    "confirmedProcessing": "Thank you — your order is confirmed on our side. We're now confirming prices and delivery, and we'll message you the amount to pay.",
+    "confirmedBadge": "Message received",
+    "statusConfirmed": "Message received"
   },
   "customerReview": {
     "eyebrow": "CUSTOMER STORIES",
@@ -851,6 +861,7 @@
     "passwordPlaceholder": "Admin password",
     "signIn": "Sign In",
     "incorrectPassword": "Incorrect password",
+    "sessionExpired": "Your session has expired. Please sign in again.",
     "loading": "Loading...",
     "refresh": "Refresh",
     "noOrders": "No orders yet.",
@@ -876,7 +887,22 @@
     "awaitingHint": "Don't ship or price this until the customer's message arrives in the OA chat or WhatsApp.",
     "markConfirmed": "Mark confirmed",
     "confirmedLabel": "Customer confirmed",
-    "undoConfirm": "Undo"
+    "undoConfirm": "Undo",
+    "filterAll": "All",
+    "filterAwaiting": "Awaiting customer",
+    "filterConfirmed": "Confirmed",
+    "deliveryLabel": "Delivery fee (฿)",
+    "deliveryPlaceholder": "Carrier cost — blank = not quoted",
+    "saveDelivery": "Save delivery & notify",
+    "deliverySaved": "Delivery fee saved.",
+    "deliverySavedNotified": "Delivery fee saved & customer notified on LINE.",
+    "deliveryNotQuoted": "Delivery not quoted yet",
+    "deliveryHint": "Charge the carrier's real cost, no markup. Fast or slower/cheaper — whichever the customer asked for.",
+    "amountToPay": "Amount to pay",
+    "confirmedViaLine": "Confirmed automatically from LINE",
+    "confirmedViaStaff": "Marked by staff",
+    "confirmedNotified": "Marked confirmed & customer notified on LINE.",
+    "noMatches": "No orders match this filter."
   },
   "institutional": {
     "bannerBadge": "B2B Portal",
@@ -925,13 +951,80 @@
     "submitPrompt": "Made something with our materials? Tag us at"
   },
   "orderConfirm": {
-    "title": "Step 2: confirm your order",
+    "title": "Confirm your order with us",
     "intro": "Send us your order number below. Without this message we can't verify your order and it may not be processed.",
     "orderNumber": "Your order number",
     "copyMessage": "Copy message",
     "copied": "Copied",
     "viaLine": "Send on LINE",
     "viaWhatsapp": "Send on WhatsApp",
-    "desktopHint": "On a computer the button may not open LINE. In that case search {lineId} in LINE and paste the copied message."
+    "desktopHint": "On a computer the button may not open LINE. In that case search {lineId} in LINE and paste the copied message.",
+    "helpTitle": "Not sure what to do?",
+    "helpText": "Simply add our LINE Official Account and tell us your order number. We'll take care of the rest.",
+    "copyId": "Copy ID",
+    "addOnLine": "Add on LINE"
+  },
+  "orderSteps": {
+    "label": "Ordering progress",
+    "pick": "Pick your items",
+    "details": "Your details",
+    "confirm": "Confirm on LINE / WhatsApp",
+    "finish": "We confirm price & payment"
+  },
+  "priceNotice": {
+    "prices": "Prices on this site aren't fully up to date, and many items still show older prices. We confirm the final price with you before you pay.",
+    "delivery": "Delivery isn't included. We charge the carrier's actual cost, with no markup, and add it to your order.",
+    "short": "Prices shown may be out of date — we confirm the final price with you before you pay."
+  },
+  "orderTotals": {
+    "itemsSubtotal": "Items subtotal",
+    "itemsPending": "Awaiting pricing",
+    "delivery": "Delivery",
+    "deliveryPending": "We'll quote it at the carrier's cost",
+    "deliveryFree": "No delivery charge",
+    "amountToPay": "Amount to pay",
+    "amountPending": "Confirmed once delivery is quoted"
+  },
+  "orderDetail": {
+    "placedOn": "Placed on {date}",
+    "items": "Items",
+    "noItems": "No items listed.",
+    "tracking": "Tracking number",
+    "state": {
+      "awaiting": "Waiting for your message",
+      "confirmed": "Message received",
+      "paid": "Paid",
+      "shipped": "Shipped",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled"
+    },
+    "next": {
+      "quote": "We got your message and we're pricing your items. We'll message you the final total.",
+      "deliveryPending": "We got your message. We're confirming prices and quoting delivery at the carrier's cost, then we'll message you the amount to pay.",
+      "pay": "Your final amount is below. We'll message you how to pay.",
+      "paid": "Payment received. We're preparing your order.",
+      "shipped": "Your order is on its way.",
+      "delivered": "Your order has been delivered. Thank you!",
+      "cancelled": "This order was cancelled. Message us if that's unexpected.",
+      "awaiting": "Send us your order number to confirm this order."
+    }
+  },
+  "orderLookup": {
+    "title": "Find your order",
+    "subtitle": "Enter your order number and the phone number you ordered with.",
+    "orderNumber": "Order number",
+    "orderNumberPlaceholder": "WH-2026-12345",
+    "phone": "Phone number",
+    "phonePlaceholder": "08x xxx xxxx",
+    "submit": "Find order",
+    "searching": "Searching...",
+    "notFound": "We couldn't find an order with those details. Check the order number and the phone number you used at checkout.",
+    "invalidLink": "That link didn't work. Enter your order number and phone number instead.",
+    "failed": "Something went wrong. Please try again.",
+    "loginHint": "Have an account? Log in to see all your orders.",
+    "guestToggle": "Ordered as a guest? Find an order by its number",
+    "yourOrders": "Your orders",
+    "selectHint": "Select an order to see where it is and what happens next.",
+    "loading": "Loading your order..."
   }
 }

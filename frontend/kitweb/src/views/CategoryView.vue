@@ -13,6 +13,7 @@ import { resolveCategoryGroup } from '@/utils/catalogCategories';
 import { getProductImageUrl, getProductImageSrcset } from '@/utils/productImages';
 // Per-piece price maths is shared with the homepage's New Arrivals strip.
 import { getCheapestPricePerPiece } from '@/utils/productPricing';
+import PriceNotice from '@/components/price-notice.vue';
 
 const props = defineProps({
   category: {
@@ -282,6 +283,9 @@ watch(letterFilter, (letter) => {
             >{{ letter }}</button>
         </div>
 
+        <!-- Prices are partly out of date; said once, plainly, beside the numbers. -->
+        <PriceNotice inline class="catalog-price-note" />
+
         <!-- Product Grid -->
         <div class="product-grid">
             <div v-if="loading" class="loading-state"
@@ -480,6 +484,10 @@ watch(letterFilter, (letter) => {
 }
 
 /* PRODUCT GRID */
+.catalog-price-note {
+    margin: 0 0 14px;
+}
+
 .product-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));

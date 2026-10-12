@@ -282,6 +282,7 @@
     "passwordPlaceholder": "密码",
     "signIn": "登录",
     "incorrectPassword": "密码错误，请重试。",
+    "sessionExpired": "登录已过期，请重新登录。",
     "dashboard": "管理面板",
     "statsItems": "{count} 个项目",
     "statsCategories": "{count} 个类别",
@@ -671,10 +672,7 @@
     "quoteTotalPending": "待确认",
     "requestQuote": "索取报价",
     "quoteNotice": "购物车中部分商品尚未定价。发货前我们的员工会与您确认最终价格和付款方式。",
-    "stepItems": "商品",
     "optionCount": "{count} 种规格",
-    "stepDetails": "您的信息",
-    "stepConfirm": "确认",
     "fieldRequired": "此项为必填。",
     "lineQuoteReason": "连接 LINE，价格确认后我们会第一时间通知您。",
     "lineAddOa": "扫码添加我们的 LINE",
@@ -688,25 +686,37 @@
     "amountMismatch": "转账金额与订单总额不符",
     "wrongAccount": "凭证未转账至我们的账户",
     "duplicateSlip": "此凭证已用于其他订单",
-    "confirmBannerBadge": "下单流程",
-    "confirmBannerText": "提交订单后，请通过 LINE 或 WhatsApp 将订单号发送给我们确认。未收到确认的订单将无法处理。",
     "nextStepNote": "下一步：提交后，请通过 LINE 或 WhatsApp 向我们发送一条含订单号的消息。我们不会主动联系客户。",
     "nameInvalid": "请填写您的姓名（至少 2 个字符）。",
     "phoneInvalid": "请填写有效的电话号码，例如 081-234-5678 或 +66 81 234 5678。",
     "addressInvalid": "请填写完整的收货地址（门牌号、街道、区、省/府、邮编）。",
     "pleaseFixFields": "请检查标出的字段。",
-    "awaitingConfirmTag": "等待您发送消息"
+    "awaitingConfirmTag": "等待您发送消息",
+    "inCartChip": "购物车中 · {count}",
+    "cartNextHint": "提交后，请通过 LINE 或 WhatsApp 发送订单号以确认订单。",
+    "deliveryAtCost": "运费按实际收取",
+    "plusDelivery": "+ 运费"
   },
   "thankYou": {
-    "title": "已收到订单",
+    "title": "等待您的确认",
     "subtitle": "感谢您的订购",
     "received": "订单 #{orderId} 已收到",
     "processing": "您的订单尚未确认，请按下方步骤将订单号发送给我们。",
     "lineCtaButton": "通过LINE OA获取实时物流更新",
-    "quoteTitle": "已收到您的请求！",
+    "quoteTitle": "等待您的确认",
     "quoteSubtitle": "感谢您的咨询。",
     "quoteProcessing": "部分商品尚未报价。请通过下方按钮发送订单号，我们的工作人员将回复最终价格和付款方式。",
-    "continueShopping": "继续购物"
+    "continueShopping": "继续购物",
+    "pendingBadge": "订单尚未完成",
+    "summaryTitle": "您的订单",
+    "orderNumber": "订单号",
+    "name": "姓名",
+    "status": "状态",
+    "statusWaiting": "等待您的消息",
+    "confirmedTitle": "我们已收到您的消息",
+    "confirmedProcessing": "谢谢，您的订单已在我们这边确认。我们正在确认价格和运费，之后会告诉您应付金额。",
+    "confirmedBadge": "已收到消息",
+    "statusConfirmed": "已收到消息"
   },
   "customerReview": {
     "eyebrow": "客户故事",
@@ -717,6 +727,7 @@
     "passwordPlaceholder": "管理员密码",
     "signIn": "登录",
     "incorrectPassword": "密码错误",
+    "sessionExpired": "登录已过期，请重新登录。",
     "loading": "加载中...",
     "refresh": "刷新",
     "noOrders": "暂无订单",
@@ -742,7 +753,22 @@
     "awaitingHint": "在客户的消息到达 OA 聊天或 WhatsApp 之前，请勿发货或报价。",
     "markConfirmed": "标记为已确认",
     "confirmedLabel": "客户已确认",
-    "undoConfirm": "撤销"
+    "undoConfirm": "撤销",
+    "filterAll": "全部",
+    "filterAwaiting": "等待客户",
+    "filterConfirmed": "已确认",
+    "deliveryLabel": "运费 (฿)",
+    "deliveryPlaceholder": "快递实际费用 — 留空 = 未报价",
+    "saveDelivery": "保存运费并通知",
+    "deliverySaved": "运费已保存。",
+    "deliverySavedNotified": "运费已保存，并已通过 LINE 通知客户。",
+    "deliveryNotQuoted": "运费未报价",
+    "deliveryHint": "按快递实际费用收取，不加价。按客户要求选择快的或慢但便宜的。",
+    "amountToPay": "应付金额",
+    "confirmedViaLine": "已通过 LINE 自动确认",
+    "confirmedViaStaff": "由员工标记",
+    "confirmedNotified": "已标记确认，并已通过 LINE 通知客户。",
+    "noMatches": "没有符合此筛选条件的订单。"
   },
   "gallery": {
     "title": "创作者画廊",
@@ -751,13 +777,80 @@
     "submitPrompt": "用我们的材料做了作品？请标记我们"
   },
   "orderConfirm": {
-    "title": "第 2 步：确认您的订单",
+    "title": "确认您的订单",
     "intro": "请通过下方按钮发送订单号。未收到该消息，我们无法核实订单，订单可能不会被处理。",
     "orderNumber": "您的订单号",
     "copyMessage": "复制消息",
     "copied": "已复制",
     "viaLine": "通过 LINE 发送",
     "viaWhatsapp": "通过 WhatsApp 发送",
-    "desktopHint": "在电脑上按钮可能无法打开 LINE。此时请在 LINE 中搜索 {lineId}，并粘贴已复制的消息。"
+    "desktopHint": "在电脑上按钮可能无法打开 LINE。此时请在 LINE 中搜索 {lineId}，并粘贴已复制的消息。",
+    "helpTitle": "不确定怎么操作？",
+    "helpText": "只需添加我们的 LINE 官方账号，并告知订单号，其余由我们的工作人员处理。",
+    "copyId": "复制 ID",
+    "addOnLine": "添加 LINE 好友"
+  },
+  "orderSteps": {
+    "label": "下单流程",
+    "pick": "选择商品",
+    "details": "您的信息",
+    "confirm": "通过 LINE / WhatsApp 确认",
+    "finish": "确认价格与付款"
+  },
+  "priceNotice": {
+    "prices": "网站上的价格尚不完全是最新的，许多商品仍显示旧价格。付款前我们会与您确认最终价格。",
+    "delivery": "价格不含运费。我们按快递实际费用收取，不加价，并计入您的订单。",
+    "short": "显示价格可能不是最新价格，付款前我们会与您确认最终价格。"
+  },
+  "orderTotals": {
+    "itemsSubtotal": "商品小计",
+    "itemsPending": "待确认价格",
+    "delivery": "运费",
+    "deliveryPending": "我们将按快递实际费用报价",
+    "deliveryFree": "免运费",
+    "amountToPay": "应付金额",
+    "amountPending": "运费报价后确认"
+  },
+  "orderDetail": {
+    "placedOn": "下单时间 {date}",
+    "items": "商品",
+    "noItems": "没有商品。",
+    "tracking": "运单号",
+    "state": {
+      "awaiting": "等待您的消息",
+      "confirmed": "已收到消息",
+      "paid": "已付款",
+      "shipped": "已发货",
+      "delivered": "已送达",
+      "cancelled": "已取消"
+    },
+    "next": {
+      "quote": "我们已收到您的消息，正在为商品核定价格，之后会把最终总额告诉您。",
+      "deliveryPending": "我们已收到您的消息，正在确认价格并按快递实际费用报运费，之后会告诉您应付金额。",
+      "pay": "您的最终金额见下方，我们会告诉您付款方式。",
+      "paid": "已收到付款，我们正在备货。",
+      "shipped": "您的订单已发出。",
+      "delivered": "您的订单已送达，谢谢！",
+      "cancelled": "此订单已取消。如非您本意，请联系我们。",
+      "awaiting": "请把订单号发给我们以确认此订单。"
+    }
+  },
+  "orderLookup": {
+    "title": "查找您的订单",
+    "subtitle": "请输入订单号和下单时使用的手机号码。",
+    "orderNumber": "订单号",
+    "orderNumberPlaceholder": "WH-2026-12345",
+    "phone": "手机号码",
+    "phonePlaceholder": "08x xxx xxxx",
+    "submit": "查找订单",
+    "searching": "查找中...",
+    "notFound": "未找到符合这些信息的订单。请检查订单号和下单时使用的手机号码。",
+    "invalidLink": "此链接无效，请改为输入订单号和手机号码。",
+    "failed": "出了点问题，请重试。",
+    "loginHint": "已有账户？登录后可查看您的所有订单。",
+    "guestToggle": "以访客身份下的单？用订单号查找",
+    "yourOrders": "您的订单",
+    "selectHint": "选择一个订单，查看进度和下一步。",
+    "loading": "正在加载订单..."
   }
 }
