@@ -14,6 +14,7 @@ export default defineWorkersConfig({
 						ADMIN_PASSWORD: "test-admin",
 						LINE_CHANNEL_ACCESS_TOKEN: "test-line-token",
 						LINE_USER_ID: "Utest-staff",
+						LINE_CHANNEL_SECRET: "test-line-channel-secret",
 					},
 				},
 			},

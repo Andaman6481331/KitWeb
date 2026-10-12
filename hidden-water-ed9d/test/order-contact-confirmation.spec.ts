@@ -1,6 +1,6 @@
 import { env, SELF, fetchMock } from "cloudflare:test";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { resetDb, seedOrderableProduct, getOrder } from "./helpers/db";
+import { ADMIN_TEST_TOKEN, resetDb, seedOrderableProduct, getOrder } from "./helpers/db";
 
 // The shop never contacts customers first: an order is only a request until the
 // customer messages the OA / WhatsApp with their order number. These tests pin
@@ -157,7 +157,7 @@ describe("POST /order/submit — an order starts unconfirmed", () => {
 });
 
 describe("POST /orders/confirm-contact", () => {
-	const AUTH = { "Content-Type": "application/json", "Authorization": env.ADMIN_PASSWORD as string };
+	const AUTH = { "Content-Type": "application/json", "Authorization": ADMIN_TEST_TOKEN };
 
 	const confirm = (body: any, headers: Record<string, string> = AUTH) =>
 		SELF.fetch("https://example.com/orders/confirm-contact", {

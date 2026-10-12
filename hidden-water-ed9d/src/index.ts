@@ -12,6 +12,7 @@
  */
 
 import { validateContact } from "./order-validation";
+import { extractOrderIds, newViewKey, phonesMatch, secretsMatch, toOrderView, verifyLineSignature } from "./order-view";
 
 // The shop never contacts web customers first: an order is only a request until
 // the customer sends their order number to the OA or WhatsApp. Staff look for
@@ -31,6 +32,8 @@ interface Env {
 	LINE_USER_ID?: string;
 	LINE_LOGIN_CHANNEL_ID?: string;
 	LINE_LOGIN_CHANNEL_SECRET?: string;
+	// Messaging API channel secret (not the LINE Login one) — signs webhook deliveries.
+	LINE_CHANNEL_SECRET?: string;
 	EASYSLIP_API_KEY?: string;
 	PROMPTPAY_ACCOUNT?: string;
 	// Feature flag: "true" turns on EasySlip slip verification. Unset/other = off (manual payment via LINE OA).
@@ -363,6 +366,200 @@ function quantityByProduct(items: any[]): Map<string, number> {
 	return totals;
 }
 
+// ── Customer-facing LINE messages ───────────────────────────────────────────
+// Prices on the site are partly out of date and delivery is never part of the
+// catalog total, so every message that shows money says so the same way.
+const PRICE_NOTICE_TH = "ราคาบนเว็บไซต์ยังไม่ครบถ้วนเป็นปัจจุบัน และหลายรายการยังเป็นราคาเดิม เราจะยืนยันราคาสุดท้ายและค่าจัดส่งกับคุณก่อนชำระเงินค่ะ";
+const PRICE_NOTICE_EN = "Prices on our website aren't fully up to date and many items still show older prices. We confirm the final price and delivery cost with you before you pay.";
+const DELIVERY_NOTICE_TH = "ค่าจัดส่งคิดตามจริงของขนส่ง ไม่บวกเพิ่มค่ะ";
+
+const SITE_LANGS = ["th", "en", "ja", "zh"];
+
+// A customer's private link to their order. The key travels in the link so the
+// 5-digit order number alone never unlocks anything.
+function orderViewUrl(orderId: string, viewKey: string | null, lang?: string | null): string {
+	const l = SITE_LANGS.includes(String(lang)) ? String(lang) : "th";
+	const q = new URLSearchParams({ orderId });
+	if (viewKey) q.set("key", viewKey);
+	return `${PRODUCTION_ORIGIN}/${l}/ordertracking?${q.toString()}`;
+}
+
+// Items subtotal, delivery and — once both are known — the amount to pay.
+function totalsBlock(itemsTotal: number, deliveryFee: number | null): any[] {
+	const row = (label: string, value: string, bold = false, accent = false) => ({
+		type: "box", layout: "horizontal", margin: "md",
+		contents: [
+			{ type: "text", text: label, size: bold ? "md" : "sm", weight: bold ? "bold" : "regular", color: bold ? "#111111" : "#555555", flex: 3, wrap: true },
+			{ type: "text", text: value, size: bold ? "md" : "sm", weight: bold ? "bold" : "regular", color: accent ? "#DD876E" : "#111111", align: "end", flex: 3, wrap: true }
+		]
+	});
+	const rows: any[] = [
+		{ type: "separator", margin: "lg" },
+		row("ค่าสินค้า", `฿${itemsTotal.toFixed(2)}`),
+		row("ค่าจัดส่ง", deliveryFee === null ? "แจ้งให้ทราบภายหลัง" : deliveryFee === 0 ? "ไม่มีค่าจัดส่ง" : `฿${deliveryFee.toFixed(2)}`)
+	];
+	if (deliveryFee !== null) {
+		rows.push(row("ยอดที่ต้องชำระ", `฿${(itemsTotal + deliveryFee).toFixed(2)}`, true, true));
+	}
+	return rows;
+}
+
+// Push to a customer's own LINE account. Flags the order when LINE refuses (the
+// customer never added the OA) so Manage Orders can show who is unreachable.
+async function pushToCustomer(
+	env: Env,
+	order: { id: string; line_user_id: string | null },
+	messages: any[]
+): Promise<boolean> {
+	const token = env.LINE_CHANNEL_ACCESS_TOKEN || env.LINE_NOTIFY_TOKEN;
+	if (!order.line_user_id || !token) return false;
+	try {
+		const resp = await fetch("https://api.line.me/v2/bot/message/push", {
+			method: "POST",
+			headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+			body: JSON.stringify({ to: order.line_user_id, messages })
+		});
+		if (resp.ok) return true;
+		console.error(`LINE push failed for order ${order.id} (user ${order.line_user_id}): ${resp.status} ${await resp.text()}`);
+	} catch (err) {
+		console.error(`LINE push error for order ${order.id} (user ${order.line_user_id}):`, err);
+	}
+	await env.DB.prepare("UPDATE orders SET line_push_failed = 1 WHERE id = ?").bind(order.id).run();
+	return false;
+}
+
+// Tells a customer the delivery cost staff just quoted, with the amount to pay.
+async function pushDeliveryQuoted(
+	env: Env,
+	order: { id: string; line_user_id: string | null },
+	itemsTotal: number,
+	deliveryFee: number
+): Promise<boolean> {
+	const flex = {
+		type: "flex",
+		altText: `แจ้งค่าจัดส่งคำสั่งซื้อ ${order.id}`,
+		contents: {
+			type: "bubble",
+			body: {
+				type: "box",
+				layout: "vertical",
+				contents: [
+					{ type: "text", text: "Kitcharoen", weight: "bold", color: "#DD876E", size: "sm" },
+					{ type: "text", text: "แจ้งค่าจัดส่งแล้ว", weight: "bold", size: "xl", margin: "md" },
+					{ type: "text", text: `รหัส: ${order.id}`, size: "sm", color: "#888888", margin: "sm" },
+					...totalsBlock(itemsTotal, deliveryFee),
+					{ type: "text", text: DELIVERY_NOTICE_TH, size: "xs", color: "#888888", margin: "lg", wrap: true },
+					{ type: "text", text: "เจ้าหน้าที่จะแจ้งวิธีชำระเงินให้ทราบค่ะ ขอบคุณค่ะ 🧵", size: "xs", color: "#888888", margin: "sm", wrap: true }
+				]
+			}
+		}
+	};
+	return pushToCustomer(env, order, [flex]);
+}
+
+// Best effort: the order state is already saved, so a failed staff alert is logged
+// and nothing more.
+async function pushToStaff(env: Env, text: string): Promise<void> {
+	const token = env.LINE_CHANNEL_ACCESS_TOKEN || env.LINE_NOTIFY_TOKEN;
+	if (!token || !env.LINE_USER_ID) return;
+	try {
+		const resp = await fetch("https://api.line.me/v2/bot/message/push", {
+			method: "POST",
+			headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+			body: JSON.stringify({ to: env.LINE_USER_ID, messages: [{ type: "text", text }] })
+		});
+		if (!resp.ok) console.error(`LINE staff push failed: ${resp.status} ${await resp.text()}`);
+	} catch (err) {
+		console.error("LINE staff push error:", err);
+	}
+}
+
+// Replying uses the one-shot token from the customer's message and is free,
+// unlike a push.
+async function replyToCustomer(env: Env, replyToken: string, text: string): Promise<void> {
+	const token = env.LINE_CHANNEL_ACCESS_TOKEN || env.LINE_NOTIFY_TOKEN;
+	if (!token || !replyToken) return;
+	try {
+		const resp = await fetch("https://api.line.me/v2/bot/message/reply", {
+			method: "POST",
+			headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+			body: JSON.stringify({ replyToken, messages: [{ type: "text", text }] })
+		});
+		if (!resp.ok) console.error(`LINE reply failed: ${resp.status} ${await resp.text()}`);
+	} catch (err) {
+		console.error("LINE reply error:", err);
+	}
+}
+
+const confirmedReceiptText = (orderIds: string[]) =>
+	`Kitcharoen\n✅ ได้รับข้อความยืนยันของคุณแล้ว (${orderIds.join(", ")})\n`
+	+ `เจ้าหน้าที่จะยืนยันราคาสุดท้ายและค่าจัดส่ง แล้วแจ้งวิธีชำระเงินให้ทราบค่ะ 🧵\n\n`
+	+ `We've got your message. We'll confirm the final price and delivery cost, then tell you how to pay.`;
+
+// One LINE message event. Everything here is idempotent: LINE re-delivers on any
+// non-2xx, and a customer can paste the same order number twice.
+async function handleLineWebhookEvent(env: Env, event: any): Promise<void> {
+	if (event?.type !== "message" || event.message?.type !== "text") return;
+	const senderId: string | undefined = event.source?.userId;
+	const orderIds = extractOrderIds(event.message.text);
+	if (!senderId || orderIds.length === 0) return;
+
+	const confirmedNow: string[] = [];
+	const alreadyConfirmed: string[] = [];
+	const needsStaff: string[] = [];
+
+	for (const id of orderIds) {
+		const order = await env.DB.prepare(
+			"SELECT id, status, line_user_id, contact_confirmed_at FROM orders WHERE id = ?"
+		).bind(id).first() as any;
+		if (!order) continue;
+
+		// Not ours to settle by machine: a cancelled order, or one already tied to a
+		// different LINE account (someone else quoting a number they were not given).
+		if (order.status === "CANCELLED" || (order.line_user_id && order.line_user_id !== senderId)) {
+			needsStaff.push(id);
+			continue;
+		}
+
+		// They have just messaged us, so the 1:1 chat exists: link the account and
+		// clear any earlier "unreachable" flag.
+		await env.DB.prepare(
+			"UPDATE orders SET line_user_id = COALESCE(line_user_id, ?), line_push_failed = 0 WHERE id = ?"
+		).bind(senderId, id).run();
+
+		if (order.contact_confirmed_at) {
+			alreadyConfirmed.push(id);
+			continue;
+		}
+		// Guarded so a redelivered event can't confirm (and alert staff) twice.
+		const res = await env.DB.prepare(
+			"UPDATE orders SET contact_confirmed_at = CURRENT_TIMESTAMP, contact_confirmed_via = 'line-webhook' WHERE id = ? AND contact_confirmed_at IS NULL"
+		).bind(id).run();
+		(res.meta.changes > 0 ? confirmedNow : alreadyConfirmed).push(id);
+	}
+
+	const lines: string[] = [];
+	if (confirmedNow.length) lines.push(confirmedReceiptText(confirmedNow));
+	if (alreadyConfirmed.length) {
+		lines.push(`คำสั่งซื้อ ${alreadyConfirmed.join(", ")} ได้รับการยืนยันแล้วค่ะ เจ้าหน้าที่กำลังดำเนินการ\nAlready confirmed — our team is on it.`);
+	}
+	if (needsStaff.length) {
+		lines.push(`ได้รับข้อความของคุณแล้ว เจ้าหน้าที่จะตรวจสอบและติดต่อกลับค่ะ\nWe've got your message; our team will check and get back to you.`);
+	}
+	if (lines.length) await replyToCustomer(env, event.replyToken, lines.join("\n\n"));
+
+	if (confirmedNow.length) {
+		await pushToStaff(env,
+			`✅ ลูกค้ายืนยันแล้ว (LINE อัตโนมัติ)\nรหัส: ${confirmedNow.join(", ")}\n`
+			+ `ถัดไป: ยืนยันราคา + ใส่ค่าจัดส่งที่หน้า Manage Orders แล้วแจ้งวิธีชำระเงิน`);
+	}
+	if (needsStaff.length) {
+		await pushToStaff(env,
+			`⚠️ ข้อความมีรหัส ${needsStaff.join(", ")} แต่ยืนยันอัตโนมัติไม่ได้\n`
+			+ `(ออเดอร์ถูกยกเลิก หรือผูกกับบัญชี LINE อื่น) — กรุณาตรวจสอบเองใน LINE OA`);
+	}
+}
+
 // Tells a customer the price staff just confirmed on their quote. Returns whether
 // we reached them; mirrors /orders/status, including the line_push_failed flag so
 // unreachable customers stay visible in Manage Orders.
@@ -370,7 +567,8 @@ async function pushQuotePriced(
 	env: Env,
 	order: { id: string; line_user_id: string | null },
 	totalAmount: number,
-	lines: { item: any; unitPrice: number | null }[]
+	lines: { item: any; unitPrice: number | null }[],
+	deliveryFee: number | null = null
 ): Promise<boolean> {
 	const token = env.LINE_CHANNEL_ACCESS_TOKEN || env.LINE_NOTIFY_TOKEN;
 	if (!order.line_user_id || !token) return false;
@@ -407,17 +605,9 @@ async function pushQuotePriced(
 					{ type: "text", text: `รหัส: ${order.id}`, size: "sm", color: "#888888", margin: "sm" },
 					{ type: "separator", margin: "lg" },
 					{ type: "box", layout: "vertical", margin: "lg", spacing: "sm", contents: itemRows },
-					{ type: "separator", margin: "lg" },
-					{
-						type: "box",
-						layout: "horizontal",
-						margin: "lg",
-						contents: [
-							{ type: "text", text: "รวมทั้งหมด", size: "md", weight: "bold", flex: 3 },
-							{ type: "text", text: `฿${totalAmount.toFixed(2)}`, size: "md", weight: "bold", color: "#DD876E", align: "end", flex: 2 }
-						]
-					},
-					{ type: "text", text: "เจ้าหน้าที่จะติดต่อเรื่องการชำระเงินค่ะ ขอบคุณค่ะ 🧵", size: "xs", color: "#888888", margin: "lg", wrap: true }
+					...totalsBlock(totalAmount, deliveryFee),
+						{ type: "text", text: DELIVERY_NOTICE_TH, size: "xs", color: "#888888", margin: "lg", wrap: true },
+						{ type: "text", text: "เจ้าหน้าที่จะติดต่อเรื่องการชำระเงินค่ะ ขอบคุณค่ะ 🧵", size: "xs", color: "#888888", margin: "lg", wrap: true }
 				]
 			}
 		}
@@ -613,21 +803,67 @@ async function handleR2Request(
 	return new Response(request.method === "HEAD" ? null : object.body, { headers });
 }
 
+const PRODUCTION_ORIGIN = "https://kitcharoensampeng.com";
+const ALLOWED_ORIGINS = [
+	PRODUCTION_ORIGIN,
+	"https://www.kitcharoensampeng.com",
+	"http://localhost:5173",
+	"http://127.0.0.1:5173"
+];
+// Every Cloudflare Pages deployment of the storefront is served from its own
+// <hash>.kitweb.pages.dev (or <branch>.kitweb.pages.dev) origin. Only the owner
+// of the "kitweb" Pages project can create those, and a single DNS label is
+// required so "a.b.kitweb.pages.dev" and "evilkitweb.pages.dev" stay rejected.
+const PAGES_ORIGIN = /^https:\/\/([a-z0-9-]+\.)?kitweb\.pages\.dev$/;
+
+// The value for Access-Control-Allow-Origin: the caller's own origin when it is
+// allowed, otherwise the production domain (which the browser then rejects).
+function resolveCorsOrigin(origin: string | null): string {
+	if (origin && (ALLOWED_ORIGINS.includes(origin) || PAGES_ORIGIN.test(origin))) return origin;
+	return PRODUCTION_ORIGIN;
+}
+
+// ── Admin sessions ─────────────────────────────────────────────
+// The password is checked once, at login. The browser then gets a random token,
+// and only its SHA-256 hash is stored in D1, so a leaked table can't be replayed.
+const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+
+async function sha256Hex(input: string): Promise<string> {
+	const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+	return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function createAdminSession(env: Env): Promise<string> {
+	const token = [...crypto.getRandomValues(new Uint8Array(32))]
+		.map((b) => b.toString(16).padStart(2, "0"))
+		.join("");
+	const now = Date.now();
+	await env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at < ?").bind(now).run();
+	await env.DB.prepare("INSERT INTO admin_sessions (token_hash, expires_at) VALUES (?, ?)")
+		.bind(await sha256Hex(token), now + ADMIN_SESSION_TTL_MS).run();
+	return token;
+}
+
+// Accepts "Bearer <token>" or the bare token (what the admin frontend sends today).
+function readAdminToken(request: Request): string {
+	return (request.headers.get("Authorization") || "").trim().replace(/^Bearer\s+/i, "");
+}
+
+async function isAdminRequest(request: Request, env: Env): Promise<boolean> {
+	const token = readAdminToken(request);
+	if (!token) return false;
+	const row = await env.DB.prepare("SELECT expires_at FROM admin_sessions WHERE token_hash = ?")
+		.bind(await sha256Hex(token)).first<{ expires_at: number }>();
+	return !!row && row.expires_at > Date.now();
+}
+
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
 		const url = new URL(request.url);
 
 		// Helper to wrap responses with CORS
 		const corsResponse = (body: any, init?: ResponseInit) => {
-			const origin = request.headers.get("Origin");
-			const allowedOrigins = [
-				"https://kitcharoensampeng.com",
-				"https://www.kitcharoensampeng.com",
-				"http://localhost:5173",
-				"http://127.0.0.1:5173"
-			];
-			
-			const responseOrigin = (origin && allowedOrigins.includes(origin)) ? origin : allowedOrigins[0];
+			const responseOrigin = resolveCorsOrigin(request.headers.get("Origin"));
 
 			let resp: Response;
 			if (body instanceof Response) {
@@ -648,14 +884,7 @@ export default {
 
 		// 1. Handle CORS Preflight
 		if (request.method === "OPTIONS") {
-			const origin = request.headers.get("Origin");
-			const allowedOrigins = [
-				"https://kitcharoensampeng.com",
-				"https://www.kitcharoensampeng.com",
-				"http://localhost:5173",
-				"http://127.0.0.1:5173"
-			];
-			const responseOrigin = (origin && allowedOrigins.includes(origin)) ? origin : allowedOrigins[0];
+			const responseOrigin = resolveCorsOrigin(request.headers.get("Origin"));
 
 			return new Response(null, {
 				status: 204,
@@ -697,6 +926,9 @@ export default {
 				const category = url.searchParams.get("category");
 				// Admin views pass include_hidden=1 to also retrieve products hidden from the storefront
 				const includeHidden = url.searchParams.get("include_hidden") === "1";
+				if (includeHidden && !(await isAdminRequest(request, env))) {
+					return corsResponse("Unauthorized", { status: 401 });
+				}
 				let query = `
 					SELECT 
 						p.*,
@@ -769,6 +1001,9 @@ export default {
 				const limitParam = parseInt(url.searchParams.get("limit") || "", 10);
 				const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 50) : null;
 				const includeUnpublished = url.searchParams.get("include_unpublished") === "1";
+				if (includeUnpublished && !(await isAdminRequest(request, env))) {
+					return corsResponse("Unauthorized", { status: 401 });
+				}
 
 				const conditions: string[] = [];
 				if (!includeUnpublished) {
@@ -818,6 +1053,9 @@ export default {
 				// Admin lists need drafts and broken sets so they can be fixed; the
 				// storefront must never see either. Read-only, so it is safe to expose.
 				const includeUnpublished = url.searchParams.get("include_unpublished") === "1";
+				if (includeUnpublished && !(await isAdminRequest(request, env))) {
+					return corsResponse("Unauthorized", { status: 401 });
+				}
 				const sets = await loadSets(env, { includeUnpublished });
 				return corsResponse(includeUnpublished ? sets : sets.filter((s: any) => !s.is_incomplete));
 			}
@@ -884,6 +1122,9 @@ export default {
 				const limitParam = parseInt(url.searchParams.get("limit") || "", 10);
 				const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 60) : null;
 				const includeHidden = url.searchParams.get("include_hidden") === "1";
+				if (includeHidden && !(await isAdminRequest(request, env))) {
+					return corsResponse("Unauthorized", { status: 401 });
+				}
 
 				const conditions: string[] = [];
 				const binds: any[] = [];
@@ -912,6 +1153,9 @@ export default {
 			// grid finishes on what is next rather than what is over.
 			if (url.pathname === "/kitcraft" && request.method === "GET") {
 				const includeHidden = url.searchParams.get("include_hidden") === "1";
+				if (includeHidden && !(await isAdminRequest(request, env))) {
+					return corsResponse("Unauthorized", { status: 401 });
+				}
 
 				let query = "SELECT * FROM events";
 				if (!includeHidden) query += " WHERE (is_visible IS NULL OR is_visible = 1)";
@@ -1237,9 +1481,11 @@ export default {
 				// Persist order + items in one batch (server-computed total; linked to the
 				// account when logged in). Batching also makes the write atomic — a failed
 				// item insert can no longer leave an order with zero items behind.
+				const viewKey = newViewKey();
+				const orderLang = (formData.get("lang") as string) || "th";
 				const orderInsert = env.DB.prepare(
-					"INSERT INTO orders (id, customer_name, total_amount, payment_method, note, customer_id, phone_number, shipping_address, slip_url, line_user_id, line_display_name, slip_transaction_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-				).bind(orderId, customerName, isQuote ? 0 : totalAmount, paymentMethod, orderNote, customerId, phoneNumber, shippingAddress, slipUrl, lineUserId || null, lineDisplayName || null, transRef);
+					"INSERT INTO orders (id, customer_name, total_amount, payment_method, note, customer_id, phone_number, shipping_address, slip_url, line_user_id, line_display_name, slip_transaction_ref, view_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+				).bind(orderId, customerName, isQuote ? 0 : totalAmount, paymentMethod, orderNote, customerId, phoneNumber, shippingAddress, slipUrl, lineUserId || null, lineDisplayName || null, transRef, viewKey);
 
 				const itemInsert = env.DB.prepare(
 					"INSERT INTO order_items (order_id, product_id, product_name, size, color, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?)"
@@ -1274,8 +1520,9 @@ export default {
 					}
 				});
 				lineMsg += isQuote
-					? `รวมทั้งหมด: รอยืนยันราคากับลูกค้า\n`
-					: `รวมทั้งหมด: ${totalAmount.toFixed(2)} บาท\n`;
+					? `รวมค่าสินค้า: รอยืนยันราคากับลูกค้า\n`
+					: `รวมค่าสินค้า: ${totalAmount.toFixed(2)} บาท\n`;
+				lineMsg += `ค่าจัดส่ง: ยังไม่ได้ระบุ — ใส่ที่หน้า Manage Orders (คิดตามจริง ไม่บวกเพิ่ม)\n`;
 				if (orderNote) lineMsg += `หมายเหตุ: ${orderNote}\n`;
 				lineMsg += slipUrl
 					? `หลักฐานการโอน: ${slipUrl}`
@@ -1352,18 +1599,13 @@ export default {
 										spacing: "sm",
 										contents: itemRows
 									},
-									{ type: "separator", margin: "lg" },
-									{
-										type: "box",
-										layout: "horizontal",
-										margin: "lg",
-										contents: [
-											{ type: "text", text: "รวมทั้งหมด", size: "md", weight: "bold", flex: 3 },
-											{ type: "text", text: `฿${totalAmount.toFixed(2)}`, size: "md", weight: "bold", color: "#DD876E", align: "end", flex: 2 }
-										]
-									},
+									...totalsBlock(totalAmount, null),
 									{ type: "text", text: "⚠️ คำสั่งซื้อจะยังไม่ได้รับการยืนยัน จนกว่าคุณจะส่งข้อความหาเรา กรุณากดปุ่มด้านล่าง", size: "xs", color: "#888888", margin: "lg", wrap: true },
-									{ type: "text", text: "Your order is not confirmed until you message us. Tap the button below.", size: "xs", color: "#888888", margin: "sm", wrap: true }
+									{ type: "text", text: "Your order is not confirmed until you message us. Tap the button below.", size: "xs", color: "#888888", margin: "sm", wrap: true },
+									{ type: "separator", margin: "lg" },
+									{ type: "text", text: PRICE_NOTICE_TH, size: "xs", color: "#888888", margin: "lg", wrap: true },
+									{ type: "text", text: PRICE_NOTICE_EN, size: "xs", color: "#888888", margin: "sm", wrap: true },
+									{ type: "text", text: DELIVERY_NOTICE_TH, size: "xs", color: "#888888", margin: "sm", wrap: true }
 								]
 							},
 							// A message action sends this text from the customer's own account into
@@ -1378,6 +1620,11 @@ export default {
 										style: "primary",
 										color: "#06C755",
 										action: { type: "message", label: "ยืนยันคำสั่งซื้อ", text: confirmationText(orderId) }
+									},
+									{
+										type: "button",
+										style: "link",
+										action: { type: "uri", label: "ดูสถานะคำสั่งซื้อ", uri: orderViewUrl(orderId, viewKey, orderLang) }
 									}
 								]
 							}
@@ -1390,6 +1637,7 @@ export default {
 							+ `มีสินค้าบางรายการที่ยังไม่ได้ระบุราคา\n`
 							+ `กรุณาตอบกลับข้อความนี้ด้วยรหัสคำสั่งซื้อ เพื่อให้เจ้าหน้าที่ยืนยันราคาและวิธีชำระเงินค่ะ 🧵\n\n`
 							+ `We've received your request. Please reply with your order number (${orderId}) so our team can confirm the price.`
+							+ `\n\nดูสถานะ / Track: ${orderViewUrl(orderId, viewKey, orderLang)}`
 					};
 
 					const customerMessage = isQuote ? quoteMessage : flexMessage;
@@ -1420,7 +1668,57 @@ export default {
 					}
 				}
 
-				return corsResponse({ success: true, orderId, isQuote });
+				return corsResponse({ success: true, orderId, isQuote, viewKey });
+			}
+
+			// Customer-facing view of one order. Public, but it only answers to proof: the
+			// private key from the customer's own link, or the phone the order was placed
+			// with. Every miss — unknown order, wrong key, wrong phone — is the same 404, so
+			// this can't be used to find out which order numbers exist.
+			if (url.pathname === "/orders/lookup" && request.method === "POST") {
+				const body = await request.json().catch(() => ({})) as any;
+				const orderId = String(body.orderId || "").trim().toUpperCase();
+				const key = typeof body.key === "string" ? body.key.trim() : "";
+				const phone = typeof body.phone === "string" ? body.phone.trim() : "";
+				if (!orderId || (!key && !phone)) {
+					return corsResponse({ error: "orderId and key or phone are required" }, { status: 400 });
+				}
+
+				const order = await env.DB.prepare("SELECT * FROM orders WHERE id = ?").bind(orderId).first() as any;
+				const proven = !!order && (
+					(!!key && secretsMatch(order.view_key, key)) ||
+					(!!phone && phonesMatch(order.phone_number, phone))
+				);
+				if (!proven) {
+					return corsResponse({ error: "NOT_FOUND" }, { status: 404 });
+				}
+
+				const { results: items } = await env.DB.prepare(
+					"SELECT * FROM order_items WHERE order_id = ? ORDER BY id"
+				).bind(orderId).all();
+				return corsResponse({ order: toOrderView(order, items as any[]) });
+			}
+
+			// LINE Messaging API webhook: a customer's message to the OA arrives here.
+			// Unsigned or wrongly signed requests are refused before anything is read.
+			if (url.pathname === "/line/webhook" && request.method === "POST") {
+				const channelSecret = env.LINE_CHANNEL_SECRET;
+				if (!channelSecret) {
+					console.error("LINE webhook called but LINE_CHANNEL_SECRET is not configured");
+					return corsResponse({ error: "Webhook not configured" }, { status: 503 });
+				}
+				const rawBody = await request.text();
+				const signed = await verifyLineSignature(rawBody, request.headers.get("x-line-signature"), channelSecret);
+				if (!signed) {
+					return corsResponse({ error: "Invalid signature" }, { status: 401 });
+				}
+
+				let payload: any = {};
+				try { payload = JSON.parse(rawBody); } catch { /* signed but empty: nothing to do */ }
+				for (const event of Array.isArray(payload.events) ? payload.events : []) {
+					await handleLineWebhookEvent(env, event);
+				}
+				return corsResponse({ success: true });
 			}
 
 			if (url.pathname === "/rfq/submit" && request.method === "POST") {
@@ -1577,18 +1875,28 @@ export default {
 				const body = await request.json() as any;
 				const received = (body.password || "").trim();
 				const expected = (env.ADMIN_PASSWORD || "").trim();
-				if (received === expected) {
-					return corsResponse({ success: true, token: received });
+				// An empty ADMIN_PASSWORD must never match an empty attempt.
+				if (expected && received && (await sha256Hex(received)) === (await sha256Hex(expected))) {
+					return corsResponse({ success: true, token: await createAdminSession(env) });
 				}
 				return corsResponse({ success: false }, { status: 401 });
+			}
+
+			if (url.pathname === "/admin/logout" && request.method === "POST") {
+				const token = readAdminToken(request);
+				if (token) {
+					await env.DB.prepare("DELETE FROM admin_sessions WHERE token_hash = ?")
+						.bind(await sha256Hex(token)).run();
+				}
+				return corsResponse({ success: true });
 			}
 
 			if (url.pathname === "/orders" && request.method === "GET") {
 				const customerId = url.searchParams.get("customer_id");
 				const auth = request.headers.get("Authorization");
-				
-				// Allow if admin password matches OR if customerId matches the token (which is user.id for now)
-				const isAdmin = auth === (env.ADMIN_PASSWORD || "").trim();
+
+				// Allow if this is a valid admin session OR if customerId matches the token (which is user.id for now)
+				const isAdmin = await isAdminRequest(request, env);
 				const isCustomer = customerId && auth === customerId;
 
 				if (!isAdmin && !isCustomer) {
@@ -1626,8 +1934,7 @@ export default {
 			}
 
 			// 3. PROTECTED ROUTES
-			const auth = request.headers.get("Authorization");
-			if (auth !== (env.ADMIN_PASSWORD || "").trim()) {
+			if (!(await isAdminRequest(request, env))) {
 				return corsResponse("Unauthorized", { status: 401 });
 			}
 
@@ -1963,21 +2270,34 @@ export default {
 				}
 				const confirmed = body.confirmed !== false;
 
-				const existing = await env.DB.prepare("SELECT id FROM orders WHERE id = ?").bind(orderId).first();
+				const existing = await env.DB.prepare(
+					"SELECT id, line_user_id, contact_confirmed_at FROM orders WHERE id = ?"
+				).bind(orderId).first() as any;
 				if (!existing) {
 					return corsResponse({ error: "Order not found" }, { status: 404 });
 				}
 
 				await env.DB.prepare(
 					confirmed
-						? "UPDATE orders SET contact_confirmed_at = CURRENT_TIMESTAMP WHERE id = ?"
-						: "UPDATE orders SET contact_confirmed_at = NULL WHERE id = ?"
+						? "UPDATE orders SET contact_confirmed_at = CURRENT_TIMESTAMP, contact_confirmed_via = 'staff' WHERE id = ?"
+						: "UPDATE orders SET contact_confirmed_at = NULL, contact_confirmed_via = NULL WHERE id = ?"
 				).bind(orderId).run();
+
+				// The customer is told only the first time it flips to confirmed — an
+				// undo, or pressing the button again, stays silent.
+				let customerNotified = false;
+				if (confirmed && !existing.contact_confirmed_at) {
+					customerNotified = await pushToCustomer(
+						env,
+						{ id: orderId, line_user_id: existing.line_user_id },
+						[{ type: "text", text: confirmedReceiptText([orderId]) }]
+					);
+				}
 
 				const updated = await env.DB.prepare(
 					"SELECT contact_confirmed_at FROM orders WHERE id = ?"
 				).bind(orderId).first() as any;
-				return corsResponse({ success: true, contact_confirmed_at: updated?.contact_confirmed_at ?? null });
+				return corsResponse({ success: true, contact_confirmed_at: updated?.contact_confirmed_at ?? null, customerNotified });
 			}
 
 			// Update an order's status + tracking number, and notify the customer on LINE
@@ -2099,10 +2419,27 @@ export default {
 					return corsResponse({ error: "orderId is required" }, { status: 400 });
 				}
 				const existing = await env.DB.prepare(
-					"SELECT id, payment_method, line_user_id FROM orders WHERE id = ?"
+					"SELECT id, payment_method, line_user_id, delivery_fee FROM orders WHERE id = ?"
 				).bind(orderId).first() as any;
 				if (!existing) {
 					return corsResponse({ error: "Order not found" }, { status: 404 });
+				}
+
+				// Delivery is quoted per order at the carrier's real cost. Omitted keeps what is
+				// stored; null or "" clears it back to "not quoted yet"; 0 means no charge.
+				// Validated before anything is written so a bad value changes nothing.
+				let deliveryFee: number | null | undefined;
+				if (Object.prototype.hasOwnProperty.call(body, "deliveryFee")) {
+					const raw = body.deliveryFee;
+					if (raw === null || raw === "") {
+						deliveryFee = null;
+					} else {
+						const n = Number(raw);
+						if (!Number.isFinite(n) || n < 0) {
+							return corsResponse({ error: "deliveryFee must be a number, 0 or more" }, { status: 400 });
+						}
+						deliveryFee = Math.round(n * 100) / 100;
+					}
 				}
 
 				// Update editable fields (COALESCE keeps existing values when omitted).
@@ -2118,6 +2455,12 @@ export default {
 					body.trackingNumber ?? null,
 					orderId
 				).run();
+
+				if (deliveryFee !== undefined) {
+					await env.DB.prepare("UPDATE orders SET delivery_fee = ? WHERE id = ?").bind(deliveryFee, orderId).run();
+				}
+				const effectiveDelivery: number | null =
+					deliveryFee !== undefined ? deliveryFee : (existing.delivery_fee ?? null);
 
 				// If an items array is supplied, replace the line items and recompute the total.
 				let customerNotified = false;
@@ -2200,14 +2543,30 @@ export default {
 						).bind(newTotal, settled, orderId).run();
 						// The pricing is already saved — a push failure must not undo it.
 						customerNotified = await pushQuotePriced(
-							env, { id: orderId, line_user_id: existing.line_user_id }, newTotal, priced
+							env, { id: orderId, line_user_id: existing.line_user_id }, newTotal, priced, effectiveDelivery
 						);
 					} else {
 						await env.DB.prepare("UPDATE orders SET total_amount = ? WHERE id = ?").bind(newTotal, orderId).run();
 					}
 				}
 
-				return corsResponse({ success: true, customerNotified });
+				// A newly quoted delivery fee reaches the customer with the final amount to
+				// pay. Skipped while the order is still an unpriced quote (the total would
+				// be meaningless) and when the pricing push above already carried it.
+				if (!customerNotified && deliveryFee !== undefined && deliveryFee !== null
+					&& deliveryFee !== (existing.delivery_fee ?? null)) {
+					const current = await env.DB.prepare(
+						"SELECT total_amount, payment_method FROM orders WHERE id = ?"
+					).bind(orderId).first() as any;
+					if (current && current.payment_method !== "QUOTE") {
+						customerNotified = await pushDeliveryQuoted(
+							env, { id: orderId, line_user_id: existing.line_user_id },
+							Number(current.total_amount) || 0, deliveryFee
+						);
+					}
+				}
+
+				return corsResponse({ success: true, customerNotified, deliveryFee: effectiveDelivery });
 			}
 
 			// POS in-store cash sale: records a walk-in sale into pos_orders / pos_order_items

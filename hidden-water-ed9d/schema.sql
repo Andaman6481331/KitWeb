@@ -56,6 +56,9 @@ CREATE TABLE IF NOT EXISTS orders (
     tracking_number TEXT,
     line_push_failed INTEGER DEFAULT 0,
     contact_confirmed_at DATETIME,
+    contact_confirmed_via TEXT,
+    delivery_fee REAL,
+    view_key TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -98,4 +101,10 @@ CREATE TABLE IF NOT EXISTS stock_history (
     reason TEXT, -- e.g., 'MANUAL_ADJUSTMENT', 'ORDER_CHECKOUT'
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
+-- Admin login sessions (token hash -> expiry in epoch ms)
+CREATE TABLE IF NOT EXISTS admin_sessions (
+    token_hash TEXT PRIMARY KEY,
+    expires_at INTEGER NOT NULL
 );

@@ -1,6 +1,6 @@
 import { env, SELF, fetchMock } from "cloudflare:test";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { resetDb, seedProduct, getOrder, getOrderItems } from "./helpers/db";
+import { ADMIN_TEST_TOKEN, resetDb, seedProduct, getOrder, getOrderItems } from "./helpers/db";
 
 // The storefront shows a PER-PIECE price: the tier's box price divided by the MOQ
 // (which doubles as the box size). The Worker has to arrive at the same number, or
@@ -168,7 +168,7 @@ describe("POST /order/submit — tier and MOQ pricing", () => {
 describe("POST /orders/update — tier and MOQ pricing", () => {
 	const AUTH = {
 		"Content-Type": "application/json",
-		"Authorization": env.ADMIN_PASSWORD as string
+		"Authorization": ADMIN_TEST_TOKEN
 	};
 
 	beforeEach(resetDb);

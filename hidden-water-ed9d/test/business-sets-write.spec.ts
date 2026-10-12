@@ -1,8 +1,8 @@
 import { env, SELF } from "cloudflare:test";
 import { describe, it, expect, beforeEach } from "vitest";
-import { resetDb, seedProduct } from "./helpers/db";
+import { ADMIN_TEST_TOKEN, resetDb, seedProduct } from "./helpers/db";
 
-const AUTH = { "Content-Type": "application/json", "Authorization": env.ADMIN_PASSWORD as string };
+const AUTH = { "Content-Type": "application/json", "Authorization": ADMIN_TEST_TOKEN };
 
 const post = (path: string, body: any, headers: Record<string, string> = AUTH) =>
 	SELF.fetch(`https://example.com${path}`, { method: "POST", headers, body: JSON.stringify(body) });
@@ -101,7 +101,7 @@ describe("admin listing and delete", () => {
 		const publicRes = await SELF.fetch("https://example.com/business-sets");
 		expect(await publicRes.json()).toEqual([]);
 
-		const adminRes = await SELF.fetch("https://example.com/business-sets?include_unpublished=1");
+		const adminRes = await SELF.fetch("https://example.com/business-sets?include_unpublished=1", { headers: AUTH });
 		const body = await adminRes.json() as any[];
 		expect(body).toHaveLength(1);
 		expect(body[0].is_incomplete).toBe(true);

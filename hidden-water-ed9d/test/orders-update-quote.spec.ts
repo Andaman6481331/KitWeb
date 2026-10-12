@@ -1,8 +1,8 @@
 import { env, SELF, fetchMock } from "cloudflare:test";
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from "vitest";
-import { resetDb, seedOrderableProduct, getOrder, getOrderItems } from "./helpers/db";
+import { ADMIN_TEST_TOKEN, resetDb, seedOrderableProduct, getOrder, getOrderItems } from "./helpers/db";
 
-const AUTH = { "Content-Type": "application/json", "Authorization": env.ADMIN_PASSWORD as string };
+const AUTH = { "Content-Type": "application/json", "Authorization": ADMIN_TEST_TOKEN };
 
 const update = (body: any) =>
 	SELF.fetch("https://example.com/orders/update", {

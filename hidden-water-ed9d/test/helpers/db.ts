@@ -49,7 +49,8 @@ const DDL = [
 		line_push_failed INTEGER DEFAULT 0, customer_id TEXT, phone_number TEXT,
 		shipping_address TEXT, slip_url TEXT, line_user_id TEXT,
 		line_display_name TEXT, slip_transaction_ref TEXT,
-		contact_confirmed_at DATETIME,
+		contact_confirmed_at DATETIME, contact_confirmed_via TEXT,
+		delivery_fee REAL, view_key TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`,
 	`CREATE TABLE IF NOT EXISTS order_items (
@@ -62,8 +63,18 @@ const DDL = [
 
 const TABLES = [
 	"order_items", "orders", "diy_products",
-	"product_set_items", "product_sets", "product_variants", "products"
+	"product_set_items", "product_sets", "product_variants", "products", "admin_sessions"
 ];
+
+// Raw bearer token for protected routes in tests. resetDb() stores its hash as a live
+// session, so each test starts already signed in. Admin login itself is covered in
+// admin-session.spec.ts.
+export const ADMIN_TEST_TOKEN = "test-admin-session";
+
+async function sha256Hex(input: string): Promise<string> {
+	const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+	return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 export async function resetDb(): Promise<void> {
 	for (const table of TABLES) {
@@ -72,6 +83,11 @@ export async function resetDb(): Promise<void> {
 	for (const ddl of DDL) {
 		await env.DB.prepare(ddl).run();
 	}
+	await env.DB.prepare(
+		`CREATE TABLE IF NOT EXISTS admin_sessions (token_hash TEXT PRIMARY KEY, expires_at INTEGER NOT NULL)`
+	).run();
+	await env.DB.prepare("INSERT INTO admin_sessions (token_hash, expires_at) VALUES (?, ?)")
+		.bind(await sha256Hex(ADMIN_TEST_TOKEN), Date.now() + 60 * 60 * 1000).run();
 }
 
 export interface ProductSeed {
