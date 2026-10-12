@@ -687,17 +687,25 @@
     "slipInvalid": "无法验证凭证，请检查图片后重试",
     "amountMismatch": "转账金额与订单总额不符",
     "wrongAccount": "凭证未转账至我们的账户",
-    "duplicateSlip": "此凭证已用于其他订单"
+    "duplicateSlip": "此凭证已用于其他订单",
+    "confirmBannerBadge": "下单流程",
+    "confirmBannerText": "提交订单后，请通过 LINE 或 WhatsApp 将订单号发送给我们确认。未收到确认的订单将无法处理。",
+    "nextStepNote": "下一步：提交后，请通过 LINE 或 WhatsApp 向我们发送一条含订单号的消息。我们不会主动联系客户。",
+    "nameInvalid": "请填写您的姓名（至少 2 个字符）。",
+    "phoneInvalid": "请填写有效的电话号码，例如 081-234-5678 或 +66 81 234 5678。",
+    "addressInvalid": "请填写完整的收货地址（门牌号、街道、区、省/府、邮编）。",
+    "pleaseFixFields": "请检查标出的字段。",
+    "awaitingConfirmTag": "等待您发送消息"
   },
   "thankYou": {
-    "title": "订单已确认！",
+    "title": "已收到订单",
     "subtitle": "感谢您的订购",
     "received": "订单 #{orderId} 已收到",
-    "processing": "我们将尽快处理并发货",
+    "processing": "您的订单尚未确认，请按下方步骤将订单号发送给我们。",
     "lineCtaButton": "通过LINE OA获取实时物流更新",
     "quoteTitle": "已收到您的请求！",
     "quoteSubtitle": "感谢您的咨询。",
-    "quoteProcessing": "部分商品仍需定价。我们的员工将尽快与您确认最终价格和付款方式。",
+    "quoteProcessing": "部分商品尚未报价。请通过下方按钮发送订单号，我们的工作人员将回复最终价格和付款方式。",
     "continueShopping": "继续购物"
   },
   "customerReview": {
@@ -729,12 +737,27 @@
       "SHIPPED": "已发货",
       "DELIVERED": "已送达",
       "CANCELLED": "已取消"
-    }
+    },
+    "awaitingCustomer": "等待客户消息",
+    "awaitingHint": "在客户的消息到达 OA 聊天或 WhatsApp 之前，请勿发货或报价。",
+    "markConfirmed": "标记为已确认",
+    "confirmedLabel": "客户已确认",
+    "undoConfirm": "撤销"
   },
   "gallery": {
     "title": "创作者画廊",
     "subtitle": "来自我们社群的作品，做于工作坊，也做于家中。",
     "shopThis": "选购同款",
     "submitPrompt": "用我们的材料做了作品？请标记我们"
+  },
+  "orderConfirm": {
+    "title": "第 2 步：确认您的订单",
+    "intro": "请通过下方按钮发送订单号。未收到该消息，我们无法核实订单，订单可能不会被处理。",
+    "orderNumber": "您的订单号",
+    "copyMessage": "复制消息",
+    "copied": "已复制",
+    "viaLine": "通过 LINE 发送",
+    "viaWhatsapp": "通过 WhatsApp 发送",
+    "desktopHint": "在电脑上按钮可能无法打开 LINE。此时请在 LINE 中搜索 {lineId}，并粘贴已复制的消息。"
   }
 }

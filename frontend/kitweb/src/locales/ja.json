@@ -696,17 +696,25 @@
     "slipInvalid": "証明書を確認できませんでした。画像を確認して再試行してください",
     "amountMismatch": "振込金額が注文合計と一致しません",
     "wrongAccount": "証明書が当社口座への振込ではありません",
-    "duplicateSlip": "この証明書は他の注文に使用済みです"
+    "duplicateSlip": "この証明書は他の注文に使用済みです",
+    "confirmBannerBadge": "ご注文の流れ",
+    "confirmBannerText": "ご注文後、LINEまたはWhatsAppで注文番号をお送りください。ご連絡がない場合、ご注文は処理できません。",
+    "nextStepNote": "次のステップ：送信後、LINEまたはWhatsAppで注文番号を1通お送りください。当店からお客様へ先にご連絡することはありません。",
+    "nameInvalid": "お名前（2文字以上）を入力してください。",
+    "phoneInvalid": "有効な電話番号を入力してください（例：081-234-5678 または +66 81 234 5678）。",
+    "addressInvalid": "配送先住所を詳しく入力してください（番地・通り・地区・県・郵便番号）。",
+    "pleaseFixFields": "ハイライトされた項目をご確認ください。",
+    "awaitingConfirmTag": "メッセージをお待ちしています"
   },
   "thankYou": {
-    "title": "注文が確認されました！",
+    "title": "ご注文を受け付けました",
     "subtitle": "ご注文ありがとうございます",
     "received": "注文番号 #{orderId} を受け付けました",
-    "processing": "できるだけ早く処理・発送いたします",
+    "processing": "ご注文はまだ確定していません。下記の手順で注文番号をお送りください。",
     "lineCtaButton": "LINE OAでリアルタイム配送情報を受け取る",
     "quoteTitle": "リクエストを受け付けました！",
     "quoteSubtitle": "ご依頼ありがとうございます。",
-    "quoteProcessing": "一部の商品は価格を確認中です。スタッフが最終価格とお支払い方法をまもなくご連絡します。",
+    "quoteProcessing": "価格未定の商品があります。下記から注文番号をお送りいただければ、スタッフが最終価格とお支払い方法をご案内します。",
     "continueShopping": "ショッピングを続ける"
   },
   "customerReview": {
@@ -738,12 +746,27 @@
       "SHIPPED": "発送済み",
       "DELIVERED": "配達完了",
       "CANCELLED": "キャンセル済み"
-    }
+    },
+    "awaitingCustomer": "お客様のメッセージ待ち",
+    "awaitingHint": "お客様のメッセージがOAチャットまたはWhatsAppに届くまで、発送や価格設定は行わないでください。",
+    "markConfirmed": "確認済みにする",
+    "confirmedLabel": "お客様確認済み",
+    "undoConfirm": "取り消し"
   },
   "gallery": {
     "title": "クリエイターギャラリー",
     "subtitle": "ワークショップで、そしてご自宅で。コミュニティのみなさんの作品です。",
     "shopThis": "この商品を見る",
     "submitPrompt": "私たちの材料で作ったら、タグ付けしてください"
+  },
+  "orderConfirm": {
+    "title": "ステップ2：ご注文の確認",
+    "intro": "下のボタンから注文番号をお送りください。メッセージがない場合、ご注文を確認できず、処理されない可能性があります。",
+    "orderNumber": "注文番号",
+    "copyMessage": "メッセージをコピー",
+    "copied": "コピーしました",
+    "viaLine": "LINEで送る",
+    "viaWhatsapp": "WhatsAppで送る",
+    "desktopHint": "パソコンではボタンでLINEが開かない場合があります。その場合はLINEで {lineId} を検索し、コピーしたメッセージを貼り付けてください。"
   }
 }

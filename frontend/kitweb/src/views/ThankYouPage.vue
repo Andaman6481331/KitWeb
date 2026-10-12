@@ -3,6 +3,8 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { authStore } from '../stores/authStore'
+import { LINE_OA_URL } from '../utils/orderConfirmation'
+import OrderConfirmActions from '../components/order-confirm-actions.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -16,8 +18,6 @@ const currentLang = computed(() => route.params.lang || 'th')
 // Set by OrderPage from the server's own answer — a quote has no agreed total,
 // so it must not be confirmed with the usual "we'll ship shortly" copy.
 const isQuote = computed(() => route.query.quote === '1')
-
-const LINE_OA_URL = 'https://line.me/R/ti/p/@oar4837p'
 
 const goShop = () => {
   router.push({ name: 'catalog', params: { lang: currentLang.value } })
@@ -45,8 +45,12 @@ const goShop = () => {
 
       <p class="processing">{{ isQuote ? t('thankYou.quoteProcessing') : t('thankYou.processing') }}</p>
 
-      <!-- LINE OA CTA -->
-      <a :href="LINE_OA_URL" target="_blank" rel="noopener" class="line-cta-btn">
+      <!-- Step 2: the customer messages us first. Until that arrives staff treat the
+           order as unverified, so this is the page's main action. -->
+      <OrderConfirmActions v-if="orderId" :order-id="String(orderId)" class="confirm-block" />
+
+      <!-- Reached without an order id (bookmark / refresh): fall back to the OA link. -->
+      <a v-else :href="LINE_OA_URL" target="_blank" rel="noopener" class="line-cta-btn">
         <svg width="22" height="22" viewBox="0 0 40 40" fill="none">
           <rect width="40" height="40" rx="10" fill="#06C755"/>
           <path d="M20 8C13.4 8 8 12.5 8 18c0 3.7 2.4 6.9 6 8.8l-.8 3.9 4.5-2.4c.7.1 1.5.2 2.3.2 6.6 0 12-4.5 12-10S26.6 8 20 8z"
@@ -144,6 +148,10 @@ h1 {
   text-decoration: none;
   transition: all 0.25s ease;
   margin-bottom: 14px;
+}
+
+.confirm-block {
+  margin-bottom: 18px;
 }
 
 .line-cta-btn:hover {

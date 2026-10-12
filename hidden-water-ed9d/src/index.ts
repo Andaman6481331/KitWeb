@@ -11,6 +11,14 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
+import { validateContact } from "./order-validation";
+
+// The shop never contacts web customers first: an order is only a request until
+// the customer sends their order number to the OA or WhatsApp. Staff look for
+// this text (and the order id in it) in those two inboxes.
+const SHOP_WHATSAPP = "66894886877";
+const confirmationText = (orderId: string) => `Hi, my order is ${orderId}`;
+
 interface Env {
 	DB: D1Database;
 	IMAGES: R2Bucket;
@@ -1052,7 +1060,7 @@ export default {
 
 				const formData = await request.formData();
 				const customerName = formData.get("customerName") as string;
-				const phoneNumber = formData.get("phoneNumber") as string;
+				const phoneNumberRaw = formData.get("phoneNumber") as string;
 				const shippingAddress = formData.get("shippingAddress") as string;
 				const orderNote = (formData.get("orderNote") as string) || "";
 				const lineUserId = (formData.get("lineUserId") as string) || "";
@@ -1068,9 +1076,20 @@ export default {
 
 				// Name, phone and address are required. The slip requirement depends on whether
 				// the cart turns out to be a quote, so it is checked after pricing below.
-				if (!customerName || !phoneNumber || !shippingAddress) {
+				if (!customerName || !phoneNumberRaw || !shippingAddress) {
 					return corsResponse({ error: "Missing required fields" }, { status: 400 });
 				}
+
+				// Format checks run before anything is written or pushed, so junk input
+				// creates no order and no staff alert. The phone is stored normalised
+				// (a dropped leading 0 restored).
+				const contact = validateContact({
+					name: customerName, phone: phoneNumberRaw, address: shippingAddress
+				});
+				if (!contact.ok) {
+					return corsResponse({ error: contact.error }, { status: 400 });
+				}
+				const phoneNumber = contact.phone;
 
 				const cartItems: any[] = JSON.parse(cartItemsRaw || "[]");
 				if (cartItems.length === 0) {
@@ -1236,6 +1255,10 @@ export default {
 					? `📝 ขอใบเสนอราคา (เว็บไซต์) — รอใส่ราคา\n`
 					: `🧾 คำสั่งซื้อใหม่ (เว็บไซต์)\n`;
 				lineMsg += `รหัส: ${orderId}\n`;
+				// FYI only — the customer has not confirmed yet, so staff must not act on
+				// the order (or chase the contact details) until their message arrives.
+				lineMsg += `⏳ รอลูกค้าส่งข้อความยืนยัน — อย่าเพิ่งดำเนินการ\n`;
+				lineMsg += `   ค้นหารหัสนี้ใน LINE OA หรือ WhatsApp ${SHOP_WHATSAPP}\n`;
 				lineMsg += `ชื่อ: ${customerName}  โทร: ${phoneNumber}\n`;
 				if (lineDisplayName) lineMsg += `LINE: ${lineDisplayName}\n`;
 				lineMsg += `ที่อยู่: ${shippingAddress}\n\n`;
@@ -1318,7 +1341,7 @@ export default {
 								layout: "vertical",
 								contents: [
 									{ type: "text", text: "Kitcharoen", weight: "bold", color: "#DD876E", size: "sm" },
-									{ type: "text", text: "ยืนยันคำสั่งซื้อ", weight: "bold", size: "xl", margin: "md" },
+									{ type: "text", text: "ได้รับคำสั่งซื้อแล้ว", weight: "bold", size: "xl", margin: "md" },
 									{ type: "text", text: `รหัส: ${orderId}`, size: "sm", color: "#888888", margin: "sm" },
 									{ type: "text", text: `ชื่อ: ${customerName}`, size: "sm", color: "#888888" },
 									{ type: "separator", margin: "lg" },
@@ -1339,7 +1362,23 @@ export default {
 											{ type: "text", text: `฿${totalAmount.toFixed(2)}`, size: "md", weight: "bold", color: "#DD876E", align: "end", flex: 2 }
 										]
 									},
-									{ type: "text", text: "เราได้รับคำสั่งซื้อของคุณแล้ว และจะจัดส่งให้เร็วที่สุด ขอบคุณค่ะ 🧵", size: "xs", color: "#888888", margin: "lg", wrap: true }
+									{ type: "text", text: "⚠️ คำสั่งซื้อจะยังไม่ได้รับการยืนยัน จนกว่าคุณจะส่งข้อความหาเรา กรุณากดปุ่มด้านล่าง", size: "xs", color: "#888888", margin: "lg", wrap: true },
+									{ type: "text", text: "Your order is not confirmed until you message us. Tap the button below.", size: "xs", color: "#888888", margin: "sm", wrap: true }
+								]
+							},
+							// A message action sends this text from the customer's own account into
+							// the chat with the OA — one tap, no deep link. LINE caps the label at 20
+							// characters.
+							footer: {
+								type: "box",
+								layout: "vertical",
+								contents: [
+									{
+										type: "button",
+										style: "primary",
+										color: "#06C755",
+										action: { type: "message", label: "ยืนยันคำสั่งซื้อ", text: confirmationText(orderId) }
+									}
 								]
 							}
 						}
@@ -1348,8 +1387,9 @@ export default {
 					const quoteMessage = {
 						type: "text",
 						text: `Kitcharoen\nเราได้รับคำขอของคุณแล้ว (รหัส: ${orderId})\n\n`
-							+ `มีสินค้าบางรายการที่ยังไม่ได้ระบุราคา เจ้าหน้าที่จะติดต่อกลับ`
-							+ `เพื่อยืนยันราคาและวิธีชำระเงินก่อนจัดส่งค่ะ ขอบคุณค่ะ 🧵`
+							+ `มีสินค้าบางรายการที่ยังไม่ได้ระบุราคา\n`
+							+ `กรุณาตอบกลับข้อความนี้ด้วยรหัสคำสั่งซื้อ เพื่อให้เจ้าหน้าที่ยืนยันราคาและวิธีชำระเงินค่ะ 🧵\n\n`
+							+ `We've received your request. Please reply with your order number (${orderId}) so our team can confirm the price.`
 					};
 
 					const customerMessage = isQuote ? quoteMessage : flexMessage;
@@ -1910,6 +1950,34 @@ export default {
 				}
 
 				return corsResponse({ success: true, updated });
+			}
+
+			// Staff mark a web order as confirmed once the customer's message (with the
+			// order number) has arrived in the OA chat or WhatsApp. `confirmed: false`
+			// undoes a mistaken press.
+			if (url.pathname === "/orders/confirm-contact" && request.method === "POST") {
+				const body = await request.json() as any;
+				const orderId = (body.orderId as string || "").trim();
+				if (!orderId) {
+					return corsResponse({ error: "orderId is required" }, { status: 400 });
+				}
+				const confirmed = body.confirmed !== false;
+
+				const existing = await env.DB.prepare("SELECT id FROM orders WHERE id = ?").bind(orderId).first();
+				if (!existing) {
+					return corsResponse({ error: "Order not found" }, { status: 404 });
+				}
+
+				await env.DB.prepare(
+					confirmed
+						? "UPDATE orders SET contact_confirmed_at = CURRENT_TIMESTAMP WHERE id = ?"
+						: "UPDATE orders SET contact_confirmed_at = NULL WHERE id = ?"
+				).bind(orderId).run();
+
+				const updated = await env.DB.prepare(
+					"SELECT contact_confirmed_at FROM orders WHERE id = ?"
+				).bind(orderId).first() as any;
+				return corsResponse({ success: true, contact_confirmed_at: updated?.contact_confirmed_at ?? null });
 			}
 
 			// Update an order's status + tracking number, and notify the customer on LINE

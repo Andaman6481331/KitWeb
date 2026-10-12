@@ -49,6 +49,7 @@ const DDL = [
 		line_push_failed INTEGER DEFAULT 0, customer_id TEXT, phone_number TEXT,
 		shipping_address TEXT, slip_url TEXT, line_user_id TEXT,
 		line_display_name TEXT, slip_transaction_ref TEXT,
+		contact_confirmed_at DATETIME,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`,
 	`CREATE TABLE IF NOT EXISTS order_items (

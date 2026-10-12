@@ -11,6 +11,8 @@ import { cartHasUnpriced, isUnpricedItem, isPriced } from '../utils/cartPricing'
 import { parseMoq, toPerPiece, stepQty } from '../utils/productPricing';
 import AddToOrderModal from '../components/add-to-order-modal.vue';
 import LineConnectPanel from '../components/line-connect-panel.vue';
+import InfoBanner from '../components/info-banner.vue';
+import { validateContact } from '../utils/orderContact';
 
 const route = useRoute();
 const router = useRouter();
@@ -423,6 +425,9 @@ const triggerLineLogin = () => {
 // Which required fields are currently blank. A corner toast alone left the customer
 // hunting for the offending field, so the field itself is marked and scrolled to.
 const fieldErrors = ref({ customerName: false, phoneNumber: false, shippingAddress: false })
+// What the inline error under a field says: "required" when blank, a format hint
+// when it is filled in but unusable.
+const fieldErrorText = ref({ customerName: '', phoneNumber: '', shippingAddress: '' })
 
 // Clear a field's error as soon as it's being fixed, rather than making the customer
 // re-submit to find out whether they've satisfied it.
@@ -430,21 +435,46 @@ watch(customerName, () => { fieldErrors.value.customerName = false })
 watch(phoneNumber, () => { fieldErrors.value.phoneNumber = false })
 watch(shippingAddress, () => { fieldErrors.value.shippingAddress = false })
 
+// Same codes the Worker answers with (it re-checks, since this form can be bypassed).
+const contactErrorText = (code) => ({
+    INVALID_NAME: tt('order.nameInvalid', 'Please enter your full name (at least 2 letters).'),
+    INVALID_PHONE: tt('order.phoneInvalid', 'Enter a valid phone number, e.g. 081-234-5678 or +66 81 234 5678.'),
+    INVALID_ADDRESS: tt('order.addressInvalid', 'Please enter your full shipping address (house no., street, district, province, postal code).')
+}[code])
+
 const submitOrder = async () => {
     // Name, phone and address are required; the LINE display name is optional.
-    fieldErrors.value = {
+    const blank = {
         customerName: !customerName.value.trim(),
         phoneNumber: !phoneNumber.value.trim(),
         shippingAddress: !shippingAddress.value.trim()
     }
-    const firstInvalid = Object.keys(fieldErrors.value).find(k => fieldErrors.value[k])
+    const contact = validateContact({
+        name: customerName.value, phone: phoneNumber.value, address: shippingAddress.value
+    })
+    const flags = {}
+    const texts = {}
+    for (const field of Object.keys(blank)) {
+        flags[field] = blank[field] || !!contact.errors[field]
+        texts[field] = blank[field] ? t('order.fieldRequired') : (contactErrorText(contact.errors[field]) || '')
+    }
+    fieldErrors.value = flags
+    fieldErrorText.value = texts
+
+    const firstInvalid = Object.keys(flags).find(k => flags[k])
     if (firstInvalid) {
-        showNotificationMsg(tt('order.pleaseFillRequired', 'Please fill in your name, phone and address.'), 'error')
+        const anyBlank = Object.values(blank).some(Boolean)
+        showNotificationMsg(anyBlank
+            ? tt('order.pleaseFillRequired', 'Please fill in your name, phone and address.')
+            : tt('order.pleaseFixFields', 'Please check the highlighted fields.'), 'error')
         await nextTick()
         document.querySelector(`[data-field="${firstInvalid}"]`)
             ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
         return
     }
+    // Show the customer the number we will actually store (e.g. a dropped leading 0
+    // restored), so a silent correction is never a surprise on the receipt.
+    phoneNumber.value = contact.phone
     // A quote has no agreed total to pay against, so the slip requirement only
     // applies once every line is priced. Mirrors the Worker.
     if (slipRequired && !isQuoteCart.value && !slipImage.value) {
@@ -502,6 +532,9 @@ const submitOrder = async () => {
                 WRONG_ACCOUNT: t('order.wrongAccount'),
                 DUPLICATE: t('order.duplicateSlip'),
                 PRODUCT_UNAVAILABLE: tt('order.productUnavailable', 'A product in your cart is no longer available.'),
+                INVALID_NAME: contactErrorText('INVALID_NAME'),
+                INVALID_PHONE: contactErrorText('INVALID_PHONE'),
+                INVALID_ADDRESS: contactErrorText('INVALID_ADDRESS'),
             }
             showNotificationMsg(errMap[result.error] || t('order.orderFailed'), 'error')
         }
@@ -561,6 +594,11 @@ const isProductInCart = (productId) => {
 
 <template>
     <div class="order-page">
+        <!-- Sets the expectation up front: we never contact web customers first, so an
+             order only moves once they message us with its order number. -->
+        <InfoBanner :badge="tt('order.confirmBannerBadge', 'How ordering works')"
+            :text="tt('order.confirmBannerText', 'After you submit, send us your order number on LINE or WhatsApp to confirm it. Orders we don\'t hear about can\'t be processed.')" />
+
         <!-- Page Header -->
         <div class="headers-wrapper">
             <div class="page-header">
@@ -801,8 +839,7 @@ const isProductInCart = (productId) => {
                                         :placeholder="t('order.fullNamePlaceholder')" class="form-input"
                                         :class="{ 'has-error': fieldErrors.customerName }" data-field="customerName"
                                         required />
-                                    <p class="field-error" v-if="fieldErrors.customerName">{{ t('order.fieldRequired')
-                                        }}</p>
+                                    <p class="field-error" v-if="fieldErrors.customerName">{{ fieldErrorText.customerName }}</p>
                                 </div>
 
                                 <div class="form-group">
@@ -811,8 +848,7 @@ const isProductInCart = (productId) => {
                                         :placeholder="t('order.phoneNumberPlaceholder')" class="form-input"
                                         :class="{ 'has-error': fieldErrors.phoneNumber }" data-field="phoneNumber"
                                         required />
-                                    <p class="field-error" v-if="fieldErrors.phoneNumber">{{ t('order.fieldRequired')
-                                        }}</p>
+                                    <p class="field-error" v-if="fieldErrors.phoneNumber">{{ fieldErrorText.phoneNumber }}</p>
                                 </div>
 
                                 <!-- Contact details belong together: name, phone and the
@@ -838,7 +874,7 @@ const isProductInCart = (productId) => {
                             <textarea v-model="shippingAddress" :placeholder="t('order.shippingAddressPlaceholder')"
                                 class="form-textarea" :class="{ 'has-error': fieldErrors.shippingAddress }"
                                 data-field="shippingAddress" rows="3" required></textarea>
-                            <p class="field-error" v-if="fieldErrors.shippingAddress">{{ t('order.fieldRequired') }}</p>
+                            <p class="field-error" v-if="fieldErrors.shippingAddress">{{ fieldErrorText.shippingAddress }}</p>
                         </div>
 
                         <div class="form-group" :class="{ 'no-margin': !isLoggedIn }">
@@ -966,6 +1002,12 @@ const isProductInCart = (productId) => {
                             <span class="ship-recap-name">{{ customerName }}</span>
                             <span class="ship-recap-addr" v-if="shippingAddress.trim()">{{ shippingAddress }}</span>
                         </div>
+
+                        <!-- Said again at the point of commitment: the order is a request
+                             until the customer messages us; we do not contact them first. -->
+                        <p class="confirm-next-step" v-if="isCheckoutView">
+                            {{ tt('order.nextStepNote', 'Next step: after you submit, send us one message on LINE or WhatsApp with your order number. We don\'t contact customers first.') }}
+                        </p>
 
                         <div class="cart-actions-modern">
                             <button v-if="!isCheckoutView" @click="checkout" class="checkout-btn-modern">
@@ -1723,6 +1765,17 @@ const isProductInCart = (productId) => {
     font-size: 13px;
     line-height: 1.5;
     color: #6B584A;
+}
+
+.confirm-next-step {
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    background: #F0FFF6;
+    border-left: 3px solid #06C755;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #2d6a4f;
 }
 
 .total-tbc {

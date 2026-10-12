@@ -31,6 +31,31 @@ const formatDate = (value) => {
 // cart contained a product whose catalog price hadn't been uploaded yet.
 const isQuote = (o) => o.payment_method === 'QUOTE';
 
+// Web orders are only a request until the customer sends us their order number on
+// the OA chat / WhatsApp. NULL = still waiting; undefined (column not migrated
+// yet) and cancelled orders are not waiting on anything.
+const awaitingCustomer = (o) => o.contact_confirmed_at === null && o.status !== 'CANCELLED';
+const isContactConfirmed = (o) => !!o.contact_confirmed_at;
+
+// Order ids with a confirm/undo request in flight, to disable their button.
+const confirming = reactive({});
+
+const setContactConfirmed = async (o, confirmed) => {
+  confirming[o.id] = true;
+  try {
+    const res = await api.confirmOrderContact({ orderId: o.id, confirmed });
+    o.contact_confirmed_at = res?.contact_confirmed_at ?? null;
+  } catch (e) {
+    const d = drafts[o.id];
+    if (d) {
+      d.error = true;
+      d.message = e?.message || t('manageOrders.saveFailed');
+    }
+  } finally {
+    confirming[o.id] = false;
+  }
+};
+
 // Reachability of the customer on LINE OA, used for the indicator badge.
 const lineState = (o) => {
   if (!o.line_user_id) return 'none';
@@ -210,6 +235,7 @@ onMounted(() => {
               <span class="order-date">{{ formatDate(o.created_at) }}</span>
             </div>
             <div class="badge-group">
+              <span v-if="awaitingCustomer(o)" class="await-badge">{{ t('manageOrders.awaitingCustomer') }}</span>
               <span v-if="isQuote(o)" class="quote-badge">{{ t('manageOrders.awaitingPricing', 'Awaiting pricing') }}</span>
               <span class="status-badge" :class="'status-' + (o.status || 'PENDING')">
                 {{ statusLabel(o.status) }}
@@ -228,6 +254,20 @@ onMounted(() => {
             <template v-if="lineState(o) === 'reachable'">🟢 {{ t('manageOrders.lineReachable') }}</template>
             <template v-else-if="lineState(o) === 'unreachable'">🔴 {{ t('manageOrders.lineUnreachable') }}</template>
             <template v-else>⚪ {{ t('manageOrders.lineNotConnected') }}</template>
+          </div>
+
+          <!-- Customer confirmation: they message us first; staff mark it once it lands -->
+          <div v-if="awaitingCustomer(o)" class="confirm-row confirm-pending">
+            <p class="confirm-hint">{{ t('manageOrders.awaitingHint') }}</p>
+            <button class="confirm-btn" :disabled="confirming[o.id]" @click="setContactConfirmed(o, true)">
+              {{ t('manageOrders.markConfirmed') }}
+            </button>
+          </div>
+          <div v-else-if="isContactConfirmed(o) && o.status !== 'CANCELLED'" class="confirm-row confirm-done">
+            <span>✅ {{ t('manageOrders.confirmedLabel') }}</span>
+            <button class="undo-btn" :disabled="confirming[o.id]" @click="setContactConfirmed(o, false)">
+              {{ t('manageOrders.undoConfirm') }}
+            </button>
           </div>
 
           <!-- Items -->
@@ -409,10 +449,56 @@ onMounted(() => {
   color: #b5652f;
 }
 
+.await-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: #fdece6;
+  color: #b5472b;
+}
+
 .order-meta {
   display: flex;
   justify-content: space-between;
   margin: 12px 0 8px;
+}
+
+.confirm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+}
+.confirm-pending { background: #fff4ee; border: 1px solid #f3d3c4; color: #8a4a30; }
+.confirm-done { background: #f1faf4; border: 1px solid #cfe9d8; color: #2e7a4c; }
+.confirm-hint { margin: 0; line-height: 1.4; }
+.confirm-btn {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #3D2B1F;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.confirm-btn:disabled { opacity: 0.6; cursor: default; }
+.undo-btn {
+  background: none;
+  border: none;
+  color: #2e7a4c;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+@media (max-width: 520px) {
+  .confirm-pending { flex-direction: column; align-items: stretch; }
 }
 .customer { color: #4a3728; font-weight: 600; }
 .total { color: #DD876E; font-weight: 700; }

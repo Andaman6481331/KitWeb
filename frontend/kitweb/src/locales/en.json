@@ -821,17 +821,25 @@
     "slipInvalid": "Slip could not be verified. Please check the image and try again.",
     "amountMismatch": "Transfer amount does not match your order total.",
     "wrongAccount": "Slip was not transferred to our account.",
-    "duplicateSlip": "This slip has already been used for another order."
+    "duplicateSlip": "This slip has already been used for another order.",
+    "confirmBannerBadge": "How ordering works",
+    "confirmBannerText": "After you submit, send us your order number on LINE or WhatsApp to confirm it. Orders we don't hear about can't be processed.",
+    "nextStepNote": "Next step: after you submit, send us one message on LINE or WhatsApp with your order number. We don't contact customers first.",
+    "nameInvalid": "Please enter your full name (at least 2 letters).",
+    "phoneInvalid": "Enter a valid phone number, e.g. 081-234-5678 or +66 81 234 5678.",
+    "addressInvalid": "Please enter your full shipping address (house no., street, district, province, postal code).",
+    "pleaseFixFields": "Please check the highlighted fields.",
+    "awaitingConfirmTag": "Awaiting your message"
   },
   "thankYou": {
-    "title": "Order Confirmed!",
+    "title": "Order Received",
     "subtitle": "Thank you for your order.",
     "received": "Order #{orderId} has been received.",
-    "processing": "We will process and ship your order shortly.",
+    "processing": "Your order is not confirmed yet. Please send us your order number as shown below.",
     "lineCtaButton": "Get Instant Tracking Updates on LINE OA",
     "quoteTitle": "Request Received!",
     "quoteSubtitle": "Thank you for your request.",
-    "quoteProcessing": "Some items still need pricing. Our staff will confirm the final price and payment with you shortly.",
+    "quoteProcessing": "Some items still need pricing. Send us your order number below and our staff will reply with the final price and payment details.",
     "continueShopping": "Continue Shopping"
   },
   "customerReview": {
@@ -863,7 +871,12 @@
       "SHIPPED": "Shipped",
       "DELIVERED": "Delivered",
       "CANCELLED": "Cancelled"
-    }
+    },
+    "awaitingCustomer": "Awaiting customer message",
+    "awaitingHint": "Don't ship or price this until the customer's message arrives in the OA chat or WhatsApp.",
+    "markConfirmed": "Mark confirmed",
+    "confirmedLabel": "Customer confirmed",
+    "undoConfirm": "Undo"
   },
   "institutional": {
     "bannerBadge": "B2B Portal",
@@ -910,5 +923,15 @@
     "subtitle": "Made by our community, at our workshops and at home.",
     "shopThis": "Shop this",
     "submitPrompt": "Made something with our materials? Tag us at"
+  },
+  "orderConfirm": {
+    "title": "Step 2: confirm your order",
+    "intro": "Send us your order number below. Without this message we can't verify your order and it may not be processed.",
+    "orderNumber": "Your order number",
+    "copyMessage": "Copy message",
+    "copied": "Copied",
+    "viaLine": "Send on LINE",
+    "viaWhatsapp": "Send on WhatsApp",
+    "desktopHint": "On a computer the button may not open LINE. In that case search {lineId} in LINE and paste the copied message."
   }
 }

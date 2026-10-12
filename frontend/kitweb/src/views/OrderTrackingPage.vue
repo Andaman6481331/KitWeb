@@ -6,6 +6,7 @@ import { api, API_URL, getDiyImageUrl } from '../services/api'
 import { useProducts } from '../composables/useProducts'
 import { authStore } from '../stores/authStore'
 import { defaultLang } from '@/utils/localeRoutes'
+import OrderConfirmActions from '../components/order-confirm-actions.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -124,6 +125,12 @@ const closeOrderDetails = () => {
     selectedOrder.value = null
 }
 
+// Strictly null: the column is NULL until staff mark the customer's message as
+// received. An order that predates the column (undefined) or was cancelled is
+// not waiting on anything.
+const awaitingMessage = (order) =>
+    order?.contact_confirmed_at === null && order.status !== 'CANCELLED'
+
 const goToNewOrder = () => {
     router.push({ name: 'orderpage', params: { lang: currentLang.value } })
 }
@@ -194,6 +201,8 @@ const goToNewOrder = () => {
                                     <span v-if="order.status === 'SHIPPED'" class="status-tag shipped">{{
                                         t('order.shipped') }}</span>
                                     <span v-else class="status-tag pending">{{ order.status }}</span>
+                                    <span v-if="awaitingMessage(order)" class="status-tag awaiting">{{
+                                        t('order.awaitingConfirmTag') }}</span>
                                 </div>
                                 <h3 class="order-name">{{ order.items && order.items.length > 0 ?
                                     order.items[0].product_name : 'New Order' }}</h3>
@@ -265,6 +274,9 @@ const goToNewOrder = () => {
                             <p><strong>{{ t('order.total') }}:</strong> ฿{{ selectedOrder.price.toLocaleString() }}
                             </p>
                         </div>
+                        <!-- Still unverified: the customer has not sent us the order number yet. -->
+                        <OrderConfirmActions v-if="awaitingMessage(selectedOrder)" :order-id="selectedOrder.id"
+                            compact class="details-confirm" />
                         <div class="order-items-mini">
                             <div v-for="item in selectedOrder.items" :key="item.id" class="mini-item">
                                 <p><strong>{{ item.product_name }}</strong> x {{ item.quantity }}</p>
@@ -531,6 +543,15 @@ const goToNewOrder = () => {
 .status-tag.pending {
     background: #FFF9E6;
     color: #B28900;
+}
+
+.status-tag.awaiting {
+    background: #FDECE6;
+    color: #B5472B;
+}
+
+.details-confirm {
+    margin-bottom: 16px;
 }
 
 .order-name {

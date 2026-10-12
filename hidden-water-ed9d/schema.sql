@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS orders (
     note TEXT,
     tracking_number TEXT,
     line_push_failed INTEGER DEFAULT 0,
+    contact_confirmed_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

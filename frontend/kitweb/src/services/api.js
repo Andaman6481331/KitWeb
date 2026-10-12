@@ -453,6 +453,23 @@ export const api = {
     return await response.json();
   },
 
+  // Admin: mark a web order as confirmed once the customer's message (with the
+  // order number) has reached the OA chat / WhatsApp. confirmed:false undoes it.
+  async confirmOrderContact({ orderId, confirmed = true }) {
+    const response = await fetch(`${API_URL}/orders/confirm-contact`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': this.getToken()
+      },
+      body: JSON.stringify({ orderId, confirmed })
+    });
+    if (!response.ok) {
+      throw new Error(await parseApiError(response, 'Failed to update order'));
+    }
+    return await response.json();
+  },
+
   // Admin: full order edit — customer/fulfilment fields + line items.
   // The backend recomputes the total server-side from DB prices.
   async updateOrder(payload) {
