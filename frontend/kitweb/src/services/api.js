@@ -319,7 +319,7 @@ export const api = {
   // ── Workshops & market appearances ────────────────────────────
   async getEvents({ includeHidden = false } = {}) {
     return getJson(
-      includeHidden ? `${API_URL}/events?include_hidden=1` : `${API_URL}/events`,
+      includeHidden ? `${API_URL}/kitcraft?include_hidden=1` : `${API_URL}/kitcraft`,
       'Failed to fetch events',
       { auth: includeHidden }
     );
@@ -327,7 +327,7 @@ export const api = {
 
   // Create when payload has no id, update when it does.
   async saveEvent(payload) {
-    const response = await fetch(`${API_URL}/events`, {
+    const response = await fetch(`${API_URL}/kitcraft`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
       body: JSON.stringify(payload)
@@ -338,7 +338,7 @@ export const api = {
   },
 
   async deleteEvent(id) {
-    const response = await fetch(`${API_URL}/events/delete`, {
+    const response = await fetch(`${API_URL}/kitcraft/delete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
       body: JSON.stringify({ id })
