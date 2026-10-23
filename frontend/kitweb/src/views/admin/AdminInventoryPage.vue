@@ -17,7 +17,7 @@ import InventoryCard from '../../components/admin/inventory/InventoryCard.vue';
 import InventoryRow from '../../components/admin/inventory/InventoryRow.vue';
 import InventoryBulkBar from '../../components/admin/inventory/InventoryBulkBar.vue';
 import InventoryArchiveDialog from '../../components/admin/inventory/InventoryArchiveDialog.vue';
-import AdminProductForm from '../../components/admin-product-form.vue';
+import ProductEditPanel from '../../components/admin/product-edit/ProductEditPanel.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -267,6 +267,16 @@ const closeForm = () => {
   editing.value = null;
   if (route.query.new || route.query.edit) router.replace({ query: {} });
 };
+// Saved from the panel: say so, and reload the list so it shows the new prices and options.
+const onSaved = () => {
+  flash(t.value.toastSaved);
+  load({ silent: true });
+};
+// Archive from inside the panel runs the page's own confirmed, Undo-able archive.
+const onPanelArchive = (id) => {
+  closeForm();
+  askArchive([id]);
+};
 
 // ── Selection ─────────────────────────────────────────────────────
 const toggleSelect = (id) => {
@@ -476,6 +486,7 @@ onUnmounted(() => {
     <InventoryBulkBar
       v-if="selected.length > 0"
       :count="selected.length"
+      :all-shown="allSelected"
       :t="t"
       :categories="categoryOptions"
       :archived-view="archivedView"
@@ -507,12 +518,13 @@ onUnmounted(() => {
     @cancel="archiveIds = null"
   />
 
-  <AdminProductForm
+  <ProductEditPanel
     :open="formOpen"
     :product="editing"
     :categories="categories"
     @close="closeForm"
-    @saved="load({ silent: true })"
+    @saved="onSaved"
+    @archive="onPanelArchive"
     @session-expired="handleAuthError({ status: 401 })"
   />
 </template>

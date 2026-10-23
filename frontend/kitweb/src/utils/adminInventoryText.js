@@ -70,6 +70,7 @@ const en = {
   bulk: 'Bulk actions',
   selectedN: (n) => `${n} selected`,
   selectAllN: 'Select all shown',
+  unselectAllN: 'Unselect all',
   bulkShow: 'Show on website',
   bulkHide: 'Hide',
   bulkCat: 'Add to category…',
@@ -90,6 +91,7 @@ const en = {
     : `Restored ${n} products. They stay hidden until you show them.`),
   toastAddedToCategory: (n, category) => `Added ${n} ${plural(n, 'product')} to ${category}`,
   toastDuplicated: 'Duplicated. The copy is hidden until you publish it.',
+  toastSaved: 'Product saved.',
   toastError: 'That did not go through. Nothing was changed.',
 };
 
@@ -156,6 +158,7 @@ const th = {
   bulk: 'จัดการหลายรายการ',
   selectedN: (n) => `เลือกแล้ว ${n}`,
   selectAllN: 'เลือกที่แสดงทั้งหมด',
+  unselectAllN: 'ยกเลิกเลือกทั้งหมด',
   bulkShow: 'แสดงบนเว็บไซต์',
   bulkHide: 'ซ่อน',
   bulkCat: 'เพิ่มเข้าหมวดหมู่…',
@@ -174,6 +177,7 @@ const th = {
   toastRestored: (n) => `กู้คืน ${n} รายการแล้ว จะยังซ่อนอยู่จนกว่าคุณจะแสดงบนเว็บไซต์`,
   toastAddedToCategory: (n, category) => `เพิ่ม ${n} รายการเข้า ${category} แล้ว`,
   toastDuplicated: 'ทำสำเนาแล้ว (ซ่อนอยู่จนกว่าจะเผยแพร่)',
+  toastSaved: 'บันทึกสินค้าแล้ว',
   toastError: 'ดำเนินการไม่สำเร็จ ไม่มีอะไรถูกเปลี่ยนแปลง',
 };
 

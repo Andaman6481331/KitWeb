@@ -4,6 +4,8 @@
 // another category or archived; `archivedView` switches between the two.
 defineProps({
   count: { type: Number, required: true },
+  // True when every product on screen is selected: the link then turns into "Unselect all".
+  allShown: { type: Boolean, default: false },
   t: { type: Object, required: true },
   categories: { type: Array, default: () => [] }, // [{ key, label }]
   archivedView: { type: Boolean, default: false },
@@ -21,7 +23,9 @@ const onCategory = (event) => {
 <template>
   <div role="toolbar" :aria-label="t.bulk" class="adm-bulk">
     <b>{{ t.selectedN(count) }}</b>
-    <button type="button" class="adm-bulk-link" @click="$emit('select-all')">{{ t.selectAllN }}</button>
+    <button type="button" class="adm-bulk-link" @click="$emit(allShown ? 'clear' : 'select-all')">
+      {{ allShown ? t.unselectAllN : t.selectAllN }}
+    </button>
 
     <template v-if="archivedView">
       <button type="button" class="adm-bulk-btn" :disabled="busy" @click="$emit('restore')">{{ t.bulkRestore }}</button>

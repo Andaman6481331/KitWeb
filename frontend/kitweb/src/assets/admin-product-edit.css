@@ -1,0 +1,317 @@
+/* Edit product slide-over (components/admin/product-edit). Everything is namespaced .pe-*
+   and reads the --adm-* tokens that .adm-shell defines; nothing here touches the public
+   site. App.vue forces fonts with !important, so the font rules are written one step
+   higher, the same way admin-ui.css does for the other admin surfaces. */
+
+html[lang][lang] :is(.pe-panel, .pe-dialog-back, .pe-lightbox, .pe-toast),
+html[lang][lang] :is(.pe-panel, .pe-dialog-back, .pe-lightbox, .pe-toast) *,
+html[lang][lang] :is(.pe-panel, .pe-dialog-back, .pe-lightbox, .pe-toast) *::before,
+html[lang][lang] :is(.pe-panel, .pe-dialog-back, .pe-lightbox, .pe-toast) *::after {
+  font-family: 'Work Sans', 'Noto Sans Thai', sans-serif !important;
+}
+html[lang][lang] .pe-panel .pe-serif { font-family: Lora, 'Noto Sans Thai', serif !important; }
+.pe-panel *, .pe-dialog-back *, .pe-lightbox *, .pe-toast * { box-sizing: border-box; }
+
+/* ── Shell ─────────────────────────────────────────────────── */
+/* The panel covers the whole page (sidebar included) and slides in from the right; the
+   "← Inventory" button in its header is the way back. */
+.pe-panel {
+  position: fixed; inset: 0; z-index: 201;
+  display: flex; flex-direction: column;
+  background: var(--adm-bg); color: var(--adm-text); font-size: 14px; line-height: 1.45;
+}
+.pe-slide-enter-active { transition: transform .3s ease-out; }
+.pe-slide-leave-active { transition: transform .3s ease-in; }
+.pe-slide-enter-from, .pe-slide-leave-to { transform: translateX(100%); }
+@media (prefers-reduced-motion: reduce) {
+  .pe-slide-enter-active, .pe-slide-leave-active { transition: none; }
+}
+
+.pe-head, .pe-foot {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 24px; background: rgba(255, 255, 255, .95);
+}
+.pe-head { border-bottom: 1px solid var(--adm-border); }
+.pe-foot { border-top: 1px solid var(--adm-border); }
+.pe-head-title { margin: 0; font-size: 20px; font-weight: 700; }
+.pe-crumb { color: var(--adm-muted); font-size: 13px; }
+.pe-head-spacer { flex: 1 1 auto; }
+.pe-iconbtn {
+  width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--adm-border);
+  background: #fff; font-size: 22px; line-height: 1; cursor: pointer; color: var(--adm-text);
+}
+.pe-iconbtn:hover { border-color: var(--adm-brand); }
+.pe-back {
+  min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--adm-border);
+  background: #fff; font-size: 14px; font-weight: 600; color: var(--adm-text); cursor: pointer; white-space: nowrap;
+}
+.pe-back:hover { border-color: var(--adm-brand); }
+
+/* Three columns on a wide screen: status/categories | basic info + sizes | photos. The two
+   side columns stay in view while the middle scrolls. Narrower, the photos card moves back
+   between basic info and sizes (.pe-main stops being a box of its own, so the grid areas can
+   interleave its children with the photos), and below 900px everything stacks. */
+.pe-scroll { flex: 1 1 auto; overflow-y: auto; padding: 24px; }
+.pe-layout {
+  max-width: 1800px; margin: 0 auto; display: grid; gap: 20px 24px; align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "side" "basic" "imgs" "sizes";
+}
+.pe-side { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.pe-side-left { grid-area: side; }
+.pe-side-right { grid-area: imgs; }
+.pe-main { display: contents; }
+.pe-basic { grid-area: basic; }
+.pe-sizes { grid-area: sizes; }
+.pe-center { padding: 64px 0; text-align: center; color: var(--adm-muted-2); display: flex; flex-direction: column; align-items: center; gap: 12px; }
+@media (min-width: 900px) {
+  .pe-layout {
+    grid-template-columns: 270px minmax(0, 1fr);
+    grid-template-areas: "side basic" "side imgs" "side sizes";
+  }
+}
+/* The sticky columns are never taller than the space under the header and above the footer
+   (about 178px of bars and padding), so a long one scrolls inside itself instead of being cut. */
+@media (min-width: 900px) {
+  .pe-side-left { position: sticky; top: 0; max-height: calc(100vh - 178px); overflow-x: hidden; overflow-y: auto; }
+}
+@media (min-width: 1440px) {
+  .pe-layout {
+    grid-template-columns: 260px minmax(0, 1fr) 340px;
+    grid-template-areas: "side main imgs";
+  }
+  .pe-main { grid-area: main; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .pe-side-right { position: sticky; top: 0; max-height: calc(100vh - 178px); overflow-x: hidden; overflow-y: auto; }
+  .pe-side-right .pe-card { padding: 16px; }
+  .pe-side-right .pe-imgs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+}
+@media (max-width: 900px) {
+  .pe-scroll { padding: 16px; }
+  .pe-head, .pe-foot { padding: 10px 16px; }
+}
+
+/* ── Cards and form controls ───────────────────────────────── */
+.pe-card { background: var(--adm-surface); border: 1px solid var(--adm-border); border-radius: 14px; padding: 22px; }
+.pe-card-tight { padding: 16px; }
+.pe-h { margin: 0; font-size: 18px; font-weight: 700; }
+.pe-card-tight .pe-h { font-size: 15px; margin-bottom: 10px; }
+.pe-sub { color: var(--adm-muted); font-size: 13px; margin: 4px 0 16px; }
+.pe-hint { color: var(--adm-muted); font-size: 12px; margin-top: 6px; }
+.pe-error { color: var(--adm-danger); font-size: 13px; margin: 8px 0 0; }
+.pe-lab { display: block; font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+.pe-opt { font-weight: 400; color: var(--adm-muted); font-size: 11px; }
+.pe-in {
+  width: 100%; border: 1px solid var(--adm-border); background: #fcfbf9; border-radius: 10px;
+  padding: 10px 12px; font: inherit; color: inherit; min-height: 44px;
+}
+textarea.pe-in { min-height: 70px; resize: vertical; }
+textarea.pe-tall { min-height: 96px; }
+.pe-in:focus-visible, .pe-sel:focus-visible, .pe-cin:focus-visible, .pe-lg input:focus-visible,
+.pe-btn:focus-visible, .pe-iconbtn:focus-visible, .pe-back:focus-visible, .pe-sw:focus-visible,
+.pe-tag-x:focus-visible, .pe-tagbox-toggle:focus-visible {
+  outline: 2px solid var(--adm-brand); outline-offset: 1px;
+}
+.pe-in[readonly] { background: #f1ede6; color: var(--adm-muted-2); }
+.pe-mb { margin-bottom: 16px; }
+.pe-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 700px) { .pe-grid-2 { grid-template-columns: minmax(0, 1fr); } }
+.pe-row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pe-row-gap { display: flex; gap: 8px; flex-wrap: wrap; }
+.pe-spacer { flex: 1 1 auto; }
+.pe-hidden { display: none; }
+.pe-scroll-x { overflow-x: auto; }
+
+.pe-btn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px;
+  border: 1px solid var(--adm-border); background: #fff; border-radius: 10px; color: var(--adm-text);
+  font-size: 14px; font-weight: 500; cursor: pointer;
+}
+.pe-btn:hover { border-color: var(--adm-brand); }
+.pe-btn:disabled { opacity: .55; cursor: not-allowed; }
+.pe-btn:disabled:hover { border-color: var(--adm-border); }
+.pe-btn-sm { min-height: 36px; }
+.pe-btn-pri { background: var(--adm-brand); border-color: var(--adm-brand); color: #fff; font-weight: 600; }
+.pe-btn-pri:hover { background: var(--adm-brand-dark); border-color: var(--adm-brand-dark); }
+.pe-x {
+  width: 32px; height: 32px; border-radius: 8px; border: 1px solid transparent; background: transparent;
+  font-size: 18px; line-height: 1; color: var(--adm-muted-2); cursor: pointer;
+}
+.pe-x:hover:not(:disabled) { border-color: var(--adm-border); color: var(--adm-danger); }
+.pe-x:disabled { opacity: .35; cursor: not-allowed; }
+
+.pe-sw {
+  position: relative; flex: none; width: 46px; height: 26px; padding: 0; border: 0; border-radius: 999px;
+  background: #cfc7ba; cursor: pointer;
+}
+.pe-sw::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; transition: left .15s;
+}
+.pe-sw.is-on { background: var(--adm-ok); }
+.pe-sw.is-on::after { left: 23px; }
+.pe-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+/* ── Status card ───────────────────────────────────────────── */
+.pe-progress { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.pe-bar { flex: 1; height: 8px; border-radius: 99px; background: #eee8df; overflow: hidden; }
+.pe-bar-fill { height: 100%; background: var(--adm-brand); transition: width .2s; }
+.pe-bar-fill.is-complete { background: var(--adm-ok); }
+.pe-note { border-radius: 10px; padding: 8px 10px; font-size: 12.5px; margin-bottom: 6px; }
+.pe-note-ok { background: #e3f2ec; color: var(--adm-ok); }
+.pe-note-warn { background: var(--adm-warn-bg); color: var(--adm-warn-fg); }
+.pe-ck { display: flex; gap: 8px; align-items: flex-start; padding: 5px 6px; font-size: 13px; line-height: 1.3; }
+.pe-ic {
+  width: 18px; height: 18px; border-radius: 50%; flex: none; margin-top: 1px; font-size: 11px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center; background: #e3f2ec; color: var(--adm-ok);
+}
+.pe-ic.is-todo { background: #eee8df; color: var(--adm-muted-2); }
+
+/* ── Categories ────────────────────────────────────────────── */
+.pe-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.pe-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 12px; border-radius: 999px;
+  background: #eee8df; color: var(--adm-text-2); font-size: 13px;
+}
+.pe-chip.is-first { background: var(--adm-brand); color: #fff; }
+.pe-chip-x { border: 0; background: transparent; color: inherit; font-size: 16px; line-height: 1; cursor: pointer; padding: 0 4px; opacity: .8; }
+.pe-chip-x:hover { opacity: 1; }
+
+/* ── Basic info ────────────────────────────────────────────── */
+.pe-seg { display: inline-flex; padding: 3px; border: 1px solid var(--adm-border); background: var(--adm-surface); border-radius: 12px; }
+.pe-seg-btn { min-height: 32px; padding: 0 12px; border: 0; border-radius: 9px; background: transparent; font-size: 13px; font-weight: 500; color: var(--adm-text-2); cursor: pointer; }
+.pe-seg-btn.is-on { background: var(--adm-brand-tint); color: var(--adm-brand-dark); font-weight: 600; }
+/* The dropdown hangs off the field itself, not the (taller) grid cell around it. */
+.pe-usage-field { position: relative; }
+/* The usage field: chosen usages are small tags that wrap inside it. With a few of them it is
+   still one 44px row, so choosing usages does not push the form down. */
+.pe-tagbox { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 7px 12px; cursor: pointer; }
+.pe-tagbox.is-open { border-color: var(--adm-brand); }
+.pe-tag {
+  display: inline-flex; align-items: center; gap: 2px; max-width: 100%; height: 28px; padding: 0 4px 0 10px;
+  border: 1px solid var(--adm-brand); border-radius: 999px; background: var(--adm-brand-tint);
+  color: var(--adm-brand-dark); font-size: 12.5px; font-weight: 500; line-height: 1; white-space: nowrap; cursor: default;
+}
+.pe-tag-x {
+  width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: transparent;
+  color: inherit; font-size: 15px; line-height: 1; cursor: pointer;
+}
+.pe-tag-x:hover { background: rgba(140, 106, 63, .2); }
+.pe-tagbox-toggle {
+  flex: 1 1 36px; min-width: 36px; min-height: 28px; padding: 0; border: 0; background: transparent;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.pe-tagbox-toggle.is-empty { color: var(--adm-muted); }
+.pe-scrim { position: fixed; inset: 0; z-index: 4; }
+.pe-menu {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5; background: var(--adm-surface);
+  border: 1px solid var(--adm-border); border-radius: 12px; box-shadow: 0 12px 32px rgba(40, 28, 10, .18); padding: 8px;
+}
+.pe-menu-list { max-height: 240px; overflow-y: auto; margin-top: 6px; }
+.pe-menu-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.pe-menu-row:hover { background: #faf6f0; }
+.pe-menu-row input { width: 16px; height: 16px; }
+.pe-menu-th { color: var(--adm-muted); }
+
+/* ── Images ────────────────────────────────────────────────── */
+.pe-imgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; align-items: start; }
+.pe-img { position: relative; border: 1px solid var(--adm-border); border-radius: 12px; overflow: hidden; background: #fff; }
+.pe-img-thumb { display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: cover; background: #f1ede6; cursor: zoom-in; }
+.pe-badge-main {
+  position: absolute; top: 8px; left: 8px; z-index: 1; background: var(--adm-brand); color: #fff;
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+}
+.pe-img-tools { position: absolute; top: 8px; right: 8px; z-index: 1; display: flex; gap: 6px; }
+.pe-img-btn {
+  min-height: 28px; padding: 0 8px; border: 1px solid var(--adm-border); border-radius: 8px;
+  background: rgba(255, 255, 255, .95); font-size: 12px; font-weight: 600; cursor: pointer; color: var(--adm-text);
+}
+.pe-img-btn:hover { border-color: var(--adm-brand); }
+.pe-img-x { width: 28px; padding: 0; font-size: 16px; line-height: 1; }
+.pe-img-cap {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px; background: #faf8f5;
+  border-top: 1px solid var(--adm-border); font-size: 12px; color: var(--adm-muted);
+}
+.pe-sel {
+  width: 100%; min-height: 36px; padding: 0 8px; border: 1px solid var(--adm-border); border-radius: 8px;
+  background: #fff; font: inherit; font-size: 12.5px; color: var(--adm-text);
+}
+.pe-drop {
+  min-height: 250px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  border: 2px dashed var(--adm-border); border-radius: 12px; background: #fcfbf9; color: var(--adm-muted);
+  text-align: center; cursor: pointer;
+}
+.pe-drop:hover, .pe-drop.is-over { border-color: var(--adm-brand); background: var(--adm-brand-tint); }
+.pe-drop-plus { font-size: 26px; line-height: 1; }
+
+/* ── Sizes, levels, colors ─────────────────────────────────── */
+.pe-pieces { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 18px; }
+.pe-pieces-field { width: 180px; }
+.pe-pieces-hint { flex: 1 1 260px; margin: 0 0 12px; font-size: 13px; }
+.pe-size { border: 1px solid var(--adm-border); border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
+.pe-size-head { padding: 14px 16px 12px; background: #faf8f5; border-bottom: 1px solid var(--adm-border); }
+.pe-size-top { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+.pe-w150 { width: 130px; }
+.pe-w190 { width: 160px; }
+.pe-margin { margin: 0 0 10px; }
+.pe-total { margin-left: auto; text-align: right; font-size: 12px; color: var(--adm-muted); }
+.pe-total b { display: block; font-size: 20px; font-weight: 700; color: var(--adm-text); }
+.pe-lg { display: grid; grid-template-columns: 92px repeat(5, minmax(104px, 1fr)); gap: 6px 8px; align-items: center; min-width: 660px; }
+.pe-lg input {
+  width: 100%; text-align: right; border: 1px solid var(--adm-brand); border-radius: 8px; padding: 8px; background: #fff;
+  font: inherit; min-height: 38px;
+}
+.pe-lg input.is-auto { border-color: var(--adm-border); background: #f1ede6; color: var(--adm-muted-2); }
+.pe-lg input.is-l5 { background: #fffaf1; box-shadow: 0 0 0 2px rgba(140, 106, 63, .18); }
+.pe-lh b { display: block; font-size: 13px; }
+.pe-lh small { color: var(--adm-muted); font-size: 11px; }
+.pe-rowlab { font-size: 11px; color: var(--adm-muted); }
+.pe-piece { text-align: right; padding: 8px; color: var(--adm-muted-2); font-variant-numeric: tabular-nums; }
+.pe-colhead { display: flex; gap: 8px; align-items: center; padding: 11px 16px; font-size: 13px; }
+.pe-colhead .pe-hint { margin: 0 0 0 auto; }
+.pe-ctab { border-collapse: collapse; width: 100%; min-width: 640px; }
+.pe-ctab th:nth-child(2), .pe-ctab td:nth-child(2) { min-width: 210px; }
+.pe-ctab th {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--adm-muted); text-align: left;
+  padding: 6px 12px; font-weight: 500; border-top: 1px solid var(--adm-border-soft);
+}
+.pe-ctab td { padding: 6px 12px; border-top: 1px solid var(--adm-border-soft); vertical-align: middle; }
+.pe-colorcell { display: flex; align-items: center; gap: 10px; }
+.pe-swatch {
+  position: relative; flex: none; width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--adm-border);
+  overflow: hidden; cursor: pointer;
+}
+.pe-swatch input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.pe-cin { width: 100%; min-width: 80px; border: 1px solid var(--adm-border); background: #fcfbf9; border-radius: 8px; padding: 6px 8px; font: inherit; min-height: 36px; }
+.pe-cin-th { max-width: 72px; min-width: 60px; }
+.pe-num { text-align: right; max-width: 110px; }
+.pe-colfoot { padding: 10px 16px 14px; border-top: 1px solid var(--adm-border-soft); }
+.pe-colfoot-note { padding: 0 16px 10px; }
+
+/* ── Dialogs, lightbox, toast ──────────────────────────────── */
+.pe-dialog-back {
+  position: fixed; inset: 0; z-index: 260; background: rgba(0, 0, 0, .45);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.pe-dialog {
+  width: min(460px, 100%); background: var(--adm-surface); border-radius: 14px; padding: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .3);
+}
+.pe-dialog h2 { margin: 0 0 6px; font-size: 20px; }
+.pe-dialog p { margin: 0 0 14px; color: var(--adm-muted-2); }
+.pe-dialog-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+.pe-lightbox {
+  position: fixed; inset: 0; z-index: 280; background: rgba(0, 0, 0, .82);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.pe-lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 8px; background: #fff; }
+.pe-lightbox-x {
+  position: absolute; top: 16px; right: 16px; width: 44px; height: 44px; border-radius: 50%; border: 0;
+  background: rgba(255, 255, 255, .95); font-size: 24px; line-height: 1; cursor: pointer;
+}
+.pe-toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 270; max-width: min(520px, 92vw);
+  background: #2b2620; color: #fff; padding: 12px 18px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, .3);
+  font-size: 14px;
+}
+.pe-toast.is-error { background: #7b241c; }

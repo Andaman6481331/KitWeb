@@ -61,7 +61,12 @@ const getJson = (url, errorMessage, { auth = false } = {}) => {
     const token = auth ? api.getToken() : null;
     const response = await fetch(url, token ? { headers: { 'Authorization': token } } : undefined);
     if (response.status === 401) throw sessionExpiredError();
-    if (!response.ok) throw new Error(errorMessage);
+    if (!response.ok) {
+      // The status lets a caller tell "the Worker does not have this route" (404) from a hiccup.
+      const err = new Error(errorMessage);
+      err.status = response.status;
+      throw err;
+    }
     return await response.json();
   })();
 
@@ -408,6 +413,11 @@ export const api = {
     if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(`Delete product failed: ${response.status} ${response.statusText}`);
     return await response.json();
+  },
+
+  // The sizes, colors and stock behind the admin product editor (admin only).
+  async getProductInventory(id) {
+    return getJson(`${API_URL}/products/${id}/inventory`, 'Failed to load sizes and colors', { auth: true });
   },
 
   // ── Admin inventory bulk actions ──────────────────────────────────

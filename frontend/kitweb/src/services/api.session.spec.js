@@ -168,3 +168,16 @@ describe('admin-only list reads', () => {
     expect(store.admin_token).toBeUndefined();
   });
 });
+
+describe('product inventory (sizes and colors)', () => {
+  beforeEach(() => vi.resetModules());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('reports a Worker that lacks the route as status 404 and keeps the session', async () => {
+    const store = { admin_token: 'valid-session' };
+    const api = await loadApi(store, 404);
+
+    await expect(api.getProductInventory(155)).rejects.toMatchObject({ status: 404 });
+    expect(store.admin_token).toBe('valid-session');
+  });
+});
