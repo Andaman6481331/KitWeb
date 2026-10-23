@@ -6,8 +6,8 @@ import ContactUsPage from '../views/ContactUsPage.vue'
 import Login from '../views/Login.vue'
 import KitCraftPage from '../views/KitCraftPage.vue'
 import PartnerPage from '../views/PartnerPage.vue'
-import AdminDashboard from '../views/AdminDashboard.vue'
 import FaqPage from '../views/FaqPage.vue'
+import { adminShellRoute, legacyAdminRedirects } from './adminRoutes'
 
 import { authStore } from '../stores/authStore'
 import { pathToCode } from '../i18n'
@@ -34,9 +34,9 @@ export const routes = [
       { path: 'kitcraft', name: 'kitcraft', component: KitCraftPage },
       { path: 'partners', name: 'partners', component: PartnerPage },
       { path: 'faq', name: 'faq', component: FaqPage },
-      { path: 'admin', name: 'admin', component: AdminDashboard, meta: { requiresAuth: true } },
-      { path: 'sellcash', name: 'sellcash', component: () => import('../views/SellCashPage.vue') },
-      { path: 'manageorders', name: 'manageorders', component: () => import('../views/ManageOrdersPage.vue') },
+      // Staff area: one shell with its own admin login (see adminRoutes.js).
+      adminShellRoute,
+      ...legacyAdminRedirects,
       { path: 'thank-you', name: 'thank-you', component: () => import('../views/ThankYouPage.vue') },
       { path: ':pathMatch(.*)*', redirect: (to) => `/${to.params.lang}` },
     ],
@@ -120,7 +120,7 @@ export function installRouterGuards(router, i18n) {
     }
 
     // Keep staff-only pages out of search indexes (global meta is "index, follow").
-    const isPrivate = to.name === 'sellcash' || to.name === 'admin' || to.name === 'manageorders'
+    const isPrivate = to.matched.some((record) => record.meta?.adminShell)
     let robotsMeta = document.querySelector('meta[name="robots"]')
     if (!robotsMeta) {
       robotsMeta = document.createElement('meta')

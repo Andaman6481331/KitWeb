@@ -1,6 +1,8 @@
-// Service to communicate with Cloudflare Backend
-// const API_URL = 'http://127.0.0.1:8787';
-export const API_URL = 'https://hidden-water-ed9d.shop-backend-kitweb.workers.dev';
+// Service to communicate with Cloudflare Backend.
+// Always the deployed Worker unless VITE_API_URL says otherwise: set it to
+// http://127.0.0.1:8787 (with `wrangler dev` running) to try admin changes against a
+// local database instead of production.
+export const API_URL = import.meta.env?.VITE_API_URL || 'https://hidden-water-ed9d.shop-backend-kitweb.workers.dev';
 export const getImageUrl = (filename) => `${API_URL}/images/${filename}`;
 // Pass a version (e.g. getUtilsUrl('x.webp', 2)) to bust browser/CDN cache after
 // re-uploading a file under the same name. The worker serves utils as immutable,
@@ -99,6 +101,13 @@ export const api = {
   getToken() {
     if (!isBrowser) return null;
     return localStorage.getItem('admin_token') || localStorage.getItem('kitweb_auth_token');
+  },
+
+  // The admin session alone. getToken() falls back to a customer login, which is
+  // right for the order pages but must never count as "signed in to the admin".
+  getAdminToken() {
+    if (!isBrowser) return null;
+    return localStorage.getItem('admin_token');
   },
 
   async adminLogin(password) {
@@ -399,6 +408,41 @@ export const api = {
     if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(`Delete product failed: ${response.status} ${response.statusText}`);
     return await response.json();
+  },
+
+  // ── Admin inventory bulk actions ──────────────────────────────────
+  // Narrow, additive Worker routes: they flip a flag or add a category link and
+  // never remove anything. Prefer them over updateProduct() for bulk changes, since
+  // PUT /products/:id rewrites the whole row.
+  async postProductAction(path, body, errorMessage) {
+    const response = await fetch(`${API_URL}/products/${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': this.getToken()
+      },
+      body: JSON.stringify(body)
+    });
+    if (response.status === 401) throw sessionExpiredError();
+    if (!response.ok) throw new Error(await parseApiError(response, errorMessage));
+    return await response.json();
+  },
+
+  setProductsVisibility(ids, isVisible) {
+    return this.postProductAction('visibility', { ids, is_visible: isVisible }, 'Failed to update visibility');
+  },
+
+  addProductsToCategory(ids, categoryPath) {
+    return this.postProductAction('categories', { ids, category_path: categoryPath }, 'Failed to add to category');
+  },
+
+  archiveProducts(ids) {
+    return this.postProductAction('archive', { ids }, 'Failed to archive');
+  },
+
+  // items: [{ id, is_visible }] — the visibility each product had before it was archived.
+  restoreProducts(items) {
+    return this.postProductAction('restore', { items }, 'Failed to restore');
   },
 
   async getImages() {

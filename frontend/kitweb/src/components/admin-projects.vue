@@ -1,7 +1,7 @@
 <script setup>
 // Editor for the `projects` table — the content type behind the homepage's
 // featured slot, the KitCraft archive, and the tutorial blocks on product pages.
-// Self-contained so AdminDashboard only has to render it under a tab.
+// Self-contained: the admin shell just mounts it on its own route (/:lang/admin/project-article).
 import { ref, computed, onMounted } from 'vue';
 import { api, getProjectImageUrl, API_URL, sessionExpiredError } from '../services/api';
 

@@ -59,6 +59,81 @@ describe('admin session handling', () => {
   });
 });
 
+describe('admin token', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('is the admin session only, never a customer login', async () => {
+    const api = await loadApi({ kitweb_auth_token: 'cust-1' }, 200);
+    expect(api.getAdminToken()).toBeNull();
+    // getToken keeps its customer fallback for the order pages that rely on it
+    expect(api.getToken()).toBe('cust-1');
+  });
+
+  it('returns the admin session when there is one', async () => {
+    const api = await loadApi({ admin_token: 'session-token', kitweb_auth_token: 'cust-1' }, 200);
+    expect(api.getAdminToken()).toBe('session-token');
+  });
+});
+
+describe('API base URL', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('defaults to the deployed Worker', async () => {
+    await loadApi({}, 200);
+    const { API_URL } = await import('./api.js');
+    expect(API_URL).toBe('https://hidden-water-ed9d.shop-backend-kitweb.workers.dev');
+  });
+
+  it('can be pointed at a local Worker with VITE_API_URL', async () => {
+    vi.stubEnv('VITE_API_URL', 'http://127.0.0.1:8787');
+    await loadApi({}, 200);
+    const { API_URL } = await import('./api.js');
+    expect(API_URL).toBe('http://127.0.0.1:8787');
+  });
+});
+
+describe('inventory bulk actions', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const actions = [
+    ['setProductsVisibility', (api) => api.setProductsVisibility([1, 2], false),
+      '/products/visibility', { ids: [1, 2], is_visible: false }],
+    ['addProductsToCategory', (api) => api.addProductsToCategory([3], 'beads'),
+      '/products/categories', { ids: [3], category_path: 'beads' }],
+    ['archiveProducts', (api) => api.archiveProducts([4, 5]),
+      '/products/archive', { ids: [4, 5] }],
+    ['restoreProducts', (api) => api.restoreProducts([{ id: 4, is_visible: true }]),
+      '/products/restore', { items: [{ id: 4, is_visible: true }] }],
+  ];
+
+  it.each(actions)('%s posts JSON with the admin session', async (_name, call, path, body) => {
+    const api = await loadApi({ admin_token: 'session-token' }, 200);
+    await call(api);
+
+    const [url, init] = fetch.mock.calls[0];
+    expect(url.endsWith(path)).toBe(true);
+    expect(init.method).toBe('POST');
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json', Authorization: 'session-token' });
+    expect(JSON.parse(init.body)).toEqual(body);
+  });
+
+  it.each(actions)('%s turns a 401 into a session-expired error', async (_name, call) => {
+    const store = { admin_token: 'stale' };
+    const api = await loadApi(store, 401);
+    await expect(call(api)).rejects.toMatchObject({ status: 401 });
+    expect(store.admin_token).toBeUndefined();
+  });
+
+  it('surfaces the Worker error message', async () => {
+    const api = await loadApi({ admin_token: 'session-token' }, 200);
+    fetch.mockResolvedValueOnce(new Response(JSON.stringify({ error: 'Unknown category' }), { status: 400 }));
+    await expect(api.addProductsToCategory([1], 'nope')).rejects.toThrow('Unknown category');
+  });
+});
+
 describe('admin-only list reads', () => {
   afterEach(() => vi.unstubAllGlobals());
 

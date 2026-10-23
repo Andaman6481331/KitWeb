@@ -1,4 +1,7 @@
 User-agent: *
 Disallow: /admin
 Disallow: /sellcash
+Disallow: /*/admin
+Disallow: /*/manageorders
+Disallow: /*/sellcash
 Sitemap: https://kitcharoensampeng.com/sitemap.xml

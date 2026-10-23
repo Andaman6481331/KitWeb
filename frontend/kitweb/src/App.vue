@@ -393,20 +393,33 @@ const handleNavKeydown = (e) => {
 // pages that overlay it (e.g. the catalog drawer) can offset by var(--nav-h)
 // instead of guessing a fixed pixel value.
 const navBarEl = ref(null)
+// Staff pages bring their own navbar; the public header, footer and drawers are hidden.
+const isAdminShell = computed(() => route.matched.some((record) => record.meta?.adminShell))
 let navResizeObserver = null
 const syncNavHeight = () => {
   const h = navBarEl.value?.offsetHeight
   if (h) document.documentElement.style.setProperty('--nav-h', `${h}px`)
 }
 
+// The navbar is absent on admin routes (see isAdminShell), so the observer follows the
+// element instead of being attached once: landing on an admin URL and then navigating
+// to a public page must still start publishing --nav-h.
+const attachNavObserver = (el) => {
+  navResizeObserver?.disconnect()
+  navResizeObserver = null
+  if (!el) return
+  syncNavHeight()
+  if ('ResizeObserver' in window) {
+    navResizeObserver = new ResizeObserver(syncNavHeight)
+    navResizeObserver.observe(el)
+  }
+}
+watch(navBarEl, attachNavObserver, { flush: 'post' })
+
 onMounted(() => {
   document.addEventListener('click', closeAllMenus)
   document.addEventListener('keydown', handleNavKeydown)
-  syncNavHeight()
-  if (navBarEl.value && 'ResizeObserver' in window) {
-    navResizeObserver = new ResizeObserver(syncNavHeight)
-    navResizeObserver.observe(navBarEl.value)
-  }
+  attachNavObserver(navBarEl.value)
 })
 
 onUnmounted(() => {
@@ -424,6 +437,7 @@ onUnmounted(() => {
 
 <template>
   <div>
+    <template v-if="!isAdminShell">
     <div class="NavBar" ref="navBarEl">
       <!-- Left: Logo -->
       <div class="nav-left">
@@ -824,8 +838,11 @@ onUnmounted(() => {
       </nav>
     </Transition>
 
+    </template>
+
     <RouterView />
 
+    <template v-if="!isAdminShell">
     <!-- Footer -->
     <footer class="footer">
       <div class="footer-content">
@@ -928,6 +945,7 @@ onUnmounted(() => {
         </div>
       </div>
     </transition>
+    </template>
   </div>
 </template>
 

@@ -65,6 +65,33 @@ export const stepQty = (current, direction, moq = 1) => {
     return Math.min(Math.max(0, next), maxWholeBoxes(box));
 };
 
+// The rows a product is actually sold as. Mirrors variantsForCart in
+// add-to-order-modal.vue: each variant_link image is a row that uses its own price_1..3
+// when it sets any of them (null means "not set"; 0 counts as set) and the base
+// product's otherwise. A product with no variants is a single base row.
+const priceRows = (item) => {
+    const variants = (item.images || []).filter((img) => img.attribute_type === 'variant_link');
+    if (variants.length === 0) return [item];
+    return variants.map((img) => {
+        const overrides = [img.price_1, img.price_2, img.price_3].some((p) => p !== null && p !== undefined);
+        return overrides ? img : item;
+    });
+};
+
+// Cheapest and dearest per-piece price a customer can be quoted, over every row and
+// the three customer-facing tiers; null when nothing is priced yet (the admin flags
+// that as "No price"). The legacy products.price column is never read.
+export const getPriceRange = (item) => {
+    if (!item) return null;
+    const moq = parseMoq(item.moq);
+    const perPiece = priceRows(item)
+        .flatMap((row) => [row.price_1, row.price_2, row.price_3])
+        .map(Number)
+        .filter((p) => p > 0)
+        .map((p) => toPerPiece(p, moq));
+    return perPiece.length ? { min: Math.min(...perPiece), max: Math.max(...perPiece) } : null;
+};
+
 // Lowest available per-piece price across the three customer-facing tiers
 // (L1-L3; L4/L5 are staff-only and never shown on the storefront).
 export const getCheapestPricePerPiece = (item) => {

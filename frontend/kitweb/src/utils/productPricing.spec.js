@@ -1,5 +1,54 @@
 import { describe, it, expect } from 'vitest';
-import { MAX_ORDER_QTY, clampTypedQty, stepQty } from './productPricing';
+import { MAX_ORDER_QTY, clampTypedQty, stepQty, getPriceRange } from './productPricing';
+
+describe('getPriceRange', () => {
+    it('is null when no tier has a price, so the admin can flag "No price"', () => {
+        expect(getPriceRange({ moq: '20 pcs', price_1: 0, price_2: null, price_3: 0 })).toBeNull();
+        expect(getPriceRange({})).toBeNull();
+        expect(getPriceRange(null)).toBeNull();
+    });
+
+    it('is a single price when only one tier is set', () => {
+        expect(getPriceRange({ moq: '20 pcs', price_1: 800 })).toEqual({ min: 40, max: 40 });
+    });
+
+    it('spans the cheapest and dearest customer tier, per piece', () => {
+        expect(getPriceRange({ moq: '20 pcs', price_1: 800, price_2: 700, price_3: 600 }))
+            .toEqual({ min: 30, max: 40 });
+    });
+
+    it('treats a product without MOQ as sold by the piece', () => {
+        expect(getPriceRange({ price_1: 55, price_3: 40 })).toEqual({ min: 40, max: 55 });
+    });
+
+    it('ignores the staff-only tiers and the legacy price column', () => {
+        expect(getPriceRange({ moq: '1', price: 999, price_4: 1, price_5: 2 })).toBeNull();
+    });
+
+    it('prices a product by its variants when it has them, like the order dialog', () => {
+        const product = {
+            moq: '1', price_1: 100,
+            images: [
+                { attribute_type: 'gallery', price_1: 5 },
+                { attribute_type: 'variant_link', attribute_value: '3"', price_1: 0, price_2: null, price_3: 20 },
+                { attribute_type: 'variant_link', attribute_value: '5"', price_1: 0, price_2: null, price_3: 80 },
+            ],
+        };
+        expect(getPriceRange(product)).toEqual({ min: 20, max: 80 });
+    });
+
+    it('falls back to the base price for a variant with no prices of its own', () => {
+        const product = {
+            moq: '1', price_1: 12,
+            images: [{ attribute_type: 'variant_link', attribute_value: 'Red', price_1: null, price_2: null, price_3: null }],
+        };
+        expect(getPriceRange(product)).toEqual({ min: 12, max: 12 });
+    });
+
+    it('rounds per-piece prices half up to two decimals', () => {
+        expect(getPriceRange({ moq: '3 pcs', price_1: 10 })).toEqual({ min: 3.33, max: 3.33 });
+    });
+});
 
 describe('clampTypedQty', () => {
     it('leaves a quantity that already fills whole boxes alone', () => {

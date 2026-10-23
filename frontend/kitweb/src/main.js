@@ -70,6 +70,12 @@ export async function includedRoutes(paths = []) {
       if (suffix.includes(':') || suffix.includes('*')) {
         continue
       }
+      // Staff pages are client-only and private: no static HTML for them (the SPA
+      // fallback in public/_redirects serves them). The two old top-level staff URLs
+      // are redirects into the admin, which a prerender would snapshot as admin HTML.
+      if (suffix === '/admin' || suffix.startsWith('/admin/') || suffix === '/manageorders' || suffix === '/sellcash') {
+        continue
+      }
       supportedLocales.forEach((lang) => {
         expanded.push(`/${lang}${suffix}`)
       })
