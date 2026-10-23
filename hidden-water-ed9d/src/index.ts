@@ -13,6 +13,7 @@
 
 import { validateContact } from "./order-validation";
 import { extractOrderIds, newViewKey, phonesMatch, secretsMatch, toOrderView, verifyLineSignature } from "./order-view";
+import { InventoryError, applyInventory, prepareInventory, readInventory } from "./product-inventory";
 
 // The shop never contacts web customers first: an order is only a request until
 // the customer sends their order number to the OA or WhatsApp. Staff look for
@@ -2624,6 +2625,12 @@ export default {
 				return corsResponse({ success: true, order_id: orderId });
 			}
 
+			// The sizes, colors and stock behind the admin product editor (product-inventory.ts).
+			const inventoryMatch = url.pathname.match(/^\/products\/(\d+)\/inventory$/);
+			if (inventoryMatch && request.method === "GET") {
+				return corsResponse(await readInventory(env.DB, Number(inventoryMatch[1])));
+			}
+
 			// Bulk Hide/Show for the admin inventory page. Archived products are skipped:
 			// they only come back through /products/restore.
 			if (url.pathname === "/products/visibility" && request.method === "POST") {
@@ -2721,12 +2728,25 @@ export default {
 				const { name, name_th, description, price, category, categories, image_key, usage, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images } = body;
 				const categoryList = normalizeCategoryList(categories, category);
 				const primaryCategory = categoryList[0] || category || null;
-				const activePrice = price || price_3 || 0;
 				let productId: number | null = null;
 
 				if (!primaryCategory) {
 					return corsResponse({ error: "At least one category is required" }, { status: 400 });
 				}
+
+				// Sizes, colors and stock arrive as an optional `inventory` block; reject a bad one
+				// before the product row exists (see product-inventory.ts).
+				const prepared = body.inventory == null
+					? null
+					: await prepareInventory(env.DB, null, body.inventory, images);
+				if (prepared && !prepared.ok) {
+					return corsResponse({ error: prepared.error }, { status: prepared.status });
+				}
+				const inventory = prepared && prepared.ok ? prepared.value : null;
+				const prices = inventory
+					? inventory.basePrices
+					: [price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0];
+				const activePrice = price || prices[2] || 0;
 
 				try {
 					const sku = await allocateProductSku(env, primaryCategory, body.sku);
@@ -2736,7 +2756,7 @@ export default {
 					).bind(
 						dbValue(name), dbValue(name_th), dbValue(description), dbValue(body.description_th || null), activePrice, primaryCategory,
 						dbValue(image_key), dbValue(usage), dbValue(body.usage_th || null), dbValue(body.attribute || null), dbValue(body.attribute_th || null), dbValue(varieties), dbValue(sizes), dbValue(colors),
-						price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, dbValue(moq), is_visible === false ? 0 : 1, sku
+						...prices, dbValue(moq), is_visible === false ? 0 : 1, sku
 					).run();
 
 					productId = meta.last_row_id;
@@ -2748,7 +2768,9 @@ export default {
 						await saveProductCategories(env, productId, categoryList);
 					}
 
-					if (images && Array.isArray(images) && productId) {
+					if (inventory && productId) {
+						await applyInventory(env.DB, productId, inventory);
+					} else if (images && Array.isArray(images) && productId) {
 						const validImages = images.filter((img: any) => isValidImageKey(img?.image_key));
 						if (validImages.length) {
 							const imageInsert = env.DB.prepare(
@@ -2776,18 +2798,32 @@ export default {
 				const { name, name_th, description, price, category, categories, image_key, usage, varieties, sizes, colors, price_1, price_2, price_3, price_4, price_5, moq, is_visible, images } = body;
 				const categoryList = normalizeCategoryList(categories, category);
 				const primaryCategory = categoryList[0] || category || null;
-				const activePrice = price_3 || price || 0;
 
 				if (!primaryCategory) {
 					return corsResponse({ error: "At least one category is required" }, { status: 400 });
 				}
+
+				// Sizes, colors and stock arrive as an optional `inventory` block. Everything that
+				// can reject it is checked here, before anything is written.
+				const prepared = body.inventory == null
+					? null
+					: await prepareInventory(env.DB, Number(id), body.inventory, images);
+				if (prepared && !prepared.ok) {
+					return corsResponse({ error: prepared.error }, { status: prepared.status });
+				}
+				const inventory = prepared && prepared.ok ? prepared.value : null;
+				// With an inventory block the storefront's base prices are mirrored from it.
+				const prices = inventory
+					? inventory.basePrices
+					: [price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0];
+				const activePrice = (inventory ? prices[2] : price_3) || price || 0;
 
 				await env.DB.prepare(
 					"UPDATE products SET name=?, name_th=?, description=?, description_th=?, price=?, category=?, image_key=?, usage=?, usage_th=?, attribute=?, attribute_th=?, varieties=?, sizes=?, colors=?, price_1=?, price_2=?, price_3=?, price_4=?, price_5=?, moq=?, is_visible=? WHERE id=?"
 				).bind(
 					dbValue(name), dbValue(name_th), dbValue(description), dbValue(body.description_th || null), activePrice, primaryCategory,
 					dbValue(image_key), dbValue(usage), dbValue(body.usage_th || null), dbValue(body.attribute || null), dbValue(body.attribute_th || null), dbValue(varieties), dbValue(sizes), dbValue(colors),
-					price_1 ?? 0, price_2 ?? 0, price_3 ?? 0, price_4 ?? 0, price_5 ?? 0, dbValue(moq), is_visible === false ? 0 : 1, id
+					...prices, dbValue(moq), is_visible === false ? 0 : 1, id
 				).run();
 
 				// Keep the slug in step with a renamed product. The id suffix means
@@ -2802,7 +2838,10 @@ export default {
 
 				// Update images: simplest way is to delete and re-insert, batched into
 				// one atomic round-trip instead of a DELETE plus one INSERT per image.
-				if (images && Array.isArray(images)) {
+				// With an inventory block the sizes, colors and images go in one batch instead.
+				if (inventory) {
+					await applyInventory(env.DB, Number(id), inventory);
+				} else if (images && Array.isArray(images)) {
 					const validImages = images.filter((img: any) => isValidImageKey(img?.image_key));
 					const imageInsert = env.DB.prepare(
 						"INSERT INTO product_images (product_id, image_key, attribute_type, attribute_value, is_main, price_1, price_2, price_3, price_4, price_5) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -2946,6 +2985,7 @@ export default {
 
 			return corsResponse("Not Found", { status: 404 });
 		} catch (e: any) {
+			if (e instanceof InventoryError) return corsResponse({ error: e.message }, { status: e.status });
 			const message = e?.message || "Internal server error";
 			const friendly = message.includes("UNIQUE constraint failed: products.sku")
 				? "This SKU already exists. Please try again."

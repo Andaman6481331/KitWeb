@@ -11,6 +11,7 @@ const DDL = [
 		usage TEXT, use_for TEXT, varieties TEXT, sizes TEXT, colors TEXT,
 		price_1 REAL, price_2 REAL, price_3 REAL, price_4 REAL, price_5 REAL,
 		name_th TEXT, sku TEXT UNIQUE, moq TEXT,
+		description_th TEXT, usage_th TEXT, attribute TEXT, attribute_th TEXT, slug TEXT,
 		is_visible INTEGER DEFAULT 1,
 		archived_at TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -77,10 +78,39 @@ const DDL = [
 		order_id TEXT, product_id INTEGER, product_name TEXT,
 		size TEXT, color TEXT, quantity INTEGER, price REAL,
 		FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+	)`,
+	`CREATE TABLE IF NOT EXISTS product_sizes (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		product_id INTEGER NOT NULL, label TEXT NOT NULL, label_th TEXT,
+		sort_order INTEGER NOT NULL DEFAULT 0, box_cost REAL,
+		price_1 REAL, price_2 REAL, price_3 REAL, price_4 REAL, price_5 REAL,
+		archived_at TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (product_id) REFERENCES products(id)
+	)`,
+	`CREATE UNIQUE INDEX IF NOT EXISTS idx_product_sizes_label
+		ON product_sizes(product_id, label) WHERE archived_at IS NULL`,
+	`CREATE TABLE IF NOT EXISTS product_colors (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		size_id INTEGER NOT NULL, name TEXT NOT NULL, name_th TEXT, hex TEXT, sku TEXT,
+		stock INTEGER NOT NULL DEFAULT 0, is_visible INTEGER NOT NULL DEFAULT 1,
+		sort_order INTEGER NOT NULL DEFAULT 0,
+		archived_at TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (size_id) REFERENCES product_sizes(id)
+	)`,
+	`CREATE UNIQUE INDEX IF NOT EXISTS idx_product_colors_sku
+		ON product_colors(sku) WHERE sku IS NOT NULL AND archived_at IS NULL`,
+	`CREATE UNIQUE INDEX IF NOT EXISTS idx_product_colors_name
+		ON product_colors(size_id, name) WHERE archived_at IS NULL`,
+	`CREATE TABLE IF NOT EXISTS stock_movements (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		color_id INTEGER NOT NULL, change_amount INTEGER NOT NULL, new_stock INTEGER NOT NULL,
+		reason TEXT NOT NULL, ref TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (color_id) REFERENCES product_colors(id)
 	)`
 ];
 
 const TABLES = [
+	"stock_movements", "product_colors", "product_sizes",
 	"order_items", "orders", "diy_products",
 	"product_set_items", "product_sets", "product_variants", "product_images",
 	"product_categories", "categories", "products", "admin_sessions"

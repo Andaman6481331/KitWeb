@@ -108,3 +108,50 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
     token_hash TEXT PRIMARY KEY,
     expires_at INTEGER NOT NULL
 );
+
+-- Sizes, colors and stock (migration 0023)
+CREATE TABLE IF NOT EXISTS product_sizes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    label TEXT NOT NULL,
+    label_th TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    box_cost REAL,
+    price_1 REAL, price_2 REAL, price_3 REAL, price_4 REAL, price_5 REAL,
+    archived_at TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_product_sizes_label
+    ON product_sizes(product_id, label) WHERE archived_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS product_colors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    size_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    name_th TEXT,
+    hex TEXT,
+    sku TEXT,
+    stock INTEGER NOT NULL DEFAULT 0,
+    is_visible INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    archived_at TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (size_id) REFERENCES product_sizes(id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_product_colors_sku
+    ON product_colors(sku) WHERE sku IS NOT NULL AND archived_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_product_colors_name
+    ON product_colors(size_id, name) WHERE archived_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS stock_movements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    color_id INTEGER NOT NULL,
+    change_amount INTEGER NOT NULL,
+    new_stock INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    ref TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (color_id) REFERENCES product_colors(id)
+);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_color ON stock_movements(color_id);
