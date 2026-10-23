@@ -12,7 +12,26 @@ const DDL = [
 		price_1 REAL, price_2 REAL, price_3 REAL, price_4 REAL, price_5 REAL,
 		name_th TEXT, sku TEXT UNIQUE, moq TEXT,
 		is_visible INTEGER DEFAULT 1,
+		archived_at TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	)`,
+	`CREATE TABLE IF NOT EXISTS product_images (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		product_id INTEGER NOT NULL, image_key TEXT,
+		attribute_type TEXT, attribute_value TEXT, is_main INTEGER DEFAULT 0,
+		price_1 REAL, price_2 REAL, price_3 REAL, price_4 REAL, price_5 REAL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	)`,
+	`CREATE TABLE IF NOT EXISTS product_categories (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		product_id INTEGER NOT NULL, category_path TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(product_id, category_path)
+	)`,
+	`CREATE TABLE IF NOT EXISTS categories (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL, name_th TEXT, path TEXT NOT NULL,
+		default_usage TEXT, default_use_for TEXT
 	)`,
 	`CREATE TABLE IF NOT EXISTS product_variants (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,7 +82,8 @@ const DDL = [
 
 const TABLES = [
 	"order_items", "orders", "diy_products",
-	"product_set_items", "product_sets", "product_variants", "products", "admin_sessions"
+	"product_set_items", "product_sets", "product_variants", "product_images",
+	"product_categories", "categories", "products", "admin_sessions"
 ];
 
 // Raw bearer token for protected routes in tests. resetDb() stores its hash as a live

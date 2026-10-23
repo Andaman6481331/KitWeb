@@ -737,8 +737,38 @@ async function saveProductCategories(env: Env, productId: number, categories: st
 	]);
 }
 
+// ── Inventory bulk actions ────────────────────────────────────────
+// Additive only: these routes UPDATE flags or INSERT category links. They never
+// DELETE a row and never touch R2.
+const MAX_BULK_IDS = 500;
+// D1 allows at most 100 bound parameters per statement; leave room for the extras.
+const IDS_PER_STATEMENT = 90;
+
+/** Distinct positive integers, 1..MAX_BULK_IDS of them, or null when the input is not that. */
+function parseIdList(raw: unknown): number[] | null {
+	if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_BULK_IDS) return null;
+	if (!raw.every((n) => Number.isInteger(n) && n > 0)) return null;
+	return [...new Set(raw as number[])];
+}
+
+function chunkIds(ids: number[]): number[][] {
+	const chunks: number[][] = [];
+	for (let i = 0; i < ids.length; i += IDS_PER_STATEMENT) {
+		chunks.push(ids.slice(i, i + IDS_PER_STATEMENT));
+	}
+	return chunks;
+}
+
+const placeholders = (n: number) => new Array(n).fill("?").join(",");
+
+/** Runs the statements as one atomic batch and returns how many rows they changed. */
+async function runBulk(env: Env, statements: D1PreparedStatement[]): Promise<number> {
+	const results = await env.DB.batch(statements);
+	return results.reduce((sum, r) => sum + (r.meta?.changes ?? 0), 0);
+}
+
 async function handleR2Request(
-	bucket: R2Bucket, 
+	bucket: R2Bucket,
 	key: string, 
 	request: Request, 
 	negotiate: boolean = true
@@ -2592,6 +2622,81 @@ export default {
 				await env.DB.batch(statements);
 
 				return corsResponse({ success: true, order_id: orderId });
+			}
+
+			// Bulk Hide/Show for the admin inventory page. Archived products are skipped:
+			// they only come back through /products/restore.
+			if (url.pathname === "/products/visibility" && request.method === "POST") {
+				const body = await request.json().catch(() => null) as any;
+				const ids = parseIdList(body?.ids);
+				if (!ids || typeof body?.is_visible !== "boolean") {
+					return corsResponse({ error: "ids (1-500 integers) and is_visible (boolean) are required" }, { status: 400 });
+				}
+				const updated = await runBulk(env, chunkIds(ids).map((chunk) =>
+					env.DB.prepare(
+						`UPDATE products SET is_visible = ? WHERE archived_at IS NULL AND id IN (${placeholders(chunk.length)})`
+					).bind(body.is_visible ? 1 : 0, ...chunk)
+				));
+				return corsResponse({ success: true, updated });
+			}
+
+			// Adds a category link to many products. Existing links and the primary
+			// products.category are left exactly as they were.
+			if (url.pathname === "/products/categories" && request.method === "POST") {
+				const body = await request.json().catch(() => null) as any;
+				const ids = parseIdList(body?.ids);
+				const path = typeof body?.category_path === "string" ? body.category_path.trim() : "";
+				if (!ids || !path) {
+					return corsResponse({ error: "ids (1-500 integers) and category_path are required" }, { status: 400 });
+				}
+				const known = await env.DB.prepare("SELECT 1 AS ok FROM categories WHERE path = ?").bind(path).first();
+				if (!known) return corsResponse({ error: "Unknown category" }, { status: 400 });
+
+				const added = await runBulk(env, chunkIds(ids).map((chunk) =>
+					env.DB.prepare(
+						`INSERT OR IGNORE INTO product_categories (product_id, category_path)
+						 SELECT id, ? FROM products WHERE id IN (${placeholders(chunk.length)})`
+					).bind(path, ...chunk)
+				));
+				return corsResponse({ success: true, added });
+			}
+
+			// "Delete" in the admin inventory is an archive: the row, its images and its
+			// category links all stay. archived_at keeps the first archive date.
+			if (url.pathname === "/products/archive" && request.method === "POST") {
+				const body = await request.json().catch(() => null) as any;
+				const ids = parseIdList(body?.ids);
+				if (!ids) return corsResponse({ error: "ids (1-500 integers) are required" }, { status: 400 });
+				const updated = await runBulk(env, chunkIds(ids).map((chunk) =>
+					env.DB.prepare(
+						`UPDATE products SET archived_at = CURRENT_TIMESTAMP, is_visible = 0
+						 WHERE archived_at IS NULL AND id IN (${placeholders(chunk.length)})`
+					).bind(...chunk)
+				));
+				return corsResponse({ success: true, updated });
+			}
+
+			// Undo for archive. The caller sends back the visibility each product had
+			// before it was archived; products that are not archived are left alone.
+			if (url.pathname === "/products/restore" && request.method === "POST") {
+				const body = await request.json().catch(() => null) as any;
+				const items = Array.isArray(body?.items) ? body.items : null;
+				if (!items || items.length === 0 || items.length > MAX_BULK_IDS ||
+					!items.every((it: any) => Number.isInteger(it?.id) && it.id > 0 && typeof it?.is_visible === "boolean")) {
+					return corsResponse({ error: "items (1-500 of {id, is_visible}) are required" }, { status: 400 });
+				}
+				const statements: D1PreparedStatement[] = [];
+				for (const visible of [true, false]) {
+					const ids = parseIdList(items.filter((it: any) => it.is_visible === visible).map((it: any) => it.id));
+					if (!ids) continue;
+					for (const chunk of chunkIds(ids)) {
+						statements.push(env.DB.prepare(
+							`UPDATE products SET archived_at = NULL, is_visible = ?
+							 WHERE archived_at IS NOT NULL AND id IN (${placeholders(chunk.length)})`
+						).bind(visible ? 1 : 0, ...chunk));
+					}
+				}
+				return corsResponse({ success: true, updated: await runBulk(env, statements) });
 			}
 
 			if (url.pathname === "/products/next-sku" && request.method === "GET") {
