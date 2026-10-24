@@ -5,7 +5,7 @@ import {
     sizeStock, productStock, colorSku, refreshSkus, blankColor, blankSize, cleanDecimal, cleanInteger,
     USAGE_OPTIONS, parseUsage, serializeUsage, blankDraft, buildDraft, importLegacy, imageCard, setMain,
     findColor, colorOptions, withSize, reconcileImages, attributionOf, completeness, unorderableSizes,
-    validateDraft, snapshot, isDirty, buildPayload,
+    validateDraft, snapshot, isDirty, buildPayload, stickyTop,
 } from './adminProductEdit';
 
 describe('price formula', () => {
@@ -692,5 +692,29 @@ describe('buildPayload', () => {
         expect(p.images.map((i) => [i.image_key, i.size_ref])).toEqual([
             ['v1', d.sizes[0].ref], ['v2', d.sizes[1].ref],
         ]);
+    });
+});
+
+describe('stickyTop', () => {
+    // The first argument is the room the column may use: the scrolling area minus its padding,
+    // because a sticky box pins inside the padding, not against the edge.
+    it('pins a column that fits to the top of that room', () => {
+        expect(stickyTop(722, 657)).toBe(0);
+        expect(stickyTop(657, 657)).toBe(0); // fits exactly
+    });
+
+    it('lets a taller column scroll until its own bottom is in view, then pins it there', () => {
+        expect(stickyTop(590, 657)).toBe(-67);
+        expect(stickyTop(400, 900)).toBe(-500);
+    });
+
+    it('rounds down, so a fractional size never leaves the last pixel cut off', () => {
+        expect(stickyTop(590.4, 656.7)).toBe(-67);
+    });
+
+    it('leaves the column where it is until both sizes have been measured', () => {
+        for (const [room, column] of [[0, 657], [Number.NaN, 657], [590, 0], [590, undefined]]) {
+            expect(stickyTop(room, column)).toBe(0);
+        }
     });
 });

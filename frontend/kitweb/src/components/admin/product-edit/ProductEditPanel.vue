@@ -9,7 +9,7 @@ import { processProductImage } from '../../../services/image-processor';
 import { useAdminLang } from '../../../composables/useAdminLang';
 import { productEditText } from '../../../utils/adminProductEditText';
 import {
-  blankDraft, buildDraft, buildPayload, isDirty, loadPercents, refreshSkus, snapshot, validateDraft,
+  blankDraft, buildDraft, buildPayload, isDirty, loadPercents, refreshSkus, snapshot, stickyTop, validateDraft,
 } from '../../../utils/adminProductEdit';
 import ProductStatusCard from './ProductStatusCard.vue';
 import ProductSwitch from './ProductSwitch.vue';
@@ -49,6 +49,31 @@ const flash = (message, error = false) => {
   toast.value = { message, error };
   toastTimer = setTimeout(() => { toast.value = null; }, 6000);
 };
+
+// ── Left column stays in view ─────────────────────────────────────
+// The status/categories column is position: sticky. How far up it may sit depends on whether it
+// is taller than the visible area (see stickyTop), so both sizes are measured and followed.
+const scroller = ref(null);
+const leftSide = ref(null);
+const leftTop = ref(0);
+let sizeObserver = null;
+
+const measureLeft = () => {
+  if (!scroller.value || !leftSide.value) return;
+  // A sticky box pins inside the scroller's padding, so that padding is not room it can use.
+  const style = getComputedStyle(scroller.value);
+  const room = scroller.value.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+  leftTop.value = stickyTop(room, leftSide.value.offsetHeight);
+};
+watch(leftSide, () => {
+  sizeObserver?.disconnect();
+  if (typeof ResizeObserver === 'undefined' || !scroller.value || !leftSide.value) return;
+  sizeObserver = new ResizeObserver(measureLeft);
+  sizeObserver.observe(scroller.value);
+  sizeObserver.observe(leftSide.value);
+  measureLeft();
+}, { flush: 'post' });
+onBeforeUnmount(() => sizeObserver?.disconnect());
 
 // ── Opening ───────────────────────────────────────────────────────
 let openToken = 0;
@@ -224,14 +249,14 @@ onBeforeUnmount(() => {
         <button type="button" class="pe-iconbtn" :aria-label="t.close" :title="t.close" @click="requestClose">×</button>
       </header>
 
-      <div class="pe-scroll">
+      <div ref="scroller" class="pe-scroll">
         <div v-if="loading" class="pe-center" role="status">{{ t.loading }}</div>
         <div v-else-if="loadFailed" class="pe-center">
           <p>{{ loadFailed === 'outdated' ? t.loadOutdated : t.loadError }}</p>
           <button type="button" class="pe-btn" @click="begin">{{ t.retry }}</button>
         </div>
         <div v-else-if="draft" :key="session" class="pe-layout">
-          <aside class="pe-side pe-side-left">
+          <aside ref="leftSide" class="pe-side pe-side-left" :style="{ '--pe-left-top': leftTop + 'px' }">
             <ProductStatusCard :draft="draft" :t="t" />
             <section class="pe-card pe-card-tight">
               <div class="pe-switch-row">

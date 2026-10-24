@@ -27,6 +27,20 @@ describe('productEditText', () => {
         expect(productEditText('xx')).toBe(en);
     });
 
+    it('labels the description and attribute in each language, the way it labels the name', () => {
+        expect([en.nameEn, en.descEn, en.attrEn]).toEqual(['Product name (English)', 'Description (English)', 'Attribute (English)']);
+        expect([en.nameTh, en.descTh, en.attrTh]).toEqual(['Product name (ไทย)', 'Description (ไทย)', 'Attribute (ไทย)']);
+        expect([th.descEn, th.descTh]).toEqual(['คำอธิบาย (English)', 'คำอธิบาย (ไทย)']);
+        expect([th.attrEn, th.attrTh]).toEqual(['คุณสมบัติ (English)', 'คุณสมบัติ (ไทย)']);
+    });
+
+    it('no longer has the EN/ไทย switch that chose which language to edit', () => {
+        for (const t of [en, th]) {
+            expect(t).not.toHaveProperty('langEn');
+            expect(t).not.toHaveProperty('langTh');
+        }
+    });
+
     it('says plainly that removing archives', () => {
         expect(en.removedNote).toMatch(/archived/i);
         expect(en.removedNote).not.toMatch(/delete[^d]/i);

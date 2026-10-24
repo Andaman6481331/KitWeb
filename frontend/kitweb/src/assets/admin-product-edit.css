@@ -47,10 +47,11 @@ html[lang][lang] .pe-panel .pe-serif { font-family: Lora, 'Noto Sans Thai', seri
 }
 .pe-back:hover { border-color: var(--adm-brand); }
 
-/* Three columns on a wide screen: status/categories | basic info + sizes | photos. The two
-   side columns stay in view while the middle scrolls. Narrower, the photos card moves back
-   between basic info and sizes (.pe-main stops being a box of its own, so the grid areas can
-   interleave its children with the photos), and below 900px everything stacks. */
+/* Three columns on a wide screen: status/categories | basic info + sizes | photos. Narrower,
+   the photos card moves back between basic info and sizes (.pe-main stops being a box of its
+   own, so the grid areas can interleave its children with the photos), and below 900px
+   everything stacks. Neither side column scrolls on its own: the page does the scrolling, and
+   the photos card simply grows with every photo that is added. */
 .pe-scroll { flex: 1 1 auto; overflow-y: auto; padding: 24px; }
 .pe-layout {
   max-width: 1800px; margin: 0 auto; display: grid; gap: 20px 24px; align-items: start;
@@ -70,10 +71,12 @@ html[lang][lang] .pe-panel .pe-serif { font-family: Lora, 'Noto Sans Thai', seri
     grid-template-areas: "side basic" "side imgs" "side sizes";
   }
 }
-/* The sticky columns are never taller than the space under the header and above the footer
-   (about 178px of bars and padding), so a long one scrolls inside itself instead of being cut. */
+/* Only the status/categories column is sticky: it stays in view while the middle scrolls, and
+   never scrolls inside itself. --pe-left-top is set by the panel (stickyTop): 0 when the column
+   fits the window, and negative when it is taller, so it scrolls until its bottom is in view and
+   pins there instead of having its bottom cut off. */
 @media (min-width: 900px) {
-  .pe-side-left { position: sticky; top: 0; max-height: calc(100vh - 178px); overflow-x: hidden; overflow-y: auto; }
+  .pe-side-left { position: sticky; top: var(--pe-left-top, 0px); }
 }
 @media (min-width: 1440px) {
   .pe-layout {
@@ -81,7 +84,6 @@ html[lang][lang] .pe-panel .pe-serif { font-family: Lora, 'Noto Sans Thai', seri
     grid-template-areas: "side main imgs";
   }
   .pe-main { grid-area: main; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-  .pe-side-right { position: sticky; top: 0; max-height: calc(100vh - 178px); overflow-x: hidden; overflow-y: auto; }
   .pe-side-right .pe-card { padding: 16px; }
   .pe-side-right .pe-imgs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 }
@@ -177,9 +179,6 @@ textarea.pe-tall { min-height: 96px; }
 .pe-chip-x:hover { opacity: 1; }
 
 /* ── Basic info ────────────────────────────────────────────── */
-.pe-seg { display: inline-flex; padding: 3px; border: 1px solid var(--adm-border); background: var(--adm-surface); border-radius: 12px; }
-.pe-seg-btn { min-height: 32px; padding: 0 12px; border: 0; border-radius: 9px; background: transparent; font-size: 13px; font-weight: 500; color: var(--adm-text-2); cursor: pointer; }
-.pe-seg-btn.is-on { background: var(--adm-brand-tint); color: var(--adm-brand-dark); font-weight: 600; }
 /* The dropdown hangs off the field itself, not the (taller) grid cell around it. */
 .pe-usage-field { position: relative; }
 /* The usage field: chosen usages are small tags that wrap inside it. With a few of them it is

@@ -578,3 +578,16 @@ export const buildPayload = (draft) => {
         images: images.filter(writesRow).map((img) => imagePayload(img, draft.sizes)),
     };
 };
+
+// ── Layout ────────────────────────────────────────────────────────
+
+// The `top` for the panel's left column (position: sticky). `room` is the height the column
+// may use: the scrolling area minus its own padding, since a sticky box pins inside the padding
+// rather than against the edge. A column that fits pins to the top of that room (0). A taller
+// one gets a negative top, so it scrolls until its own bottom edge reaches the bottom of the
+// room and pins there: all of it can be seen while the middle scrolls, and none of it is ever
+// cut off or made to scroll on its own. Until both heights are known it stays where it is.
+export const stickyTop = (room, columnHeight) => {
+    if (!(room > 0) || !(columnHeight > 0)) return 0;
+    return Math.min(0, Math.floor(room - columnHeight));
+};
