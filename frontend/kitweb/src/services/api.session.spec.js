@@ -158,7 +158,8 @@ describe('admin-only list reads', () => {
     const api = await loadApi(store, 200);
     await api.getProducts(null);
     await api.getEvents();
-    for (const call of fetch.mock.calls) expect(call[1]).toBeUndefined();
+    // The version lookup carries `cache: 'no-store'`; what must never appear is a token.
+    for (const call of fetch.mock.calls) expect(call[1]?.headers).toBeUndefined();
   });
 
   it('turn a 401 into a session-expired error', async () => {

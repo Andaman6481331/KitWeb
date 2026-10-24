@@ -51,15 +51,73 @@ const isBrowser = typeof window !== 'undefined' && typeof window.localStorage !=
 // is a bug, and the stores already own their own caching.
 const ssrGetCache = isBrowser ? null : new Map();
 
+// ── Catalogue version ─────────────────────────────────────────────
+// The Worker lets the browser keep the public product / project / gallery reads for an
+// hour, but only under a URL that carries the catalogue version (?v=7). Every admin
+// write bumps that version, so the next read asks for a URL the browser has never
+// seen and gets fresh data. The lookup is tiny and never cached.
+//
+// It is remembered for 30 s so a page that reads several lists asks once, and
+// forgotten after any catalogue write so the admin's own change shows at once.
+// Without a version (old Worker, migration not applied, offline) reads go out plain
+// and keep the Worker's short 30 s window. Never used while prerendering.
+const VERSION_FRESH_MS = 30 * 1000;
+let versionLookup = null; // { at, promise }
+
+const forgetCatalogVersion = () => { versionLookup = null; };
+
+const catalogVersion = () => {
+  if (!isBrowser) return Promise.resolve(null);
+  if (versionLookup && Date.now() - versionLookup.at < VERSION_FRESH_MS) return versionLookup.promise;
+
+  const lookup = { at: Date.now(), promise: null };
+  lookup.promise = (async () => {
+    try {
+      const response = await fetch(`${API_URL}/catalog-version`, { cache: 'no-store' });
+      if (!response.ok) return null;
+      const { version } = await response.json();
+      return Number.isInteger(version) ? version : null;
+    } catch {
+      return null;
+    }
+  })().then((version) => {
+    // A failed lookup is not remembered: the next read tries again.
+    if (version === null && versionLookup === lookup) versionLookup = null;
+    return version;
+  });
+  versionLookup = lookup;
+  return lookup.promise;
+};
+
+const withCatalogVersion = async (url) => {
+  const version = await catalogVersion();
+  if (version === null) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}v=${version}`;
+};
+
+// Every write that changes what the storefront shows (products, projects, gallery)
+// goes through here. Forgotten once the Worker has answered, success or not, because
+// a failed write may still have changed something.
+const catalogWrite = async (url, init) => {
+  try {
+    return await fetch(url, init);
+  } finally {
+    forgetCatalogVersion();
+  }
+};
+
 // `auth: true` is for the admin-only reads (include_hidden / include_unpublished):
 // the Worker answers those 401 unless the admin session token is sent.
-const getJson = (url, errorMessage, { auth = false } = {}) => {
+// `versioned: true` is for the public reads the Worker caches (see above); never
+// combine it with `auth`, since admin reads must always show the latest data.
+const getJson = (url, errorMessage, { auth = false, versioned = false } = {}) => {
   const cached = ssrGetCache?.get(url);
   if (cached) return cached;
 
   const request = (async () => {
     const token = auth ? api.getToken() : null;
-    const response = await fetch(url, token ? { headers: { 'Authorization': token } } : undefined);
+    const target = versioned ? await withCatalogVersion(url) : url;
+    const response = await fetch(target, token ? { headers: { 'Authorization': token } } : undefined);
     if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) {
       // The status lets a caller tell "the Worker does not have this route" (404) from a hiccup.
@@ -202,16 +260,17 @@ export const api = {
     if (includeUnpublished) params.set('include_unpublished', '1');
     const qs = params.toString();
     return getJson(qs ? `${API_URL}/projects?${qs}` : `${API_URL}/projects`, 'Failed to fetch projects',
-      { auth: includeUnpublished });
+      { auth: includeUnpublished, versioned: !includeUnpublished });
   },
 
   async getProject(slug) {
-    return getJson(`${API_URL}/projects/${encodeURIComponent(slug)}`, 'Failed to fetch project');
+    return getJson(`${API_URL}/projects/${encodeURIComponent(slug)}`, 'Failed to fetch project',
+      { versioned: true });
   },
 
   // Create when payload has no id, update when it does.
   async saveProject(payload) {
-    const response = await fetch(`${API_URL}/projects`, {
+    const response = await catalogWrite(`${API_URL}/projects`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
       body: JSON.stringify(payload)
@@ -222,7 +281,7 @@ export const api = {
   },
 
   async deleteProject(id) {
-    const response = await fetch(`${API_URL}/projects/delete`, {
+    const response = await catalogWrite(`${API_URL}/projects/delete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
       body: JSON.stringify({ id })
@@ -304,12 +363,12 @@ export const api = {
     if (includeHidden) params.set('include_hidden', '1');
     const qs = params.toString();
     return getJson(qs ? `${API_URL}/gallery?${qs}` : `${API_URL}/gallery`, 'Failed to fetch gallery',
-      { auth: includeHidden });
+      { auth: includeHidden, versioned: !includeHidden });
   },
 
   // Create when payload has no id, update when it does.
   async saveGalleryItem(payload) {
-    const response = await fetch(`${API_URL}/gallery`, {
+    const response = await catalogWrite(`${API_URL}/gallery`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
       body: JSON.stringify(payload)
@@ -320,7 +379,7 @@ export const api = {
   },
 
   async deleteGalleryItem(id) {
-    const response = await fetch(`${API_URL}/gallery/delete`, {
+    const response = await catalogWrite(`${API_URL}/gallery/delete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
       body: JSON.stringify({ id })
@@ -368,11 +427,11 @@ export const api = {
     if (includeHidden) params.set('include_hidden', '1');
     const qs = params.toString();
     return getJson(qs ? `${API_URL}/products?${qs}` : `${API_URL}/products`, 'Failed to fetch products',
-      { auth: includeHidden });
+      { auth: includeHidden, versioned: !includeHidden });
   },
 
   async addProduct(productData) {
-    const response = await fetch(`${API_URL}/products`, {
+    const response = await catalogWrite(`${API_URL}/products`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -388,7 +447,7 @@ export const api = {
   },
 
   async updateProduct(id, productData) {
-    const response = await fetch(`${API_URL}/products/${id}`, {
+    const response = await catalogWrite(`${API_URL}/products/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -404,7 +463,7 @@ export const api = {
   },
 
   async deleteProduct(id) {
-    const response = await fetch(`${API_URL}/products/${id}`, {
+    const response = await catalogWrite(`${API_URL}/products/${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': this.getToken()
@@ -425,7 +484,7 @@ export const api = {
   // never remove anything. Prefer them over updateProduct() for bulk changes, since
   // PUT /products/:id rewrites the whole row.
   async postProductAction(path, body, errorMessage) {
-    const response = await fetch(`${API_URL}/products/${path}`, {
+    const response = await catalogWrite(`${API_URL}/products/${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
