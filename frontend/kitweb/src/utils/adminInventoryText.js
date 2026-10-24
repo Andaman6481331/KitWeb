@@ -33,7 +33,14 @@ const en = {
   visHidden: 'Hidden',
   visArchived: 'Archived',
   attention: 'Needs attention',
-  showing: (shown, total) => `Showing ${shown} of ${total} products`,
+  // from–to is the page on screen, matching is what the filters leave, total is every live product.
+  showingRange: (from, to, matching, total) => (matching === 0
+    ? `Showing 0 of ${total} products`
+    : `Showing ${from}–${to} of ${matching} products${matching === total ? '' : ` · ${total} in total`}`),
+  pagesLabel: 'Pages',
+  pagePrev: 'Previous',
+  pageNext: 'Next',
+  goToPage: (n) => `Go to page ${n}`,
   loading: 'Loading products…',
   loadError: 'Could not load the products.',
   retry: 'Try again',
@@ -121,7 +128,13 @@ const th = {
   visHidden: 'ซ่อนอยู่',
   visArchived: 'เก็บถาวร',
   attention: 'ต้องตรวจสอบ',
-  showing: (shown, total) => `แสดง ${shown} จาก ${total} รายการ`,
+  showingRange: (from, to, matching, total) => (matching === 0
+    ? `แสดง 0 จาก ${total} รายการ`
+    : `แสดง ${from}–${to} จาก ${matching} รายการ${matching === total ? '' : ` · ทั้งหมด ${total}`}`),
+  pagesLabel: 'หน้า',
+  pagePrev: 'ก่อนหน้า',
+  pageNext: 'ถัดไป',
+  goToPage: (n) => `ไปหน้า ${n}`,
   loading: 'กำลังโหลดสินค้า…',
   loadError: 'โหลดสินค้าไม่สำเร็จ',
   retry: 'ลองอีกครั้ง',

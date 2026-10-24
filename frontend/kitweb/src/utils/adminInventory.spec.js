@@ -3,6 +3,7 @@ import {
     toInventoryItem, daysSince, filterItems, sortItems, categoryChips, attentionCount,
     formatPriceRange, formatMoq, formatAdded, badgesFor, visibleCategories,
     withVisibility, withArchived, withRestored, withCategory, buildDuplicatePayload,
+    PAGE_SIZE, paginate, pageNumbers,
 } from './adminInventory';
 
 const NOW = Date.parse('2026-10-23T12:00:00Z');
@@ -382,5 +383,71 @@ describe('buildDuplicatePayload', () => {
         const bare = buildDuplicatePayload(raw({ images: undefined, categories: [], category: 'yarn' }));
         expect(bare.images).toEqual([]);
         expect(bare.categories).toEqual(['yarn']);
+    });
+});
+
+describe('paginate', () => {
+    const list = (n) => Array.from({ length: n }, (_, i) => ({ id: i + 1 }));
+
+    it('shows 20 products to a page', () => {
+        expect(PAGE_SIZE).toBe(20);
+        const first = paginate(list(45), 1);
+        expect(first.items.map((i) => i.id)).toEqual(list(20).map((i) => i.id));
+        expect(first).toMatchObject({ page: 1, pageCount: 3, total: 45, from: 1, to: 20 });
+    });
+
+    it('gives the remainder on the last page', () => {
+        const last = paginate(list(45), 3);
+        expect(last.items.map((i) => i.id)).toEqual([41, 42, 43, 44, 45]);
+        expect(last).toMatchObject({ page: 3, from: 41, to: 45 });
+    });
+
+    it('does not invent an empty page after an exact multiple', () => {
+        expect(paginate(list(40), 1).pageCount).toBe(2);
+        expect(paginate(list(41), 1).pageCount).toBe(3);
+    });
+
+    it('lands on the nearest page that exists when asked for one that does not', () => {
+        expect(paginate(list(45), 9).page).toBe(3);
+        expect(paginate(list(45), 0).page).toBe(1);
+        expect(paginate(list(45), -2).page).toBe(1);
+        expect(paginate(list(45), Number.NaN).page).toBe(1);
+        expect(paginate(list(45), 2.7).page).toBe(2);
+    });
+
+    it('is one empty page for an empty list', () => {
+        expect(paginate([], 1)).toEqual({ items: [], page: 1, pageCount: 1, total: 0, from: 0, to: 0 });
+    });
+
+    it('keeps the very same product objects and leaves the list alone', () => {
+        const all = list(30);
+        const before = all.slice();
+        const second = paginate(all, 2);
+        expect(second.items[0]).toBe(all[20]);
+        expect(all).toEqual(before);
+    });
+
+    it('takes another page size when asked', () => {
+        expect(paginate(list(10), 2, 4)).toMatchObject({ pageCount: 3, from: 5, to: 8 });
+    });
+});
+
+describe('pageNumbers', () => {
+    it.each([
+        [1, 1, [1]],
+        [1, 5, [1, 2, 3, 4, 5]],
+        [3, 7, [1, 2, 3, 4, 5, 6, 7]],
+        [1, 8, [1, 2, '…', 8]],
+        [4, 8, [1, 2, 3, 4, 5, '…', 8]],
+        [5, 9, [1, '…', 4, 5, 6, '…', 9]],
+        [8, 8, [1, '…', 7, 8]],
+        [9, 9, [1, '…', 8, 9]],
+    ])('on page %i of %i shows %j', (page, count, expected) => {
+        expect(pageNumbers(page, count)).toEqual(expected);
+    });
+
+    it('never hides a single page behind an ellipsis', () => {
+        // pages 1 and 3 are shown, so 2 is shown rather than "…"
+        expect(pageNumbers(2, 20)).toEqual([1, 2, 3, '…', 20]);
     });
 });

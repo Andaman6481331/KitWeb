@@ -182,6 +182,9 @@ html[lang][lang] .adm-shell .adm-serif {
 .adm-attn-count { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: #eeeae3; color: var(--adm-muted-2); }
 .adm-attn-count.has { background: var(--adm-warn-line); color: #fff; }
 .adm-count { margin-left: auto; color: var(--adm-muted); font-size: 13px; }
+/* The count and the slim page set beside it travel as one unit: they stay on one row and wrap together. */
+.adm-count-group { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.adm-count-group .adm-count { margin-left: 0; }
 
 /* ── States ─────────────────────────────────────────────────── */
 .adm-empty {
@@ -193,11 +196,26 @@ html[lang][lang] .adm-shell .adm-serif {
 .adm-skeleton { background: linear-gradient(90deg, #efeae2, #f7f3ec, #efeae2); background-size: 200% 100%; animation: adm-shimmer 1.2s infinite; border-radius: 14px; }
 @keyframes adm-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 
+/* ── Page controls under the product list ───────────────────── */
+.adm-pager { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; margin-top: 8px; }
+.adm-pager-btn {
+  min-width: 40px; height: 40px; padding: 0 12px; border: 1px solid var(--adm-border); background: var(--adm-surface);
+  border-radius: 10px; font: inherit; font-size: 14px; font-weight: 500; color: var(--adm-text); cursor: pointer;
+}
+.adm-pager-btn:hover:not(:disabled) { border-color: var(--adm-brand); }
+.adm-pager-btn:disabled { opacity: .5; cursor: not-allowed; }
+.adm-pager-btn.is-on { background: var(--adm-brand); border-color: var(--adm-brand); color: #fff; font-weight: 600; }
+.adm-pager-btn:focus-visible { outline: 2px solid var(--adm-brand); outline-offset: 2px; }
+.adm-pager-gap { color: var(--adm-muted); padding: 0 4px; }
+/* The slim copy in the toolbar, next to the count. */
+.adm-pager.is-compact { flex-wrap: nowrap; gap: 4px; margin-top: 0; }
+.adm-pager.is-compact .adm-pager-btn { min-width: 32px; height: 32px; padding: 0 8px; font-size: 13px; border-radius: 8px; }
+
 /* ── Product grid / card ────────────────────────────────────── */
-.adm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 18px; }
+.adm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
 .adm-card {
   position: relative; display: flex; flex-direction: column; gap: 12px; padding: 14px; background: var(--adm-surface);
-  border-radius: 14px; transition: box-shadow .15s; border: 1px solid var(--adm-border);
+   transition: box-shadow .15s; border: 1px solid var(--adm-border);
 }
 .adm-card:hover { box-shadow: 0 8px 24px rgba(60, 40, 10, .08); }
 .adm-card.is-selected { border-color: var(--adm-brand); box-shadow: 0 0 0 2px rgba(140, 106, 63, .25); }
@@ -364,4 +382,6 @@ html[lang][lang] .adm-shell .adm-serif {
   .adm-title { font-size: 28px; }
   .adm-nav-inner { padding: 6px 12px; }
   .adm-count { margin-left: 0; width: 100%; }
+  .adm-count-group { margin-left: 0; width: 100%; flex-wrap: wrap; justify-content: space-between; }
+  .adm-count-group .adm-count { width: auto; }
 }

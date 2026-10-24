@@ -42,8 +42,23 @@ describe('inventoryText', () => {
         expect(en.optionsN(3)).toBe('3 options');
         expect(th.optionsN(3)).toBe('3 ตัวเลือก');
         expect(en.selectedN(2)).toBe('2 selected');
-        expect(en.showing(5, 145)).toBe('Showing 5 of 145 products');
-        expect(th.showing(5, 145)).toBe('แสดง 5 จาก 145 รายการ');
+    });
+
+    it('says which products are on screen, and how many there are in all', () => {
+        expect(en.showingRange(21, 40, 118, 118)).toBe('Showing 21–40 of 118 products');
+        expect(en.showingRange(1, 20, 118, 145)).toBe('Showing 1–20 of 118 products · 145 in total');
+        expect(en.showingRange(0, 0, 0, 145)).toBe('Showing 0 of 145 products');
+        expect(th.showingRange(21, 40, 118, 118)).toBe('แสดง 21–40 จาก 118 รายการ');
+        expect(th.showingRange(1, 20, 118, 145)).toBe('แสดง 1–20 จาก 118 รายการ · ทั้งหมด 145');
+        expect(th.showingRange(0, 0, 0, 145)).toBe('แสดง 0 จาก 145 รายการ');
+    });
+
+    it('labels the page controls', () => {
+        expect(en.pagePrev).toBe('Previous');
+        expect(en.pageNext).toBe('Next');
+        expect(en.pagesLabel).toBe('Pages');
+        expect(en.goToPage(3)).toBe('Go to page 3');
+        expect(th.goToPage(3)).toBe('ไปหน้า 3');
     });
 
     it('names what an action did', () => {

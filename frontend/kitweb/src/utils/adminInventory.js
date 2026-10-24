@@ -104,6 +104,48 @@ export const sortItems = (items, sort, lang) => {
     return items.slice().sort((a, b) => sign * compare(a, b) || a.id - b.id);
 };
 
+// ── Paging ────────────────────────────────────────────────────────
+
+// The Worker returns the whole catalogue at once, so the page pages on the client:
+// rendering every card meant one image request per product on every visit.
+export const PAGE_SIZE = 20;
+
+// One page of a list, plus what the page controls need. A page that does not exist
+// (a filter or an archive shrank the list) becomes the nearest one that does.
+export const paginate = (items, page, size = PAGE_SIZE) => {
+    const total = items.length;
+    const pageCount = Math.max(1, Math.ceil(total / size));
+    const wanted = Math.trunc(Number(page));
+    const current = Math.min(Math.max(Number.isFinite(wanted) ? wanted : 1, 1), pageCount);
+    const start = (current - 1) * size;
+    const slice = items.slice(start, start + size);
+    return {
+        items: slice,
+        page: current,
+        pageCount,
+        total,
+        from: slice.length ? start + 1 : 0,
+        to: start + slice.length,
+    };
+};
+
+// The numbers on the page controls: all of them when there are few, otherwise the
+// first, the last and the ones around the current page, with '…' for each gap. A gap
+// of exactly one page shows that page instead, since '…' would hide no more than it.
+export const pageNumbers = (page, pageCount) => {
+    if (pageCount <= 7) return Array.from({ length: pageCount }, (_, i) => i + 1);
+    const kept = [...new Set([1, pageCount, page - 1, page, page + 1].filter((n) => n >= 1 && n <= pageCount))]
+        .sort((a, b) => a - b);
+    const numbers = [];
+    kept.forEach((n, i) => {
+        const gap = i === 0 ? 1 : n - kept[i - 1];
+        if (gap === 2) numbers.push(n - 1);
+        else if (gap > 2) numbers.push('…');
+        numbers.push(n);
+    });
+    return numbers;
+};
+
 // ── Category chips ────────────────────────────────────────────────
 
 export const categoryChips = (items, categories, lang) => {

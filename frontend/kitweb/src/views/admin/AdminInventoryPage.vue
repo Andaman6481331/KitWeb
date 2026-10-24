@@ -10,11 +10,12 @@ import { useAdminSession } from '../../composables/useAdminSession';
 import { useAdminLang } from '../../composables/useAdminLang';
 import { inventoryText } from '../../utils/adminInventoryText';
 import {
-  toInventoryItem, filterItems, sortItems, categoryChips, visibleCategories, attentionCount,
+  toInventoryItem, filterItems, sortItems, categoryChips, visibleCategories, attentionCount, paginate,
   withVisibility, withArchived, withRestored, withCategory, buildDuplicatePayload,
 } from '../../utils/adminInventory';
 import InventoryCard from '../../components/admin/inventory/InventoryCard.vue';
 import InventoryRow from '../../components/admin/inventory/InventoryRow.vue';
+import InventoryPager from '../../components/admin/inventory/InventoryPager.vue';
 import InventoryBulkBar from '../../components/admin/inventory/InventoryBulkBar.vue';
 import InventoryArchiveDialog from '../../components/admin/inventory/InventoryArchiveDialog.vue';
 import ProductEditPanel from '../../components/admin/product-edit/ProductEditPanel.vue';
@@ -49,6 +50,11 @@ const editing = ref(null); // raw product row, or null for a new product
 // ── Derived ───────────────────────────────────────────────────────
 const byId = computed(() => new Map(items.value.map((i) => [i.id, i])));
 const shown = computed(() => sortItems(filterItems(items.value, filters), sort.value, lang.value));
+// Only one page of `shown` is drawn: 20 cards, not every product in the catalogue.
+// Selecting and the bulk actions still work on all of `shown`, whichever page it is on.
+const pageNum = ref(1);
+const pager = computed(() => paginate(shown.value, pageNum.value));
+const pageItems = computed(() => pager.value.items);
 const chips = computed(() => categoryChips(items.value, categories.value, lang.value));
 const shownChips = computed(() => visibleCategories(chips.value, filters.category, moreCats.value));
 const hiddenChipCount = computed(() => Math.max(0, chips.value.length - 9));
@@ -299,6 +305,24 @@ const clearFilters = () => {
   filters.attention = false;
 };
 
+// ── Paging ────────────────────────────────────────────────────────
+// Anything that changes which products are listed, or in what order, starts again at
+// page one: page 3 of a list nobody has seen page 1 of means nothing.
+watch(
+  () => [filters.query, filters.category, filters.price, filters.website, filters.attention, sort.value, lang.value],
+  () => { pageNum.value = 1; },
+);
+// If the list shrinks under the current page (archive, hide, a reload), paginate() shows
+// the nearest page that exists; keep the stored number in step with it.
+watch(() => pager.value.page, (page) => { pageNum.value = page; });
+
+const goToPage = (page) => {
+  menuId.value = null;
+  pageNum.value = page;
+  // The controls are at the bottom of a long list; bring the new page into view.
+  if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
 // Switching between live and archived products drops the selection, so a bulk action
 // can never apply to the other kind.
 watch(() => filters.website, () => { selected.value = []; });
@@ -405,7 +429,10 @@ onUnmounted(() => {
           {{ t.attention }}
           <span class="adm-attn-count" :class="{ has: attnCount > 0 }">{{ attnCount }}</span>
         </button>
-        <div class="adm-count">{{ t.showing(shown.length, totalInView) }}</div>
+        <div class="adm-count-group">
+          <div class="adm-count">{{ t.showingRange(pager.from, pager.to, shown.length, totalInView) }}</div>
+          <InventoryPager compact :pager="pager" :t="t" @go="goToPage" />
+        </div>
       </div>
     </div>
 
@@ -429,7 +456,7 @@ onUnmounted(() => {
     <!-- Grid view -->
     <div v-else-if="view === 'grid'" class="adm-grid">
       <InventoryCard
-        v-for="item in shown"
+        v-for="item in pageItems"
         :key="item.id"
         :item="item"
         :t="t"
@@ -463,7 +490,7 @@ onUnmounted(() => {
           <span></span>
         </div>
         <InventoryRow
-          v-for="item in shown"
+          v-for="item in pageItems"
           :key="item.id"
           :item="item"
           :t="t"
@@ -481,6 +508,8 @@ onUnmounted(() => {
         />
       </div>
     </div>
+
+    <InventoryPager v-if="!loading && !loadError" :pager="pager" :t="t" @go="goToPage" />
 
     <!-- Bulk action bar -->
     <InventoryBulkBar
