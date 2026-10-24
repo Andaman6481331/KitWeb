@@ -106,14 +106,20 @@ const DDL = [
 		color_id INTEGER NOT NULL, change_amount INTEGER NOT NULL, new_stock INTEGER NOT NULL,
 		reason TEXT NOT NULL, ref TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (color_id) REFERENCES product_colors(id)
-	)`
+	)`,
+	// Mirrors migrations/0024_catalog_version.sql: one row that admin writes bump.
+	`CREATE TABLE IF NOT EXISTS catalog_version (
+		id INTEGER PRIMARY KEY CHECK (id = 1),
+		version INTEGER NOT NULL DEFAULT 1
+	)`,
+	`INSERT OR IGNORE INTO catalog_version (id, version) VALUES (1, 1)`
 ];
 
 const TABLES = [
 	"stock_movements", "product_colors", "product_sizes",
 	"order_items", "orders", "diy_products",
 	"product_set_items", "product_sets", "product_variants", "product_images",
-	"product_categories", "categories", "products", "admin_sessions"
+	"product_categories", "categories", "products", "admin_sessions", "catalog_version"
 ];
 
 // Raw bearer token for protected routes in tests. resetDb() stores its hash as a live

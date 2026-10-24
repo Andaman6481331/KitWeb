@@ -11,6 +11,7 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
+import { bumpCatalogVersion, isCatalogWrite, readCatalogVersion, versionedCacheHeaders } from "./catalog-version";
 import { validateContact } from "./order-validation";
 import { extractOrderIds, newViewKey, phonesMatch, secretsMatch, toOrderView, verifyLineSignature } from "./order-view";
 import { InventoryError, applyInventory, prepareInventory, readInventory } from "./product-inventory";
@@ -888,7 +889,7 @@ async function isAdminRequest(request: Request, env: Env): Promise<boolean> {
 	return !!row && row.expires_at > Date.now();
 }
 
-export default {
+const router = {
 	async fetch(request, env, ctx): Promise<Response> {
 		const url = new URL(request.url);
 
@@ -1012,11 +1013,14 @@ export default {
 					};
 				});
 
-				// Storefront calls (no include_hidden) are safe to cache briefly in the
-				// browser: several components on the same page independently call
-				// getProducts(), so a short TTL collapses those into one D1 hit instead
-				// of one per component. Admin calls always need fresh data after an edit.
-				const cacheHeaders: Record<string, string> = includeHidden ? {} : { "Cache-Control": "public, max-age=30" };
+				// Storefront calls (no include_hidden) are safe to cache in the browser.
+				// A call that carries the catalogue version (?v=, see catalog-version.ts)
+				// is cached for an hour, because an admin edit changes the version and so
+				// the URL. Without one it keeps the short window that collapses several
+				// components' identical getProducts() calls into one D1 hit.
+				// Admin calls always need fresh data after an edit.
+				const cacheHeaders: Record<string, string> = includeHidden ? {}
+					: versionedCacheHeaders(url) ?? { "Cache-Control": "public, max-age=30", "Vary": "Origin" };
 				return corsResponse(parsedProducts, { headers: cacheHeaders });
 			}
 
@@ -1063,7 +1067,8 @@ export default {
 
 				if (limit) rows = rows.slice(0, limit);
 
-				return corsResponse(rows);
+				// The admin list (include_unpublished) is never cached.
+				return corsResponse(rows, { headers: (!includeUnpublished && versionedCacheHeaders(url)) || {} });
 			}
 
 			if (url.pathname.startsWith("/projects/") && request.method === "GET") {
@@ -1073,7 +1078,7 @@ export default {
 				const row = await env.DB.prepare("SELECT * FROM projects WHERE slug = ?").bind(slug).first();
 				if (!row) return corsResponse({ error: "Not found" }, { status: 404 });
 
-				return corsResponse(mapProjectRow(row));
+				return corsResponse(mapProjectRow(row), { headers: versionedCacheHeaders(url) || {} });
 			}
 
 			// ── Business Sets ─────────────────────────────────────────────
@@ -1176,7 +1181,10 @@ export default {
 				if (limit) query += ` LIMIT ${limit}`;
 
 				const { results } = await env.DB.prepare(query).bind(...binds).all();
-				return corsResponse((results || []).map(mapGalleryRow));
+				// The admin list (include_hidden) is never cached.
+				return corsResponse((results || []).map(mapGalleryRow), {
+					headers: (!includeHidden && versionedCacheHeaders(url)) || {}
+				});
 			}
 
 			// ── Workshops & market appearances ────────────────────────────
@@ -1207,6 +1215,13 @@ export default {
 				}));
 
 				return corsResponse(parsed);
+			}
+
+			// The number the storefront appends to its cached reads (?v=). It must stay
+			// uncached, or it could not tell anyone that the catalogue changed. null means
+			// the table is not there yet, and the frontend then sends no version.
+			if (url.pathname === "/catalog-version" && request.method === "GET") {
+				return corsResponse({ version: await readCatalogVersion(env.DB) }, { headers: { "Cache-Control": "no-store" } });
 			}
 
 			if (url.pathname === "/categories" && request.method === "GET") {
@@ -2994,5 +3009,18 @@ export default {
 					: message;
 			return corsResponse({ error: friendly }, { status: 500 });
 		}
+	},
+} satisfies ExportedHandler<Env>;
+
+// Admin writes to the content the storefront caches move the catalogue version, so
+// the storefront's next read asks for a URL the browser has never seen. This wraps
+// the router rather than sitting in each route, so a new write route can't forget.
+export default {
+	async fetch(request, env, ctx): Promise<Response> {
+		const response = await router.fetch(request, env, ctx);
+		if (response.ok && isCatalogWrite(request.method, new URL(request.url).pathname)) {
+			await bumpCatalogVersion(env.DB);
+		}
+		return response;
 	},
 } satisfies ExportedHandler<Env>;
