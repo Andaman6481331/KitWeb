@@ -112,14 +112,27 @@ const DDL = [
 		id INTEGER PRIMARY KEY CHECK (id = 1),
 		version INTEGER NOT NULL DEFAULT 1
 	)`,
-	`INSERT OR IGNORE INTO catalog_version (id, version) VALUES (1, 1)`
+	`INSERT OR IGNORE INTO catalog_version (id, version) VALUES (1, 1)`,
+	// Mirrors migrations/0025_cash_sales.sql.
+	`CREATE TABLE IF NOT EXISTS cash_sales (
+		id TEXT PRIMARY KEY, client_id TEXT NOT NULL UNIQUE, invoice_ref TEXT NOT NULL UNIQUE,
+		sold_at TEXT NOT NULL, total_amount REAL NOT NULL, line_count INTEGER NOT NULL,
+		piece_count INTEGER NOT NULL, received_amount REAL, note TEXT, copy_lang TEXT NOT NULL DEFAULT 'th'
+	)`,
+	`CREATE TABLE IF NOT EXISTS cash_sale_items (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, sale_id TEXT NOT NULL, line_no INTEGER NOT NULL,
+		name TEXT NOT NULL, name_en TEXT, unit_price REAL NOT NULL, quantity INTEGER NOT NULL,
+		line_total REAL NOT NULL, is_custom INTEGER NOT NULL DEFAULT 0,
+		FOREIGN KEY (sale_id) REFERENCES cash_sales(id)
+	)`
 ];
 
 const TABLES = [
 	"stock_movements", "product_colors", "product_sizes",
 	"order_items", "orders", "diy_products",
 	"product_set_items", "product_sets", "product_variants", "product_images",
-	"product_categories", "categories", "products", "admin_sessions", "catalog_version"
+	"product_categories", "categories", "products", "admin_sessions", "catalog_version",
+	"cash_sale_items", "cash_sales"
 ];
 
 // Raw bearer token for protected routes in tests. resetDb() stores its hash as a live

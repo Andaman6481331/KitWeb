@@ -155,3 +155,32 @@ CREATE TABLE IF NOT EXISTS stock_movements (
     FOREIGN KEY (color_id) REFERENCES product_colors(id)
 );
 CREATE INDEX IF NOT EXISTS idx_stock_movements_color ON stock_movements(color_id);
+
+-- Walk-in cash sales from the admin Cash Sale page (migrations/0025_cash_sales.sql).
+CREATE TABLE IF NOT EXISTS cash_sales (
+    id TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL UNIQUE,
+    invoice_ref TEXT NOT NULL UNIQUE,
+    sold_at TEXT NOT NULL,
+    total_amount REAL NOT NULL,
+    line_count INTEGER NOT NULL,
+    piece_count INTEGER NOT NULL,
+    received_amount REAL,
+    note TEXT,
+    copy_lang TEXT NOT NULL DEFAULT 'th'
+);
+CREATE INDEX IF NOT EXISTS idx_cash_sales_sold_at ON cash_sales(sold_at);
+CREATE TABLE IF NOT EXISTS cash_sale_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sale_id TEXT NOT NULL,
+    line_no INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    name_en TEXT,
+    unit_price REAL NOT NULL,
+    quantity INTEGER NOT NULL,
+    line_total REAL NOT NULL,
+    is_custom INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (sale_id) REFERENCES cash_sales(id)
+);
+CREATE INDEX IF NOT EXISTS idx_cash_sale_items_sale ON cash_sale_items(sale_id);
+CREATE INDEX IF NOT EXISTS idx_cash_sale_items_name ON cash_sale_items(name);

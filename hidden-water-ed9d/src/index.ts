@@ -12,6 +12,7 @@
  */
 
 import { bumpCatalogVersion, isCatalogWrite, readCatalogVersion, versionedCacheHeaders } from "./catalog-version";
+import { bangkokDay, listCashSales, parseCashSale, saveCashSale } from "./cash-sale";
 import { validateContact } from "./order-validation";
 import { extractOrderIds, newViewKey, phonesMatch, secretsMatch, toOrderView, verifyLineSignature } from "./order-view";
 import { InventoryError, applyInventory, prepareInventory, readInventory } from "./product-inventory";
@@ -2638,6 +2639,23 @@ const router = {
 				await env.DB.batch(statements);
 
 				return corsResponse({ success: true, order_id: orderId });
+			}
+
+			// Walk-in cash sales for the admin Cash Sale page (cash-sale.ts, tables from migration 0025).
+			// POST saves one sale with its lines; the total is worked out here from the lines.
+			// Sending the same client_id again returns the sale already saved.
+			if (url.pathname === "/cashsales" && request.method === "POST") {
+				const parsed = parseCashSale(await request.json().catch(() => null));
+				if (!parsed.ok) return corsResponse({ error: parsed.error }, { status: 400 });
+				const { record, created } = await saveCashSale(env.DB, parsed.sale);
+				return corsResponse({ success: true, created, sale: record }, { status: created ? 201 : 200 });
+			}
+
+			// GET /cashsales?date=YYYY-MM-DD lists that Bangkok day's sales (today when omitted).
+			if (url.pathname === "/cashsales" && request.method === "GET") {
+				const span = bangkokDay(url.searchParams.get("date"));
+				if (!span) return corsResponse({ error: "date must be YYYY-MM-DD" }, { status: 400 });
+				return corsResponse({ day: span.day, sales: await listCashSales(env.DB, span.from, span.to) });
 			}
 
 			// The sizes, colors and stock behind the admin product editor (product-inventory.ts).
