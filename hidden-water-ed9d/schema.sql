@@ -167,7 +167,10 @@ CREATE TABLE IF NOT EXISTS cash_sales (
     piece_count INTEGER NOT NULL,
     received_amount REAL,
     note TEXT,
-    copy_lang TEXT NOT NULL DEFAULT 'th'
+    copy_lang TEXT NOT NULL DEFAULT 'th',
+    -- migrations/0026: a tag, not a delete. NULL = counts as normal.
+    excluded_at TEXT,
+    exclude_reason TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_cash_sales_sold_at ON cash_sales(sold_at);
 CREATE TABLE IF NOT EXISTS cash_sale_items (

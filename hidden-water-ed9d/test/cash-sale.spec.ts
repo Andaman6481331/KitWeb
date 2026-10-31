@@ -122,6 +122,43 @@ describe("POST /cashsales", () => {
 	});
 });
 
+describe("PUT /cashsales/:id/exclude", () => {
+	beforeEach(resetDb);
+
+	const exclude = (id: string, body: any, headers: Record<string, string> = AUTH) =>
+		SELF.fetch(`https://example.com/cashsales/${id}/exclude`, { method: "PUT", headers, body: JSON.stringify(body) });
+
+	it("tags a sale as excluded, keeps it and its lines, and can clear the tag", async () => {
+		const saved = await (await post(sale())).json() as any;
+		const id = saved.sale.id;
+		expect(saved.sale.excluded_at).toBeNull();
+
+		const res = await exclude(id, { excluded: true, reason: "  typed wrong  " });
+		expect(res.status).toBe(200);
+		const tagged = (await res.json() as any).sale;
+		expect(tagged.excluded_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+		expect(tagged.exclude_reason).toBe("typed wrong");
+		expect(tagged.items).toHaveLength(2);
+
+		const listed = (await (await list()).json() as any).sales;
+		expect(listed).toHaveLength(1);
+		expect(listed[0].excluded_at).toBe(tagged.excluded_at);
+
+		const cleared = (await (await exclude(id, { excluded: false })).json() as any).sale;
+		expect(cleared.excluded_at).toBeNull();
+		expect(cleared.exclude_reason).toBeNull();
+		const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM cash_sales").first<{ n: number }>();
+		expect(n?.n).toBe(1);
+	});
+
+	it("needs an admin session, a real sale and a true/false flag", async () => {
+		const saved = await (await post(sale())).json() as any;
+		expect((await exclude(saved.sale.id, { excluded: true }, { "Content-Type": "application/json" })).status).toBe(401);
+		expect((await exclude("no-such-sale", { excluded: true })).status).toBe(404);
+		expect((await exclude(saved.sale.id, { excluded: "yes" })).status).toBe(400);
+	});
+});
+
 describe("GET /cashsales", () => {
 	beforeEach(resetDb);
 

@@ -12,7 +12,7 @@
  */
 
 import { bumpCatalogVersion, isCatalogWrite, readCatalogVersion, versionedCacheHeaders } from "./catalog-version";
-import { bangkokDay, listCashSales, parseCashSale, saveCashSale } from "./cash-sale";
+import { bangkokDay, listCashSales, parseCashSale, saveCashSale, setCashSaleExcluded } from "./cash-sale";
 import { validateContact } from "./order-validation";
 import { extractOrderIds, newViewKey, phonesMatch, secretsMatch, toOrderView, verifyLineSignature } from "./order-view";
 import { InventoryError, applyInventory, prepareInventory, readInventory } from "./product-inventory";
@@ -2656,6 +2656,17 @@ const router = {
 				const span = bangkokDay(url.searchParams.get("date"));
 				if (!span) return corsResponse({ error: "date must be YYYY-MM-DD" }, { status: 400 });
 				return corsResponse({ day: span.day, sales: await listCashSales(env.DB, span.from, span.to) });
+			}
+
+			// PUT /cashsales/:id/exclude { excluded: true|false, reason? } tags a sale as excluded (or clears
+			// the tag). The sale is never deleted; the tag is for filtering when sales are validated.
+			const excludeMatch = url.pathname.match(/^\/cashsales\/([A-Za-z0-9-]{8,64})\/exclude$/);
+			if (excludeMatch && request.method === "PUT") {
+				const body: any = await request.json().catch(() => null);
+				if (typeof body?.excluded !== "boolean") return corsResponse({ error: "excluded must be true or false" }, { status: 400 });
+				const record = await setCashSaleExcluded(env.DB, excludeMatch[1], body.excluded, String(body.reason ?? ""));
+				if (!record) return corsResponse({ error: "Sale not found" }, { status: 404 });
+				return corsResponse({ success: true, sale: record });
 			}
 
 			// The sizes, colors and stock behind the admin product editor (product-inventory.ts).

@@ -113,11 +113,12 @@ const DDL = [
 		version INTEGER NOT NULL DEFAULT 1
 	)`,
 	`INSERT OR IGNORE INTO catalog_version (id, version) VALUES (1, 1)`,
-	// Mirrors migrations/0025_cash_sales.sql.
+	// Mirrors migrations/0025_cash_sales.sql and 0026_cash_sale_exclude.sql.
 	`CREATE TABLE IF NOT EXISTS cash_sales (
 		id TEXT PRIMARY KEY, client_id TEXT NOT NULL UNIQUE, invoice_ref TEXT NOT NULL UNIQUE,
 		sold_at TEXT NOT NULL, total_amount REAL NOT NULL, line_count INTEGER NOT NULL,
-		piece_count INTEGER NOT NULL, received_amount REAL, note TEXT, copy_lang TEXT NOT NULL DEFAULT 'th'
+		piece_count INTEGER NOT NULL, received_amount REAL, note TEXT, copy_lang TEXT NOT NULL DEFAULT 'th',
+		excluded_at TEXT, exclude_reason TEXT
 	)`,
 	`CREATE TABLE IF NOT EXISTS cash_sale_items (
 		id INTEGER PRIMARY KEY AUTOINCREMENT, sale_id TEXT NOT NULL, line_no INTEGER NOT NULL,

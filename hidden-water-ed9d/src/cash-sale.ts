@@ -134,10 +134,14 @@ export interface CashSaleRecord {
 	received_amount: number | null;
 	note: string | null;
 	copy_lang: string;
+	// Set when the sale is tagged excluded; the sale itself is never removed.
+	excluded_at: string | null;
+	exclude_reason: string | null;
 	items: CashSaleItemRow[];
 }
 
-const SALE_COLUMNS = "id, invoice_ref, sold_at, total_amount, piece_count, received_amount, note, copy_lang";
+const SALE_COLUMNS =
+	"id, invoice_ref, sold_at, total_amount, piece_count, received_amount, note, copy_lang, excluded_at, exclude_reason";
 
 async function findByClientId(db: D1Database, clientId: string): Promise<CashSaleRecord | null> {
 	const sale = await db.prepare(`SELECT ${SALE_COLUMNS} FROM cash_sales WHERE client_id = ?`)
@@ -179,6 +183,23 @@ export async function saveCashSale(
 		throw e;
 	}
 	return { record: (await findByClientId(db, sale.clientId))!, created: true };
+}
+
+// Tags a sale as excluded (or clears the tag). The sale and its lines are left untouched, so
+// it can still be found and filtered later. Returns null when no sale has that id.
+export async function setCashSaleExcluded(
+	db: D1Database, id: string, excluded: boolean, reason: string, now: Date = new Date()
+): Promise<CashSaleRecord | null> {
+	const done = await db.prepare("UPDATE cash_sales SET excluded_at = ?, exclude_reason = ? WHERE id = ?")
+		.bind(excluded ? now.toISOString() : null, excluded ? (text(reason, MAX_NOTE) || null) : null, id).run();
+	if (!done.meta.changes) return null;
+	const sale = await db.prepare(`SELECT ${SALE_COLUMNS} FROM cash_sales WHERE id = ?`)
+		.bind(id).first<Omit<CashSaleRecord, "items">>();
+	const items = await db.prepare(
+		`SELECT name, name_en, unit_price, quantity, line_total, is_custom
+		 FROM cash_sale_items WHERE sale_id = ? ORDER BY line_no`
+	).bind(id).all<CashSaleItemRow>();
+	return { ...sale!, items: items.results };
 }
 
 // Sales saved between two instants (ISO strings), newest first.
