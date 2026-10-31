@@ -1,0 +1,55 @@
+// English names for the Cash Sale types, printed on the customer copy when it is set to
+// English. Fill in the second item of each pair. Leave it '' and that type prints its Thai
+// name instead. The first item must match the type's Thai name in adminCashSale.js exactly.
+export const EN_NAMES = [
+  ['กรรไกร', 'Scissors'],
+  ['กระดาษ', 'Paper'],
+  ['กระพรวน', 'Jingle bell'],
+  ['กาวแท่ง', 'Glue stick'],
+  ['ก้านลูกโป่ง', 'Balloon stick'],
+  ['กล่อง', 'Box'],
+  ['ก้ามปู', 'Lobster clasp / Trigger snap'],
+  ['กากเพชร', 'Glitter'],
+  ['กำมะหยี่', 'Velvet'],
+  ['กิ๊ป', 'Hair clip / Pin'],
+  ['เกสร', 'Stamen / Pollen'],
+  ['กระดุม', 'Button'],
+  ['กระดิ่ง', 'Bell'],
+  ['เข็มมุด', 'Straight pin'],
+  ['เข็มสอย', 'Sewing needle / Hand sewing needle'],
+  ['เข็มเนา', 'Basting needle'],
+  ['เข็มควัก', 'Crochet hook'],
+  ['ด้ายหลอด', 'Spool thread'],
+  ['ด้ายวีสปัน', 'V-Spun thread'],
+  ['ด้ายแกน', 'Core-spun thread'],
+  ['ยางแผง', 'Elastic band (carded)'],
+  ['ยางม้วน', 'Elastic roll'],
+  ['ยางหลอด', 'Elastic cord / Tube elastic'],
+  ['ริบบิ้น', 'Ribbon'],
+  ['ริบบิ้นซาติน', 'Satin ribbon'],
+  ['ริบบิ้นไนล่อน', 'Nylon ribbon'],
+  ['ริบบิ้นผ้า', 'Fabric ribbon'],
+  ['ริบบิ้นพับเหรียญ', 'Coin-folding ribbon'],
+  ['ริบบิ้นฟาง', 'Straw ribbon / Raffia ribbon'],
+  ['ลวด', 'Wire'],
+  ['ลวดพันก้าน', 'Stem wire / Floral wire'],
+  ['ลวดต้น', 'Wire trunk / Stem wire'],
+  ['ลวดวง', 'Wire loop / Ring wire'],
+  ['ไหมนก', 'Bird brand embroidery floss / Thread'],
+  ['ไหมวีนัส', 'Venus embroidery thread / Yarn'],
+  ['ไหมเส้นใหญ่', 'Chunky yarn / Thick thread'],
+  ['ไหมซัมเมอร์', 'Summer yarn / Mercerized cotton yarn'],
+  ['ไหมเบบี้', 'Baby yarn'],
+  ['ไหมญีปุ่น', 'Japanese elastic thread / Japanese yarn'],
+  ['ลูกปัด', 'Beads'],
+  ['ใบไม้', 'Artificial leaves / Leaf'],
+  ['มีดคว้าน', 'Carving knife'],
+  ['เชือกเทียน', 'Waxed cord'],
+  ['ห่วงเงิน', 'Silver jump ring / Silver loop'],
+  ['ห่วงทอง', 'Gold jump ring / Gold loop'],
+];
+
+const byThai = new Map(EN_NAMES.map(([thai, english]) => [thai, english.trim()]));
+
+// The English name for a Thai type name, or the Thai name when none has been filled in.
+export const englishName = (thai) => byThai.get(thai) || thai;

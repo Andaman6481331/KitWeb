@@ -202,14 +202,26 @@ export const api = {
     }
   },
 
-  // POS in-store cash sale. payload: { total_amount, items: [{ product_type, input_price }] }
+  // Walk-in cash sale, saved to cash_sales. payload: { client_id, items: [{ name, name_en, price, qty, custom }],
+  // received, note, copy_lang }. The Worker works out the total; resending a client_id returns the saved sale.
   async submitCashSale(payload) {
-    const response = await fetch(`${API_URL}/sellcash/submit`, {
+    const response = await fetch(`${API_URL}/cashsales`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
       body: JSON.stringify(payload)
     });
+    if (response.status === 401) throw sessionExpiredError();
     if (!response.ok) throw new Error(await parseApiError(response, 'Sale failed'));
+    return await response.json();
+  },
+
+  // The cash sales saved on one day (YYYY-MM-DD, Bangkok time), newest first.
+  async listCashSales(day) {
+    const response = await fetch(`${API_URL}/cashsales?date=${encodeURIComponent(day)}`, {
+      headers: { 'Authorization': this.getToken() }
+    });
+    if (response.status === 401) throw sessionExpiredError();
+    if (!response.ok) throw new Error(await parseApiError(response, 'Could not load the sales'));
     return await response.json();
   },
 

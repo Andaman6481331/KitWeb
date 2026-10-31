@@ -17,7 +17,7 @@ const pages = {
   'admin-events': () => import('../components/admin-events.vue'),
   'admin-business-sets': () => import('../components/admin-business-sets.vue'),
   'admin-categories': () => import('../components/admin-categories.vue'),
-  'admin-cash-sale': () => import('../views/SellCashPage.vue'),
+  'admin-cash-sale': () => import('../views/admin/AdminCashSalePage.vue'),
 };
 
 const toInventory = (to) => ({ name: 'admin-inventory', params: { lang: to.params.lang } });

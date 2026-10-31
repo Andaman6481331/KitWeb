@@ -20,7 +20,7 @@ export const adminNav = [
   { name: 'admin-events', slug: 'workshops-events', en: 'Workshops & Events', th: 'เวิร์กชอปและอีเวนต์', group: 'more', frame: 'legacy' },
   { name: 'admin-business-sets', slug: 'business-sets', en: 'Business Sets', th: 'เซตธุรกิจ', group: 'more', frame: 'legacy' },
   { name: 'admin-categories', slug: 'categories', en: 'Categories', th: 'หมวดหมู่', group: 'more', frame: 'legacy' },
-  { name: 'admin-cash-sale', slug: 'cash-sale', en: 'Cash Sale', th: 'ขายเงินสด', group: 'more', frame: 'full' },
+  { name: 'admin-cash-sale', slug: 'cash-sale', en: 'Cash Sale', th: 'ขายเงินสด', group: 'more', frame: 'page' },
 ];
 
 export const adminNavLabel = (item, lang) => (lang === 'th' ? item.th : item.en);

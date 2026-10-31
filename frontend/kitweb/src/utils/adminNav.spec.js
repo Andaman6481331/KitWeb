@@ -78,6 +78,7 @@ describe('admin route table', () => {
     expect(meta('inventory').frame).toBe('page');
     expect(meta('project-article').frame).toBe('legacy');
     expect(meta('orders').frame).toBe('full');
+    expect(meta('cash-sale').frame).toBe('page');
   });
 
   it('keeps the old order and cash-sale URLs working', () => {

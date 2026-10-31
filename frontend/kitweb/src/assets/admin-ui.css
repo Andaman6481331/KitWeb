@@ -385,3 +385,10 @@ html[lang][lang] .adm-shell .adm-serif {
   .adm-count-group { margin-left: 0; width: 100%; flex-wrap: wrap; justify-content: space-between; }
   .adm-count-group .adm-count { width: auto; }
 }
+
+/* Printing: the navbar is screen chrome. Hide it and let the sheet size itself, so the
+   admin pages print without it and without a trailing blank page. */
+@media print {
+  .adm-nav, .adm-nav-scrim { display: none !important; }
+  .adm-shell { min-height: 0; background: #fff; }
+}

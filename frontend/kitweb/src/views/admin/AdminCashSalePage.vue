@@ -1,983 +1,1110 @@
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue';
-import { api } from '../services/api';
+// Cash Sale, in the admin design language: a walk-in point of sale. Staff key in items
+// (type, price, quantity), take payment, and "Print & save" writes the sale to the
+// database and then prints the two-copy receipt. Checkout shows that receipt on screen
+// first so staff can check it, and picks the language of the customer copy. The cart,
+// the keyboard flow and the copy live here and in utils/adminCashSale*.js; the receipt
+// itself is components/admin/CashReceipt.vue.
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { api } from '../../services/api';
 import generatePayload from 'promptpay-qr';
 import QRCode from 'qrcode';
+import CashReceipt from '../../components/admin/CashReceipt.vue';
+import { useAdminLang } from '../../composables/useAdminLang';
+import { useAdminSession } from '../../composables/useAdminSession';
+import { cashSaleText } from '../../utils/adminCashSaleText';
+import {
+  CASH_TYPES, frequentTypes, matchTypes, money, sanitizePrice, sanitizeQty, lineTotal, cartTotal, pieceCount,
+  changeDue, quickAmounts, addLine as addToCart, removeLine, setLineQty, restoreLine, salePayload, saleFromRecord, newClientId, localDay,
+  clockTime, readJson, writeJson, pushSale, todaysSales, salesTotal, SALES_KEY, LAST_PRICES_KEY, COPY_LANG_KEY,
+  NEW_NAMES_KEY, NAME_MAX, addNewName, bumpNameUse, customTypes,
+} from '../../utils/adminCashSale';
 
 // ⚠️ Replace with the shop's real PromptPay mobile number (e.g. '0812345678').
 const PROMPTPAY_ID = '0894886877';
 
-const SHOP_NAME = 'ร้านกิจเจริญสำเพ็ง';
-const SHOP_SITE = 'kitcharoensampeng.com';
-const PRODUCT_TYPES = ['กรรไกร','กระดาษ', 'กระพรวน', 'กาวแท่ง', 'ก้านลูกโป่ง', 'กล่อง', 'ก้ามปู', 'กากเพชร', 'กำมะหยี่', 'กิ๊ป', 'เกสร', 'กระดุม', 'กระดิ่ง', 'เข็มมุด', 'เข็มสอย', 'เข็มเนา', 'เข็มควัก', 'ด้ายหลอด', 'ด้ายวีสปัน', 'ด้ายแกน', "ยางแผง", "ยางม้วน", "ยางหลอด", "ริบบิ้น","ริบบิ้นซาติน", "ริบบิ้นไนล่อน", "ริบบิ้นผ้า", "ริบบิ้นพับเหรียญ", "ริบบิ้นฟาง", "ลวด", "ลวดพันก้าน", "ลวดต้น", "ลวดวง", "ไหมนก", "ไหมวีนัส", "ไหมเส้นใหญ่", "ไหมซัมเมอร์", "ไหมเบบี้", "ไหมญีปุ่น", "ลูกปัด", "ใบไม้", "มีดคว้าน", "เชือกเทียน",
-"ห่วงเงิน","ห่วงทอง","ลูกปัด","อุปกรณ์จักร ............",
-"วัสดุ ......"];
+const { lang, isThai, setLang } = useAdminLang();
+const { handleAuthError } = useAdminSession();
+const t = computed(() => cashSaleText(lang.value));
 
-// Typing shortcuts: the leading consonant of each syllable (preposed vowels เ แ โ ใ ไ skipped).
-// e.g. "กก" -> กรรไกร, "ขม" -> เข็มมุด. Several words can share a shortcut; all matches are shown.
-const TYPE_SHORTCUTS = {
-  'กรรไกร': 'กก',
-  'กระดาษ': 'กด',
-  'กระพรวน': 'กพ',
-  'กาวแท่ง': 'กท',
-  'ก้านลูกโป่ง': 'กลป',
-  'กล่อง': 'ก',
-  'ก้ามปู': 'กป',
-  'กากเพชร': 'กพ',
-  'กำมะหยี่': 'กมห',
-  'กิ๊ป': 'ก',
-  'เกสร': 'กส',
-  'กระดุม': 'กด',
-  'กระดิ่ง': 'กด',
-  'เข็มมุด': 'ขม',
-  'เข็มสอย': 'ขส',
-  'เข็มเนา': 'ขน',
-  'เข็มควัก': 'ขค',
-  'ด้ายหลอด': 'ดห',
-  'ด้ายวีสปัน': 'ดวส',
-  'ด้ายแกน': 'ดก',
-  'ยางแผง': 'ยผ',
-  'ยางม้วน': 'ยม',
-  'ยางหลอด': 'ยห',
-  'ริบบิ้น': 'รบ',
-  'ริบบิ้นซาติน': 'รบซต',
-  'ริบบิ้นไนล่อน': 'รบนล',
-  'ริบบิ้นผ้า': 'รบผ',
-  'ริบบิ้นพับเหรียญ': 'รบพห',
-  'ริบบิ้นฟาง': 'รบฟ',
-  'ลวด': 'ล',
-  'ลวดพันก้าน': 'ลพก',
-  'ลวดต้น': 'ลต',
-  'ลวดวง': 'ลว',
-  'ไหมนก': 'หน',
-  'ไหมวีนัส': 'หวน',
-  'ไหมเส้นใหญ่': 'หสห',
-  'ไหมซัมเมอร์': 'หซม',
-  'ไหมเบบี้': 'หบบ',
-  'ไหมญีปุ่น': 'หญป',
-  'ลูกปัด': 'ลป',
-  'ใบไม้': 'บม',
-  'มีดคว้าน': 'มค',
-  'เชือกเทียน': 'ชท',
-  'ห่วงเงิน' : 'หง',
-  'ห่วงทอง' : 'หท'
+// --- Where the sale is: items -> checkout -> done ---
+const stage = ref('entry');
+let stageChangedAt = 0;
+const setStage = (next) => {
+  stageChangedAt = Date.now();
+  stage.value = next;
 };
+const stepIndex = computed(() => ({ entry: 0, checkout: 1, done: 2 })[stage.value]);
 
-// --- Auth gate (reuses the admin password, same as AdminDashboard) ---
-const isAuthenticated = ref(!!api.getToken());
-const password = ref('');
-const loginError = ref('');
+// --- Entry: the three boxes ---
+const q = ref(''); // what is typed in the Type box
+const picked = ref(null); // the chosen type, once there is one
+const price = ref('');
+const qty = ref('1');
+const hl = ref(0); // highlighted match
+const focus = ref('type');
 
-const handleLogin = async () => {
-  const result = await api.adminLogin(password.value);
-  if (result.success) {
-    isAuthenticated.value = true;
-    loginError.value = '';
-  } else {
-    loginError.value = 'Incorrect password';
-  }
-};
+const cart = ref([]); // [{ k, name, price, qty }]
+let nextKey = 1;
+const lastPrices = ref({}); // name -> the price it last sold at, on this browser
+const sales = ref([]); // saved sales, newest first, kept in this browser
+const lastSale = ref(null); // the sale just saved, shown on the Done screen
 
-// --- POS cart (local, ephemeral) ---
-const selectedType = ref('');
-const priceInput = ref('');
-const qtyInput = ref(1);
-const cart = ref([]); // [{ id, product_type, input_price, quantity }]
+const priceNum = computed(() => parseFloat(price.value) || 0);
+const qtyNum = computed(() => parseInt(qty.value, 10) || 0);
 
-// --- Guided entry tabs: type -> price -> qty ---
-const activeTab = ref('type');
-const searchRef = ref(null);
-const priceRef = ref(null);
-const qtyRef = ref(null);
+const newNames = ref([]); // every name added at the till, newest first, kept in this browser
+const allTypes = computed(() => [...CASH_TYPES, ...customTypes(newNames.value)]);
+const list = computed(() => matchTypes(picked.value ? '' : q.value, allTypes.value));
+const searching = computed(() => !picked.value && q.value.trim() !== '');
+const hlIndex = computed(() => Math.min(hl.value, Math.max(0, list.value.length - 1)));
+const frequent = frequentTypes();
 
-const goToTab = (tab) => {
-  activeTab.value = tab;
-  nextTick(() => {
-    if (tab === 'type' && searchRef.value) searchRef.value.focus();
-    if (tab === 'price' && priceRef.value) priceRef.value.focus();
-    if (tab === 'qty' && qtyRef.value) qtyRef.value.focus();
-  });
-};
+const lastPrice = computed(() => (picked.value ? lastPrices.value[picked.value.name] : null));
+const addOff = computed(() => !picked.value || !(priceNum.value > 0) || !(qtyNum.value >= 1));
+const previewReady = computed(() => picked.value && priceNum.value > 0 && qtyNum.value > 0);
+const previewLine = computed(() => (previewReady.value
+  ? `${picked.value.name} · ${money(priceNum.value)} × ${qtyNum.value} = ${money(priceNum.value * qtyNum.value)}`
+  : t.value.idleLine));
 
-// --- Product type search/filter ---
-const typeSearch = ref('');
-const filteredTypes = computed(() => {
-  const q = typeSearch.value.trim().toLowerCase();
-  if (!q) return PRODUCT_TYPES;
-  return PRODUCT_TYPES.filter((type) => {
-    if (type.toLowerCase().includes(q)) return true;
-    const shortcut = TYPE_SHORTCUTS[type];
-    return shortcut ? shortcut.startsWith(q) : false; // prefix match feels instant
-  });
+const keyHints = computed(() => {
+  const x = t.value;
+  if (focus.value === 'price') return [['↵', x.keyToQty], ['⇧ ↵', x.keyAddNow], ['Esc', x.keyClear]];
+  if (focus.value === 'qty') return [['↵', x.keyAddToCart], ['↑ ↓', x.keyChangeQty]];
+  return [['↵', x.keyPickType], ['↑ ↓', x.keyMoveInList], ['↵', x.keyEmptyCheckout], ['Esc', x.keyClear]];
 });
 
-const selectType = (type) => {
-  selectedType.value = type;
-  goToTab('price'); // auto-advance to price after picking a type
+const focusEl = (id) => nextTick(() => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.focus();
+  if (el.tagName === 'INPUT') el.select();
+});
+
+// The highlighted match follows the arrow keys even when the list scrolls.
+watch(hlIndex, () => nextTick(() => {
+  document.querySelector('#cs-types [aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+}));
+
+// --- Toast (also carries "Undo" for a removed line) ---
+const toast = ref(null); // { message, undo?: line, error?: true }
+let toastTimer;
+const flash = (message, ms = 3500, extra = {}) => {
+  clearTimeout(toastTimer);
+  toast.value = { message, ...extra };
+  toastTimer = setTimeout(() => { toast.value = null; }, ms);
 };
 
-// Enter in the search box selects the first (or only) match
-const selectFirstMatch = () => {
-  if (filteredTypes.value.length > 0) {
-    selectType(filteredTypes.value[0]);
-    typeSearch.value = '';
+const pickType = (type) => {
+  picked.value = type;
+  q.value = type.name;
+  price.value = lastPrices.value[type.name] ? String(lastPrices.value[type.name]) : '';
+  qty.value = '1';
+  hl.value = 0;
+  focusEl('cs-price');
+};
+
+const clearEntry = () => {
+  q.value = '';
+  picked.value = null;
+  price.value = '';
+  qty.value = '1';
+  hl.value = 0;
+};
+
+const onQ = (e) => {
+  q.value = e.target.value;
+  picked.value = null;
+  hl.value = 0;
+  price.value = '';
+};
+// A controlled box: write the cleaned text back, or a rejected letter would stay on screen.
+const onPrice = (e) => { price.value = e.target.value = sanitizePrice(e.target.value); };
+const onQty = (e) => { qty.value = e.target.value = sanitizeQty(e.target.value); };
+
+const onTypeKey = (e) => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    const n = list.value.length;
+    if (n) hl.value = (hlIndex.value + (e.key === 'ArrowDown' ? 1 : n - 1)) % n;
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (picked.value) focusEl('cs-price');
+    else if (q.value.trim()) {
+      const match = list.value[hlIndex.value];
+      if (match) pickType(match);
+      else openNameDialog();
+    } else if (cart.value.length) goCheckout();
+  } else if (e.key === 'Escape') {
+    clearEntry();
   }
 };
 
-// Price step -> advance to qty (only with a valid price)
-const confirmPrice = () => {
-  if (parseFloat(priceInput.value) > 0) goToTab('qty');
+const onPriceKey = (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  if (!(priceNum.value > 0)) return flash(t.value.priceAbove);
+  if (e.shiftKey) addLine(1);
+  else focusEl('cs-qty');
 };
 
-const incQty = () => { qtyInput.value = (parseInt(qtyInput.value) || 0) + 1; };
-const decQty = () => { qtyInput.value = Math.max(1, (parseInt(qtyInput.value) || 1) - 1); };
-
-const total = computed(() =>
-  cart.value.reduce((sum, item) => sum + item.input_price * item.quantity, 0)
-);
-
-const addToCart = () => {
-  const price = parseFloat(priceInput.value);
-  const qty = Math.max(1, parseInt(qtyInput.value) || 1);
-  if (!selectedType.value || !(price > 0)) return;
-  cart.value.push({
-    id: Date.now() + Math.random(),
-    product_type: selectedType.value,
-    input_price: Math.round(price * 100) / 100,
-    quantity: qty
-  });
-  // reset entry and jump back to the type step for the next item
-  priceInput.value = '';
-  qtyInput.value = 1;
-  selectedType.value = '';
-  typeSearch.value = '';
-  goToTab('type');
+const onQtyKey = (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    addLine();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    qty.value = String(qtyNum.value + 1);
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    qty.value = String(Math.max(1, qtyNum.value - 1));
+  }
 };
 
-const removeFromCart = (id) => {
-  cart.value = cart.value.filter((item) => item.id !== id);
+const addLine = (qtyOverride) => {
+  const amount = qtyOverride || qtyNum.value;
+  if (!picked.value) { flash(t.value.pickTypeFirst); focusEl('cs-type'); return; }
+  if (!(priceNum.value > 0)) { flash(t.value.priceAbove); focusEl('cs-price'); return; }
+  if (!(amount >= 1)) { flash(t.value.qtyMin); focusEl('cs-qty'); return; }
+  cart.value = addToCart(cart.value, { k: nextKey++, name: picked.value.name, price: priceNum.value, qty: amount, custom: Boolean(picked.value.custom) });
+  lastPrices.value = { ...lastPrices.value, [picked.value.name]: priceNum.value };
+  writeJson(LAST_PRICES_KEY, lastPrices.value);
+  if (picked.value.custom) {
+    newNames.value = bumpNameUse(readJson(NEW_NAMES_KEY, newNames.value), picked.value.name);
+    writeJson(NEW_NAMES_KEY, newNames.value);
+  }
+  clearEntry();
+  toast.value = null;
+  focusEl('cs-type');
 };
 
-const clearCart = () => {
-  cart.value = [];
+// --- Cart ---
+const saleOver = computed(() => stage.value === 'done' && lastSale.value);
+const shownItems = computed(() => (saleOver.value
+  ? lastSale.value.items.map((l, i) => ({ k: `done-${i}`, ...l }))
+  : cart.value));
+const editable = computed(() => stage.value === 'entry');
+const total = computed(() => (saleOver.value ? lastSale.value.total : cartTotal(cart.value)));
+const pieces = computed(() => pieceCount(shownItems.value));
+
+const dropLine = (line) => {
+  cart.value = removeLine(cart.value, line.k);
+  flash(t.value.removed(line.name), 6000, { undo: line });
+};
+const stepQty = (line, by) => {
+  if (line.qty + by < 1) dropLine(line);
+  else cart.value = setLineQty(cart.value, line.k, line.qty + by);
+};
+const editLine = (line) => {
+  const type = allTypes.value.find((x) => x.name === line.name) || { name: line.name, sc: '', freq: false };
+  cart.value = removeLine(cart.value, line.k);
+  picked.value = type;
+  q.value = type.name;
+  price.value = String(line.price);
+  qty.value = String(line.qty);
+  focusEl('cs-price');
+};
+const undoRemove = () => {
+  const line = toast.value?.undo;
+  if (!line) return;
+  cart.value = restoreLine(cart.value, line);
+  toast.value = null;
 };
 
-// --- Dynamic PromptPay QR ---
+// --- Live PromptPay QR for the cart's total ---
 const qrDataUrl = ref('');
+let qrRun = 0;
+
+const makeQr = async (amount) => {
+  try {
+    return await QRCode.toDataURL(generatePayload(PROMPTPAY_ID, { amount }), { margin: 1, width: 240 });
+  } catch {
+    return '';
+  }
+};
 
 watch(total, async (amount) => {
-  if (amount > 0) {
-    try {
-      const payload = generatePayload(PROMPTPAY_ID, { amount });
-      qrDataUrl.value = await QRCode.toDataURL(payload, { margin: 1, width: 240 });
-    } catch (e) {
-      qrDataUrl.value = '';
-    }
-  } else {
-    qrDataUrl.value = '';
-  }
-});
+  const run = ++qrRun;
+  const url = amount > 0 ? await makeQr(amount) : '';
+  if (run === qrRun) qrDataUrl.value = url;
+}, { immediate: true });
 
-// --- Receipt meta ---
-const receiptDate = ref('');
-const receiptInvoice = ref('');
+// --- Checkout ---
+const received = ref('');
+const note = ref('');
+const checkoutAt = ref('');
+const saveError = ref(null); // null, or the Worker's message (possibly empty) after a failed save
+const saving = ref(false);
 
-const pad = (n, len) => String(n).padStart(len, '0');
+const receivedNum = computed(() => parseFloat(received.value) || 0);
+const change = computed(() => changeDue(receivedNum.value, total.value));
+const paidInFull = computed(() => receivedNum.value > 0 && receivedNum.value >= total.value);
+const quick = computed(() => quickAmounts(total.value).map((a) => ({
+  value: a.value,
+  label: a.kind === 'exact' ? t.value.exact(money(a.value)) : money(a.value),
+})));
 
-const printReceipt = () => {
-  const now = new Date();
-  receiptDate.value = now.toLocaleString();
-  // INV-YYMMDD-REF  (e.g. INV-260623-A1B2C3)
-  const ymd = `${pad(now.getFullYear() % 100, 2)}${pad(now.getMonth() + 1, 2)}${pad(now.getDate(), 2)}`;
-  // use a short slice of the saved order's UUID when available; otherwise
-  // (printing before the sale is finalized) fall back to a HHMMSS time code
-  const ref = savedOrderId.value
-    ? savedOrderId.value.replace(/-/g, '').slice(0, 6).toUpperCase()
-    : `${pad(now.getHours(), 2)}${pad(now.getMinutes(), 2)}${pad(now.getSeconds(), 2)}`;
-  receiptInvoice.value = `INV-${ymd}-${ref}`;
-  // ensure the date renders before the print dialog opens
+const onReceived = (e) => { received.value = e.target.value = sanitizePrice(e.target.value); };
+
+// Language of the customer copy. Remembered on this device; the shop copy is always Thai.
+const copyLang = ref('th');
+const setCopyLang = (next) => {
+  copyLang.value = next;
+  writeJson(COPY_LANG_KEY, next);
+};
+
+// What the on-screen receipt shows while the sale is still a cart: same shape as the
+// printed one, with the invoice number still to come.
+const previewReceipt = computed(() => ({
+  ref: 'INV-······',
+  at: checkoutAt.value,
+  items: cart.value.map(({ name, price: unit, qty: count }) => ({ name, price: unit, qty: count })),
+  total: total.value,
+  note: note.value.trim(),
+  qr: qrDataUrl.value,
+}));
+
+// The receipt is laid out at the printed sheet's size; the preview scales that to the column.
+const SHEET_W = 794; // an A5 landscape sheet at 96 dpi
+const wrapEl = ref(null);
+const sheetEl = ref(null);
+const sheetScale = ref(1);
+const sheetHeight = ref(0);
+const sheetLeft = ref(0);
+const SHEET_MAT = 14; // the mat's padding around the sheet, px
+let sheetObserver;
+const fitSheet = () => {
+  if (!wrapEl.value || !sheetEl.value) return;
+  const width = wrapEl.value.clientWidth;
+  const scale = Math.min(1, (width - 2 * SHEET_MAT) / SHEET_W);
+  sheetScale.value = scale;
+  sheetLeft.value = Math.max(0, (width - SHEET_W * scale) / 2);
+  sheetHeight.value = Math.ceil(sheetEl.value.offsetHeight * scale + 2 * SHEET_MAT);
+};
+watch([wrapEl, sheetEl], () => {
+  sheetObserver?.disconnect();
+  if (!wrapEl.value || !sheetEl.value) return;
+  fitSheet();
+  if (typeof ResizeObserver === 'undefined') return;
+  sheetObserver = new ResizeObserver(fitSheet);
+  sheetObserver.observe(wrapEl.value);
+  sheetObserver.observe(sheetEl.value);
+}, { flush: 'post' });
+
+// One id per checkout, sent with the sale: if the answer is lost and Print & save is pressed
+// again, the Worker returns the sale it already has instead of saving a second one.
+let saleId = '';
+
+const goCheckout = () => {
+  if (!cart.value.length) return;
+  saleId = newClientId();
+  received.value = '';
+  note.value = '';
+  saveError.value = null;
+  checkoutAt.value = new Date().toLocaleString();
+  setStage('checkout');
+  focusEl('cs-checkout');
+};
+
+const backToItems = () => {
+  setStage('entry');
+  focusEl('cs-type');
+};
+
+// --- Receipt (the print layout reads this, never the live cart) ---
+const receipt = ref({ ref: '', at: '', items: [], total: 0, note: '', qr: '', lang: 'th' });
+
+const printSale = async (sale) => {
+  receipt.value = {
+    lang: sale.copyLang === 'en' ? 'en' : 'th',
+    ref: sale.ref,
+    at: new Date(sale.savedAt).toLocaleString(),
+    items: sale.items,
+    total: sale.total,
+    note: sale.note,
+    qr: await makeQr(sale.total),
+  };
+  await nextTick();
+  // let the receipt render before the print dialog opens
   requestAnimationFrame(() => window.print());
 };
 
-// --- Finalize / save sale to D1 ---
-const isSaving = ref(false);
-const savedOrderId = ref('');
-const saveError = ref('');
-
-const finalizeSale = async () => {
-  if (cart.value.length === 0) return;
-  isSaving.value = true;
-  saveError.value = '';
+// --- Print & save: the sale is saved first; if that fails, nothing prints ---
+const confirmSale = async () => {
+  if (stage.value !== 'checkout' || !cart.value.length || saving.value) return;
+  saving.value = true;
+  saveError.value = null;
+  let sale;
   try {
-    const result = await api.submitCashSale({
-      total_amount: total.value,
-      // expand each line into `quantity` rows so the data matches the
-      // pos_order_items schema (order_id, product_type, input_price) — no qty column
-      items: cart.value.flatMap((item) =>
-        Array.from({ length: item.quantity }, () => ({
-          product_type: item.product_type,
-          input_price: item.input_price
-        }))
-      )
-    });
-    savedOrderId.value = result.order_id;
-    clearCart();
+    const saleTotal = cartTotal(cart.value);
+    const result = await api.submitCashSale(salePayload(cart.value, {
+      clientId: saleId,
+      received: receivedNum.value >= saleTotal ? receivedNum.value : null,
+      note: note.value.trim(),
+      copyLang: copyLang.value,
+    }));
+    sale = saleFromRecord(result.sale);
   } catch (e) {
-    saveError.value = e.message || 'Failed to save sale';
-  } finally {
-    isSaving.value = false;
+    saving.value = false;
+    // A rejected session sends the whole admin back to the sign-in; anything else shows here.
+    if (!handleAuthError(e)) saveError.value = e.message || '';
+    return;
+  }
+  sales.value = pushSale(readJson(SALES_KEY, sales.value), sale);
+  writeJson(SALES_KEY, sales.value);
+  lastSale.value = sale;
+  cart.value = [];
+  saving.value = false;
+  setStage('done');
+  focusEl('cs-done');
+  printSale(sale);
+};
+
+const reprint = (sale) => printSale(sale);
+
+// Today's sales come from the shop's database, so every till sees the same list. The copy kept
+// on this device is what shows if the Worker can't be reached.
+const salesOffline = ref(false);
+const loadSales = async () => {
+  try {
+    const { sales: rows } = await api.listCashSales(localDay());
+    sales.value = rows.map(saleFromRecord);
+    writeJson(SALES_KEY, sales.value);
+    salesOffline.value = false;
+  } catch (e) {
+    if (!handleAuthError(e)) salesOffline.value = true;
   }
 };
 
-const formatPrice = (n) => `฿${n.toFixed(2)}`;
+const newSale = () => {
+  cart.value = [];
+  lastSale.value = null;
+  received.value = '';
+  note.value = '';
+  clearEntry();
+  setStage('entry');
+  focusEl('cs-type');
+};
+
+const mainAction = () => {
+  if (stage.value === 'entry') goCheckout();
+  else if (stage.value === 'checkout') confirmSale();
+  else newSale();
+};
+const mainLabel = computed(() => (stage.value === 'entry' ? t.value.checkout : stage.value === 'checkout' ? t.value.printSave : t.value.newSale));
+const mainHint = computed(() => (stage.value === 'entry' ? t.value.hintEntry : stage.value === 'checkout' ? t.value.hintCheckout : t.value.hintDone));
+const mainOff = computed(() => stage.value !== 'done' && (cart.value.length === 0 || saving.value));
+
+// --- New product names: a small dialog, then the name is picked like any type ---
+const nameDialog = ref(false);
+const nameDraft = ref('');
+const nameError = ref('');
+
+const openNameDialog = () => {
+  nameDraft.value = picked.value ? '' : q.value.trim();
+  nameError.value = '';
+  nameDialog.value = true;
+  focusEl('cs-newname');
+};
+
+const closeNameDialog = () => {
+  nameDialog.value = false;
+  focusEl('cs-type');
+};
+
+const confirmName = () => {
+  const out = addNewName(readJson(NEW_NAMES_KEY, newNames.value), nameDraft.value);
+  if (!out.type) {
+    nameError.value = t.value.nameEmpty;
+    focusEl('cs-newname');
+    return;
+  }
+  if (out.isNew) {
+    newNames.value = out.records;
+    writeJson(NEW_NAMES_KEY, newNames.value);
+  }
+  nameDialog.value = false;
+  pickType(out.type);
+  flash(out.isNew ? t.value.nameAdded(out.type.name) : t.value.nameExists(out.type.name));
+};
+
+const onNameKey = (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); confirmName(); }
+  else if (e.key === 'Escape') { e.preventDefault(); closeNameDialog(); }
+};
+
+const nameRows = computed(() => newNames.value.map((r) => ({
+  ...r,
+  when: new Date(r.addedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+    + ` ${clockTime(new Date(r.addedAt))}`,
+})));
+
+const copyNames = async () => {
+  try {
+    await navigator.clipboard.writeText(newNames.value.map((r) => r.name).join('\n'));
+    flash(t.value.namesCopied);
+  } catch {
+    flash(t.value.namesCopyFailed, 5000, { error: true });
+  }
+};
+
+// --- Records sidebar: today's sales and the new names ---
+const panelOpen = ref(false);
+const closePanel = () => {
+  panelOpen.value = false;
+  focusEl('cs-records-btn');
+};
+watch(panelOpen, (open) => {
+  if (!open) return;
+  focusEl('cs-records-close');
+  loadSales();
+});
+
+// --- Today's sales on this till ---
+const todays = computed(() => todaysSales(sales.value));
+const todayRows = computed(() => todays.value.map((sale) => ({
+  sale,
+  time: clockTime(new Date(sale.savedAt)),
+  pieces: pieceCount(sale.items),
+})));
+
+// --- Keys that work anywhere on the page, per stage ---
+const onWindowKey = (e) => {
+  if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  // with the sidebar open the keys belong to it, not to the sale behind it
+  if (panelOpen.value) {
+    if (e.key === 'Escape' && !nameDialog.value) closePanel();
+    return;
+  }
+  // the Enter that moved to a new stage must not also act on it
+  if (Date.now() - stageChangedAt < 300) return;
+  const tag = e.target?.tagName;
+  const typing = tag === 'INPUT' || tag === 'TEXTAREA';
+  if (stage.value === 'checkout') {
+    if (e.key === 'Enter' && tag !== 'BUTTON') { e.preventDefault(); confirmSale(); }
+    else if (e.key === 'Escape') backToItems();
+  } else if (stage.value === 'done') {
+    if (e.key === 'Enter' && tag !== 'BUTTON') { e.preventDefault(); newSale(); }
+    else if (!typing && (e.key === 'r' || e.key === 'R') && lastSale.value) reprint(lastSale.value);
+  }
+};
+
+onMounted(() => {
+  sales.value = readJson(SALES_KEY, []);
+  lastPrices.value = readJson(LAST_PRICES_KEY, {});
+  newNames.value = readJson(NEW_NAMES_KEY, []);
+  copyLang.value = readJson(COPY_LANG_KEY, 'th') === 'en' ? 'en' : 'th';
+  loadSales();
+  window.addEventListener('keydown', onWindowKey);
+  focusEl('cs-type');
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onWindowKey);
+  sheetObserver?.disconnect();
+  clearTimeout(toastTimer);
+});
 </script>
 
 <template>
-  <!-- Login gate -->
-  <div v-if="!isAuthenticated" class="sellcash-page">
-    <div class="login-box">
-      <h1>Cashier Login</h1>
-      <input
-        v-model="password"
-        type="password"
-        placeholder="Password"
-        @keyup.enter="handleLogin"
-      />
-      <button @click="handleLogin">Sign In</button>
-      <p v-if="loginError" class="error">{{ loginError }}</p>
-    </div>
-  </div>
-
-  <!-- POS UI -->
-  <div v-else class="sellcash-page">
-    <div class="pos-grid no-print">
-      <!-- Left: guided entry (Type -> Price -> Qty) -->
-      <section class="panel entry-panel">
-        <h1 class="title">Sell / Cash Checkout</h1>
-
-        <!-- Step tabs -->
-        <div class="step-tabs">
-          <button
-            class="step-tab"
-            :class="{ active: activeTab === 'type', done: selectedType }"
-            @click="goToTab('type')"
-          >
-            <span class="step-num">1</span>
-            <span class="step-label">Type</span>
-            <span class="step-val" v-if="selectedType">{{ selectedType }}</span>
+  <div class="adm-page cs-page">
+    <div class="cs-screen no-print">
+      <div class="adm-head">
+        <div class="adm-head-text">
+          <h1 class="adm-title adm-serif">{{ t.title }}</h1>
+          <div class="adm-sub">{{ t.subtitle }}</div>
+        </div>
+        <div class="adm-actions">
+          <ol class="cs-steps" :aria-label="t.stepsAria">
+            <li
+              v-for="(label, i) in t.steps"
+              :key="i"
+              class="cs-step"
+              :class="{ 'is-on': i === stepIndex, 'is-past': i < stepIndex }"
+              :aria-current="i === stepIndex ? 'step' : null"
+            ><span class="cs-step-num">{{ i + 1 }}</span>{{ label }}</li>
+          </ol>
+          <button id="cs-records-btn" type="button" class="adm-btn cs-records-btn" :aria-expanded="panelOpen" aria-controls="cs-records" @click="panelOpen = !panelOpen">
+            {{ t.records }}<span class="cs-count">{{ todays.length + newNames.length }}</span>
           </button>
-          <button
-            class="step-tab"
-            :class="{ active: activeTab === 'price', done: parseFloat(priceInput) > 0 }"
-            :disabled="!selectedType"
-            @click="selectedType && goToTab('price')"
-          >
-            <span class="step-num">2</span>
-            <span class="step-label">Price</span>
-            <span class="step-val" v-if="parseFloat(priceInput) > 0">{{ formatPrice(parseFloat(priceInput)) }}</span>
-          </button>
-          <button
-            class="step-tab"
-            :class="{ active: activeTab === 'qty' }"
-            :disabled="!(selectedType && parseFloat(priceInput) > 0)"
-            @click="selectedType && parseFloat(priceInput) > 0 && goToTab('qty')"
-          >
-            <span class="step-num">3</span>
-            <span class="step-label">Qty</span>
-            <span class="step-val">× {{ qtyInput }}</span>
-          </button>
-        </div>
-
-        <!-- Step 1: Type -->
-        <div v-show="activeTab === 'type'" class="tab-pane">
-          <div class="type-search">
-            <span class="search-icon">🔍</span>
-            <input
-              ref="searchRef"
-              v-model="typeSearch"
-              type="text"
-              placeholder="Search product type… / ค้นหาประเภทสินค้า"
-              @keyup.enter="selectFirstMatch"
-            />
-            <button v-if="typeSearch" class="clear-search" @click="typeSearch = ''">✕</button>
-          </div>
-          <div class="type-chips">
-            <button
-              v-for="type in filteredTypes"
-              :key="type"
-              class="chip"
-              :class="{ active: selectedType === type }"
-              @click="selectType(type)"
-            >
-              {{ type }}
-            </button>
-            <p v-if="filteredTypes.length === 0" class="no-match">
-              No type matches “{{ typeSearch }}”.
-            </p>
+          <div role="group" aria-label="Language" class="adm-seg">
+            <button type="button" class="adm-seg-btn is-lang" :class="{ 'is-on': !isThai }" :aria-pressed="!isThai" @click="setLang('en')">EN</button>
+            <button type="button" class="adm-seg-btn is-lang" :class="{ 'is-on': isThai }" :aria-pressed="isThai" @click="setLang('th')">ไทย</button>
           </div>
         </div>
+      </div>
 
-        <!-- Step 2: Price -->
-        <div v-show="activeTab === 'price'" class="tab-pane">
-          <p class="entry-summary">{{ selectedType }}</p>
-          <label class="field-label">Price (฿)</label>
-          <input
-            ref="priceRef"
-            v-model="priceInput"
-            class="big-input"
-            type="number"
-            min="0"
-            step="0.01"
-            inputmode="decimal"
-            placeholder="0.00"
-            @keyup.enter="confirmPrice"
-          />
-          <div class="pane-nav">
-            <button class="ghost" @click="goToTab('type')">← Type</button>
-            <button class="primary" :disabled="!(parseFloat(priceInput) > 0)" @click="confirmPrice">
-              Qty →
-            </button>
-          </div>
-        </div>
-
-        <!-- Step 3: Qty -->
-        <div v-show="activeTab === 'qty'" class="tab-pane">
-          <p class="entry-summary">{{ selectedType }} · {{ formatPrice(parseFloat(priceInput) || 0) }}</p>
-          <label class="field-label">Quantity</label>
-          <div class="qty-entry">
-            <button class="qty-btn big" @click="decQty">−</button>
-            <input
-              ref="qtyRef"
-              v-model.number="qtyInput"
-              class="big-input qty-num"
-              type="number"
-              min="1"
-              inputmode="numeric"
-              @keyup.enter="addToCart"
-            />
-            <button class="qty-btn big" @click="incQty">+</button>
-          </div>
-          <p class="line-preview">
-            = {{ formatPrice((parseFloat(priceInput) || 0) * (parseInt(qtyInput) || 1)) }}
-          </p>
-          <div class="pane-nav">
-            <button class="ghost" @click="goToTab('price')">← Price</button>
-            <button class="add-btn full" @click="addToCart">Add to Cart</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- Right: cart + actions, then QR -->
-      <div class="right-col">
-        <section class="panel cart-panel">
-          <div class="cart">
-            <h2>Cart</h2>
-            <p v-if="cart.length === 0" class="empty">No items yet.</p>
-            <ul v-else>
-              <li v-for="item in cart" :key="item.id">
-                <span class="cart-type">{{ item.product_type }}</span>
-                <span class="cart-unit">{{ formatPrice(item.input_price) }} × {{ item.quantity }}</span>
-                <span class="cart-price">{{ formatPrice(item.input_price * item.quantity) }}</span>
-                <button class="remove" @click="removeFromCart(item.id)">✕</button>
-              </li>
-            </ul>
-            <div class="total-row">
-              <span>Total</span>
-              <span class="total-amount">{{ formatPrice(total) }}</span>
+      <div class="cs-grid">
+        <!-- LEFT: entry / checkout / done, then today's sales -->
+        <div class="cs-main">
+          <!-- ENTRY -->
+          <section v-if="stage === 'entry'" class="cs-card cs-pad">
+            <div class="cs-fields">
+              <div>
+                <label for="cs-type" class="cs-label"><span class="cs-num" :class="{ 'is-active': focus === 'type', 'is-done': picked }">1</span>{{ t.fType }}</label>
+                <input
+                  id="cs-type"
+                  class="cs-in"
+                  :class="{ 'is-done': picked }"
+                  autocomplete="off"
+                  role="combobox"
+                  :aria-expanded="!picked"
+                  :aria-controls="picked ? null : 'cs-types'"
+                  :placeholder="t.typePh"
+                  :value="q"
+                  @input="onQ"
+                  @keydown="onTypeKey"
+                  @focus="focus = 'type'"
+                />
+              </div>
+              <div>
+                <label for="cs-price" class="cs-label"><span class="cs-num" :class="{ 'is-active': focus === 'price', 'is-done': priceNum > 0 }">2</span>{{ t.fPrice }}</label>
+                <input
+                  id="cs-price"
+                  class="cs-in cs-nums"
+                  :class="{ 'is-done': priceNum > 0 }"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  placeholder="0"
+                  :value="price"
+                  @input="onPrice"
+                  @keydown="onPriceKey"
+                  @focus="focus = 'price'"
+                />
+                <div v-if="lastPrice" class="cs-sub">{{ t.lastPrice(money(lastPrice)) }}</div>
+              </div>
+              <div>
+                <label for="cs-qty" class="cs-label"><span class="cs-num" :class="{ 'is-active': focus === 'qty', 'is-done': priceNum > 0 && qtyNum > 0 }">3</span>{{ t.fQty }}</label>
+                <input
+                  id="cs-qty"
+                  class="cs-in cs-nums"
+                  :class="{ 'is-done': priceNum > 0 && qtyNum > 0 }"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  :value="qty"
+                  @input="onQty"
+                  @keydown="onQtyKey"
+                  @focus="focus = 'qty'"
+                />
+              </div>
             </div>
-          </div>
 
-          <div class="actions">
-            <button class="ghost" :disabled="cart.length === 0" @click="printReceipt">
-              Print Receipt
+            <div class="cs-addrow">
+              <div class="cs-preview" :class="{ 'is-ready': previewReady }">{{ previewLine }}</div>
+              <button type="button" class="adm-btn adm-btn-primary" :disabled="addOff" @click="addLine()">
+                {{ t.add }} <kbd class="cs-kbd is-inverse">↵</kbd>
+              </button>
+            </div>
+
+            <div v-if="!picked" id="cs-types" role="listbox" class="cs-types">
+              <template v-if="searching">
+                <div class="cs-types-head">
+                  <div class="cs-sub">{{ t.matches }} · <kbd class="cs-kbd">↑</kbd> <kbd class="cs-kbd">↓</kbd> {{ t.toChoose }}, <kbd class="cs-kbd">↵</kbd> {{ t.toPick }}</div>
+                  <button type="button" class="adm-btn cs-btn-small cs-add-name" @click="openNameDialog">+ {{ t.addName }}</button>
+                </div>
+                <div class="cs-chips cs-chips-scroll">
+                  <button
+                    v-for="(c, i) in list"
+                    :key="c.name"
+                    type="button"
+                    role="option"
+                    class="cs-chip"
+                    :class="{ 'is-hl': i === hlIndex }"
+                    :aria-selected="i === hlIndex"
+                    @click="pickType(c)"
+                  >{{ c.name }}<span v-if="c.sc" class="cs-chip-sc">{{ c.sc }}</span><span v-if="c.custom" class="cs-chip-new">{{ t.newBadge }}</span></button>
+                </div>
+                <div v-if="list.length === 0" class="cs-nomatch">{{ t.noMatchAdd(q) }}</div>
+              </template>
+              <template v-else>
+                <div class="cs-types-head">
+                  <div class="cs-eyebrow">{{ t.frequent }}</div>
+                  <button type="button" class="adm-btn cs-btn-small cs-add-name" @click="openNameDialog">+ {{ t.addName }}</button>
+                </div>
+                <div class="cs-chips">
+                  <button v-for="c in frequent" :key="c.name" type="button" role="option" class="cs-chip" @click="pickType(c)">{{ c.name }}</button>
+                </div>
+              </template>
+            </div>
+
+            <div class="cs-keys">
+              <span v-for="(k, i) in keyHints" :key="i"><kbd class="cs-kbd">{{ k[0] }}</kbd> {{ k[1] }}</span>
+            </div>
+          </section>
+
+          <!-- CHECKOUT -->
+          <section v-if="stage === 'checkout'" id="cs-checkout" tabindex="-1" class="cs-card cs-pad cs-bare">
+            <div class="cs-preview-head">
+              <div>
+                <h2 class="cs-h2 adm-serif">{{ t.checkReceipt }}</h2>
+                <div class="adm-sub">{{ t.checkReceiptSub }}</div>
+              </div>
+              <div class="cs-copy-tags">
+                <span class="cs-tag">{{ t.shopCopy }} · {{ t.alwaysThai }}</span>
+                <span class="cs-tag is-on">{{ t.customerCopy }} · {{ copyLang === 'en' ? t.langEnglish : t.langThai }}</span>
+              </div>
+            </div>
+            <div ref="wrapEl" class="cs-sheet-wrap" :style="{ height: sheetHeight ? `${sheetHeight}px` : undefined }">
+              <div ref="sheetEl" class="cs-sheet" :style="{ width: `${SHEET_W}px`, transform: `translate(${sheetLeft}px, ${SHEET_MAT}px) scale(${sheetScale})` }">
+                <CashReceipt :receipt="previewReceipt" :copy-lang="copyLang" />
+              </div>
+            </div>
+            <div class="cs-sub">{{ t.refNote }}</div>
+          </section>
+
+          <!-- DONE -->
+          <section v-if="stage === 'done' && lastSale" id="cs-done" tabindex="-1" class="cs-card cs-pad cs-bare cs-done">
+            <div class="cs-done-head">
+              <span class="cs-tick" aria-hidden="true">✓</span>
+              <div>
+                <h2 class="cs-h2 adm-serif">{{ t.saved }}</h2>
+                <div class="cs-muted">{{ lastSale.ref }} · {{ new Date(lastSale.savedAt).toLocaleString() }}</div>
+              </div>
+            </div>
+            <div class="cs-done-figures">
+              <div>
+                <div class="adm-sub">{{ t.total }}</div>
+                <div class="cs-big adm-serif cs-nums">{{ money(lastSale.total) }}</div>
+              </div>
+              <template v-if="lastSale.received > 0">
+                <div>
+                  <div class="adm-sub">{{ t.received }}</div>
+                  <div class="cs-mid cs-nums">{{ money(lastSale.received) }}</div>
+                </div>
+                <div>
+                  <div class="adm-sub">{{ t.change }}</div>
+                  <div class="cs-mid cs-nums cs-ok">{{ money(changeDue(lastSale.received, lastSale.total)) }}</div>
+                </div>
+              </template>
+            </div>
+            <div class="cs-buttons">
+              <button type="button" class="adm-btn adm-btn-primary cs-btn-big" @click="newSale">{{ t.newSale }} <kbd class="cs-kbd is-inverse">↵</kbd></button>
+              <button type="button" class="adm-btn cs-btn-big" @click="reprint(lastSale)">{{ t.reprint }} <kbd class="cs-kbd">R</kbd></button>
+            </div>
+          </section>
+        </div>
+
+        <!-- RIGHT: cart (sticky) and QR -->
+        <aside class="cs-aside" :class="{ 'is-checkout': stage === 'checkout' }">
+          <!-- CHECKOUT: language, note, change, then print -->
+          <section v-if="stage === 'checkout'" class="cs-card cs-pad-cart cs-pay">
+            <div class="cs-pay-total">
+              <b>{{ t.total }}</b>
+              <b class="cs-total-amount adm-serif cs-nums">{{ money(total) }}</b>
+            </div>
+
+            <div class="cs-block">
+              <div class="cs-label-plain" id="cs-lang-label">{{ t.copyLang }}</div>
+              <div role="group" aria-labelledby="cs-lang-label" class="adm-seg cs-seg-wide">
+                <button type="button" class="adm-seg-btn" :class="{ 'is-on': copyLang === 'th' }" :aria-pressed="copyLang === 'th'" @click="setCopyLang('th')">{{ t.langThai }}</button>
+                <button type="button" class="adm-seg-btn" :class="{ 'is-on': copyLang === 'en' }" :aria-pressed="copyLang === 'en'" @click="setCopyLang('en')">{{ t.langEnglish }}</button>
+              </div>
+              <div class="cs-sub">{{ t.copyLangHelp }}</div>
+            </div>
+
+            <div class="cs-block">
+              <label for="cs-note" class="cs-label-plain">{{ t.note }} <span class="cs-opt">· {{ t.optional }}</span></label>
+              <input id="cs-note" v-model="note" class="cs-in cs-in-small" autocomplete="off" :placeholder="t.notePh" />
+            </div>
+
+            <div class="cs-block cs-cash">
+              <label for="cs-recv" class="cs-label-plain">{{ t.received }} <span class="cs-opt">· {{ t.optional }}</span></label>
+              <div class="cs-pair">
+                <input id="cs-recv" class="cs-in cs-in-small cs-nums" inputmode="decimal" autocomplete="off" placeholder="0" :value="received" @input="onReceived" />
+                <div class="cs-change" :class="{ 'is-ok': paidInFull }">
+                  <span class="cs-small">{{ t.change }}</span>
+                  <span class="cs-change-amount adm-serif cs-nums">{{ money(change) }}</span>
+                </div>
+              </div>
+              <div class="cs-chips cs-quick">
+                <button v-for="c in quick" :key="c.label" type="button" class="cs-chip" @click="received = String(c.value)">{{ c.label }}</button>
+              </div>
+              <div class="cs-sub">{{ t.receivedHelp }}</div>
+            </div>
+
+            <div v-if="saveError !== null" class="adm-error cs-save-error" role="alert">{{ t.saveFailed }} {{ saveError }}</div>
+
+            <button type="button" class="adm-btn adm-btn-primary cs-main-btn" :disabled="mainOff" @click="confirmSale">
+              {{ saving ? t.saving : t.printSave }} <kbd v-if="!saving" class="cs-kbd is-inverse">↵</kbd>
             </button>
-          </div>
-        </section>
+            <button type="button" class="adm-btn cs-back-btn" :disabled="saving" @click="backToItems">{{ t.backItems }} <kbd class="cs-kbd">Esc</kbd></button>
+            <div class="cs-main-hint">{{ t.confirmNote }}</div>
+          </section>
 
-        <!-- Live QR -->
-        <section class="panel qr-panel">
-          <h2>PromptPay QR</h2>
-          <p v-if="!qrDataUrl" class="empty">Add items to generate a QR code.</p>
-          <template v-else>
-            <img :src="qrDataUrl" alt="PromptPay QR code" class="qr-img" />
-            <p class="qr-amount">{{ formatPrice(total) }}</p>
-            <p class="qr-hint">Scan to pay {{ SHOP_NAME }}</p>
-          </template>
-        </section>
+          <section v-else class="cs-card cs-pad-cart">
+            <div class="cs-cart-head">
+              <h2 class="cs-h3 adm-serif">{{ saleOver ? t.sold : t.cart }}</h2>
+              <span v-if="pieces" class="adm-sub">{{ t.cartCount(shownItems.length, pieces) }}</span>
+            </div>
+
+            <div v-if="shownItems.length === 0" class="cs-empty">{{ t.noItems }}</div>
+
+            <div class="cs-lines">
+              <div v-for="l in shownItems" :key="l.k" class="cs-row cs-line">
+                <div class="cs-line-name">
+                  <div class="cs-line-title">{{ l.name }}</div>
+                  <div class="cs-nums cs-line-unit">{{ money(l.price) }} {{ t.each }}</div>
+                </div>
+                <div v-if="editable" class="cs-stepper">
+                  <button type="button" class="cs-sq" :aria-label="t.minus" @click="stepQty(l, -1)">−</button>
+                  <span class="cs-nums cs-stepper-qty">{{ l.qty }}</span>
+                  <button type="button" class="cs-sq" :aria-label="t.plus" @click="stepQty(l, 1)">+</button>
+                </div>
+                <span v-else class="cs-nums cs-fixed-qty">× {{ l.qty }}</span>
+                <b class="cs-nums cs-line-total">{{ money(lineTotal(l)) }}</b>
+                <div v-if="editable" class="cs-line-actions">
+                  <button type="button" class="cs-sq is-edit" :aria-label="t.edit" :title="t.edit" @click="editLine(l)">✎</button>
+                  <button type="button" class="cs-sq is-remove" :aria-label="t.remove" :title="t.remove" @click="dropLine(l)">✕</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="cs-total-row">
+              <b>{{ t.total }}</b>
+              <b class="cs-total-amount adm-serif cs-nums">{{ money(total) }}</b>
+            </div>
+
+            <button type="button" class="adm-btn adm-btn-primary cs-main-btn" :disabled="mainOff" @click="mainAction">
+              {{ mainLabel }} <kbd class="cs-kbd is-inverse">↵</kbd>
+            </button>
+            <div class="cs-main-hint">{{ mainHint }}</div>
+          </section>
+
+          <section v-if="stage === 'entry' && total > 0 && qrDataUrl" class="cs-card cs-qr">
+            <div class="cs-qr-head"><span>PromptPay</span><span class="cs-nums cs-brand">{{ money(total) }}</span></div>
+            <img :src="qrDataUrl" alt="PromptPay QR" class="cs-qr-img" />
+            <div class="cs-small">{{ t.scan }}</div>
+          </section>
+        </aside>
       </div>
     </div>
 
-    <!-- Finalize Sale: full-width bar at the bottom of the page -->
-    <div class="finalize-bar no-print">
-      <p v-if="savedOrderId" class="success">Sale saved. Order ID: {{ savedOrderId }}</p>
-      <p v-if="saveError" class="error">{{ saveError }}</p>
-      <button class="primary finalize-btn" :disabled="cart.length === 0 || isSaving" @click="finalizeSale">
-        {{ isSaving ? 'Saving…' : `Finalize Sale · ${formatPrice(total)}` }}
-      </button>
-    </div>
+    <div v-if="panelOpen" class="cs-scrim is-side no-print" @mousedown.self="closePanel">
+      <aside id="cs-records" class="cs-drawer" role="dialog" aria-modal="true" aria-labelledby="cs-records-title">
+        <div class="cs-drawer-head">
+          <h2 id="cs-records-title" class="cs-h2 adm-serif">{{ t.records }}</h2>
+          <button id="cs-records-close" type="button" class="adm-btn cs-btn-small" @click="closePanel">{{ t.close }} <kbd class="cs-kbd">Esc</kbd></button>
+        </div>
+    <!-- TODAY'S SALES -->
+    <section class="cs-card cs-pad-sm cs-panel-sec">
+      <div class="cs-today-head">
+        <div>
+          <h2 class="cs-h3 adm-serif">{{ t.today }}</h2>
+          <div class="adm-sub">{{ salesOffline ? t.salesOffline : t.todayNote }}</div>
+        </div>
+        <div v-if="todays.length" class="cs-muted">{{ t.salesSummary(todays.length, money(salesTotal(todays))) }}</div>
+      </div>
+      <div v-if="todays.length === 0" class="cs-empty">{{ t.noSales }}</div>
+      <div v-for="row in todayRows" :key="row.sale.ref" class="cs-row cs-sale">
+        <div class="cs-sale-ref">
+          <div class="cs-strong">{{ row.sale.ref }}</div>
+          <div class="adm-sub">{{ row.time }} · {{ t.pcs(row.pieces) }}</div>
+        </div>
+        <span class="cs-sale-note">{{ row.sale.note }}</span>
+        <b class="cs-nums cs-right">{{ money(row.sale.total) }}</b>
+        <button type="button" class="adm-btn cs-btn-small" @click="reprint(row.sale)">{{ t.reprint }}</button>
+      </div>
+    </section>
 
-    <!-- Receipt (hidden on screen, shown only when printing).
-         Two copies side by side on landscape A4: left has the QR, right does not. -->
-    <div class="receipt">
-      <div v-for="(isMerchant, idx) in [true, false]" :key="idx" class="receipt-copy">
-        <h3 class="r-title">
-          {{ isMerchant ? 'MERCHANT COPY / สำเนาสำหรับร้านค้า' : 'CUSTOMER COPY / สำเนาสำหรับลูกค้า' }}
-        </h3>
-        <hr />
-        <p class="r-meta">{{ receiptInvoice }} | {{ receiptDate }}</p>
-        <hr />
-
-        <!-- blank area for staff to jot extra info by hand (merchant copy only) -->
-        <div v-if="isMerchant" class="r-note"><span class="r-note-label">บันทึก / Notes</span></div>
-
-        <table class="r-table">
-          <thead>
-            <tr>
-              <th class="r-col-item">รายการ / สินค้า</th>
-              <th class="r-col-qty">จำนวน</th>
-              <th class="r-col-price">ราคาต่อหน่วย</th>
-              <th class="r-col-amt">จำนวนเงิน</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in cart" :key="item.id">
-              <td class="r-col-item">{{ item.product_type }}</td>
-              <td class="r-col-qty">{{ item.quantity }}</td>
-              <td class="r-col-price">{{ formatPrice(item.input_price) }}</td>
-              <td class="r-col-amt">{{ formatPrice(item.input_price * item.quantity) }}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div class="r-bottom">
-          <hr />
-          <!-- Merchant copy: subtotal, grand total, payment status, internal note -->
-          <template v-if="isMerchant">
-            <p class="r-line r-grand"><span>ยอดสุทธิ:</span><span>{{ formatPrice(total) }}</span></p>
-            <div class="r-payment">
-              <p class="r-payment-title">สถานะการชำระเงิน:</p>
-              <p class="r-check-line"><span class="r-box"></span> Cash / เงินสด</p>
-              <p class="r-check-line"><span class="r-box"></span> PromptPay / โอนเงิน (DYNAMIC)</p>
-            </div>
-            <p class="r-internal">FOR INTERNAL ACCOUNTING USE</p>
-          </template>
-
-          <!-- Customer copy: total paid, scan-to-pay QR, thank you -->
-          <template v-else>
-            <p class="r-line r-grand"><span>ยอดชำระทั้งหมด:</span><span>{{ formatPrice(total) }}</span></p>
-            <p class="r-scan-title">SCAN TO PAY (PROMPTPAY)</p>
-            <img v-if="qrDataUrl" :src="qrDataUrl" alt="PromptPay QR" class="r-qr" />
-            <p class="r-thanks">ยินดีให้บริการ! / THANK YOU!</p>
-            </template>
+    <!-- NEW PRODUCT NAMES: everything added at the till, to add to the code later -->
+    <section class="cs-card cs-pad-sm cs-panel-sec">
+      <div class="cs-today-head">
+        <div>
+          <h2 class="cs-h3 adm-serif">{{ t.newNames }}</h2>
+          <div class="adm-sub">{{ t.newNamesNote }}</div>
+        </div>
+        <button v-if="nameRows.length" type="button" class="adm-btn cs-btn-small" @click="copyNames">{{ t.copyNames }}</button>
+      </div>
+      <div v-if="nameRows.length === 0" class="cs-empty">{{ t.noNewNames }}</div>
+      <div v-else class="cs-names">
+        <div v-for="r in nameRows" :key="r.name" class="cs-row cs-name-row">
+          <b class="cs-name-text">{{ r.name }}</b>
+          <span class="adm-sub">{{ t.addedAt(r.when) }} · {{ t.usedTimes(r.uses || 0) }}</span>
         </div>
       </div>
+    </section>
+      </aside>
+    </div>
+
+    <div v-if="nameDialog" class="cs-scrim no-print" @mousedown.self="closeNameDialog">
+      <div class="cs-dialog" role="dialog" aria-modal="true" aria-labelledby="cs-dialog-title">
+        <h2 id="cs-dialog-title" class="cs-h2 adm-serif">{{ t.nameDialogTitle }}</h2>
+        <div class="adm-sub">{{ t.nameDialogHelp }}</div>
+        <label for="cs-newname" class="cs-label-plain cs-dialog-label">{{ t.nameLabel }}</label>
+        <input
+          id="cs-newname"
+          v-model="nameDraft"
+          class="cs-in"
+          autocomplete="off"
+          :maxlength="NAME_MAX"
+          :placeholder="t.namePh"
+          @input="nameError = ''"
+          @keydown="onNameKey"
+        />
+        <div v-if="nameError" class="adm-error cs-save-error" role="alert">{{ nameError }}</div>
+        <div class="cs-buttons">
+          <button type="button" class="adm-btn" @click="closeNameDialog">{{ t.nameCancel }} <kbd class="cs-kbd">Esc</kbd></button>
+          <div class="cs-spacer"></div>
+          <button type="button" class="adm-btn adm-btn-primary" @click="confirmName">{{ t.nameConfirm }} <kbd class="cs-kbd is-inverse">↵</kbd></button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="toast" role="status" class="adm-toast no-print" :class="{ 'is-error': toast.error }">
+      <span>{{ toast.message }}</span>
+      <button v-if="toast.undo" type="button" class="adm-toast-undo" @click="undoRemove">{{ t.undo }}</button>
+    </div>
+
+    <!-- What gets printed: the same receipt as the checkout preview, hidden on screen. -->
+    <div class="receipt-print">
+      <CashReceipt :receipt="receipt" :copy-lang="receipt.lang" />
     </div>
   </div>
 </template>
 
 <style scoped>
-.sellcash-page {
-  min-height: 100vh;
-  background: #f4f7f6;
-  padding: 30px;
-  font-family: 'Inter', sans-serif;
-  width: 100%;
-  box-sizing: border-box;
+/* Colours come from the admin tokens on .adm-shell (see assets/admin-ui.css). */
+.cs-screen { display: flex; flex-direction: column; gap: 18px; }
+
+/* --- Step indicator --- */
+.cs-steps { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.cs-step {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 14px 0 6px; border-radius: 999px;
+  font-weight: 500; border: 1px solid var(--adm-border); background: var(--adm-surface); color: var(--adm-muted);
+}
+.cs-step.is-on { font-weight: 600; border-color: var(--adm-brand); background: var(--adm-brand-tint); color: var(--adm-brand-dark); }
+.cs-step-num {
+  display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%;
+  font-size: 12px; font-weight: 700; background: #eeeae3; color: var(--adm-muted);
+}
+.cs-step.is-on .cs-step-num, .cs-step.is-past .cs-step-num { background: var(--adm-brand); color: #fff; }
+
+/* --- Layout --- */
+.cs-grid { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.cs-main { flex: 1 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+.cs-aside {
+  flex: 0 1 460px; min-width: 320px; position: sticky; top: 16px; display: flex; flex-direction: column; gap: 16px;
+}
+.cs-card { background: var(--adm-surface); border: 1px solid var(--adm-border); border-radius: 14px; }
+.cs-pad { padding: 22px; }
+.cs-pad-sm { padding: 18px 22px; }
+.cs-pad-cart { padding: 18px 20px; }
+.cs-bare { outline: none; }
+.cs-nums { font-variant-numeric: tabular-nums; }
+.cs-sub { margin-top: 4px; font-size: 12px; color: var(--adm-muted); }
+.cs-small { font-size: 12px; }
+.cs-muted { color: var(--adm-muted-2); font-size: 13px; }
+.cs-strong { font-weight: 600; }
+.cs-right { text-align: right; }
+.cs-brand { color: var(--adm-brand-dark); }
+.cs-ok { color: var(--adm-ok); }
+.cs-spacer { flex: 1; }
+.cs-h2 { margin: 0; font-size: 22px; font-weight: 700; }
+.cs-h3 { margin: 0; font-size: 18px; font-weight: 700; }
+.cs-big { font-size: 40px; font-weight: 700; line-height: 1.1; color: var(--adm-brand-dark); }
+.cs-mid { font-size: 22px; font-weight: 600; }
+.cs-empty { padding: 18px 0 6px; color: var(--adm-muted); text-align: center; }
+
+/* --- Entry: Type / Price / Qty --- */
+.cs-fields { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, .8fr); gap: 14px; align-items: start; }
+.cs-label { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 600; font-size: 13px; }
+.cs-label-plain { display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px; }
+.cs-opt { font-weight: 400; color: var(--adm-muted); }
+.cs-num {
+  display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%;
+  font-size: 11px; font-weight: 700; background: #eeeae3; color: var(--adm-brand-dark);
+}
+.cs-num.is-active { background: var(--adm-brand-tint); }
+.cs-num.is-done { background: var(--adm-brand); color: #fff; }
+.cs-in {
+  width: 100%; min-height: 56px; padding: 0 14px; border: 1px solid var(--adm-border); background: #fcfbf9;
+  border-radius: 10px; font-weight: 500; font-size: 20px; color: var(--adm-text);
+}
+.cs-in:focus { background: #fff; }
+.cs-in.is-done:not(:focus) { border-color: #d9c7a7; background: #fffaf1; }
+#cs-type.is-done { font-weight: 700; color: var(--adm-brand-dark); }
+.cs-in-small { min-height: 48px; font-size: 16px; }
+
+.cs-addrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; min-height: 44px; }
+.cs-preview { font-size: 14px; color: var(--adm-muted); }
+.cs-preview.is-ready { font-weight: 600; color: var(--adm-brand-dark); }
+
+.cs-types { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--adm-border-soft); }
+.cs-eyebrow { margin-bottom: 6px; font-size: 12px; font-weight: 600; color: var(--adm-muted); text-transform: uppercase; letter-spacing: .05em; }
+.cs-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cs-chips-scroll { max-height: 120px; overflow-y: auto; padding: 2px; margin-top: 8px; }
+.cs-chip {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 12px; border-radius: 999px;
+  border: 1px solid var(--adm-border); background: var(--adm-surface); font-weight: 500; font-size: 14px;
+  color: var(--adm-text); cursor: pointer;
+}
+.cs-chip:hover { border-color: var(--adm-brand); background: #fcf8f1; }
+.cs-chip.is-hl { border-color: var(--adm-brand); background: var(--adm-brand-tint); box-shadow: 0 0 0 2px rgba(140, 106, 63, .25); }
+.cs-chip-sc { font-size: 11px; color: var(--adm-muted); font-weight: 500; }
+.cs-nomatch { padding: 18px; text-align: center; color: var(--adm-muted); }
+.cs-types-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cs-types-head .cs-eyebrow { margin-bottom: 0; }
+.cs-add-name { border-style: dashed; color: var(--adm-brand-dark); }
+.cs-chip-new {
+  padding: 1px 7px; border-radius: 999px; background: var(--adm-brand-tint); color: var(--adm-brand-dark);
+  font-size: 11px; font-weight: 600;
 }
 
-/* --- Login box (mirrors AdminDashboard) --- */
-.login-box {
-  background: white;
-  padding: 40px;
-  border-radius: 24px;
-  text-align: center;
-  max-width: 400px;
-  margin: 100px auto;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+/* --- New product name dialog --- */
+.cs-scrim {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(40, 32, 20, .45);
 }
-.login-box h1 {
-  color: #2d3436;
-  margin-bottom: 10px;
+.cs-dialog {
+  width: min(460px, 100%); padding: 24px; border-radius: 14px; background: var(--adm-surface);
+  border: 1px solid var(--adm-border); box-shadow: 0 20px 60px rgba(40, 32, 20, .3);
 }
-.login-box input {
-  width: 100%;
-  padding: 12px;
-  margin: 20px 0;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  box-sizing: border-box;
+.cs-dialog .cs-in { margin-top: 0; }
+.cs-dialog-label { margin-top: 18px; }
+.cs-records-btn { gap: 8px; }
+.cs-count {
+  min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--adm-brand-tint); color: var(--adm-brand-dark);
+  font-size: 12px; font-weight: 700; text-align: center;
 }
-.login-box button {
-  width: 100%;
-  padding: 12px;
-  background: #8b6f47;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
+.cs-scrim.is-side { justify-content: flex-end; align-items: stretch; padding: 0; }
+.cs-drawer {
+  width: min(460px, 100%); height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;
+  padding: 20px; background: var(--adm-bg); border-left: 1px solid var(--adm-border);
+  box-shadow: -12px 0 40px rgba(40, 32, 20, .18);
+}
+.cs-drawer .cs-sale { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "ref total btn" "note note note"; }
+.cs-drawer .cs-sale-ref { grid-area: ref; }
+.cs-drawer .cs-sale > .cs-right { grid-area: total; }
+.cs-drawer .cs-sale > .adm-btn { grid-area: btn; }
+.cs-drawer .cs-sale-note { grid-area: note; white-space: normal; }
+.cs-drawer .cs-sale-note:empty { display: none; }
+.cs-drawer-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.cs-names { max-height: 260px; overflow-y: auto; margin-top: 8px; }
+.cs-name-row {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  padding: 8px 0; border-top: 1px solid var(--adm-border-soft);
+}
+.cs-name-text { overflow-wrap: anywhere; }
+
+.cs-keys {
+  display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 16px; padding-top: 12px;
+  border-top: 1px solid var(--adm-border-soft); font-size: 12.5px; color: var(--adm-muted-2);
+}
+.cs-kbd {
+  display: inline-block; min-width: 20px; padding: 1px 7px; border: 1px solid #d9d2c5; border-bottom-width: 2px;
+  border-radius: 6px; background: #fff; font-weight: 600; font-size: 12px; color: var(--adm-text-2); text-align: center;
+}
+.cs-kbd.is-inverse { background: rgba(255, 255, 255, .2); border-color: rgba(255, 255, 255, .4); color: #fff; }
+
+/* --- Checkout / done --- */
+.cs-pair { margin-top: 18px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; align-items: stretch; }
+.cs-change { display: flex; flex-direction: column; justify-content: center; padding: 4px 14px; border-radius: 10px; background: #faf8f5; color: var(--adm-muted); }
+.cs-change.is-ok { background: #e3f2ec; color: var(--adm-ok); }
+.cs-change-amount { font-size: 24px; font-weight: 700; line-height: 1.15; }
+.cs-quick { margin-top: 10px; gap: 8px; }
+.cs-save-error { margin-top: 16px; }
+.cs-buttons { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; align-items: center; }
+.cs-btn-big { min-height: 56px; padding: 0 28px; font-size: 16px; }
+.cs-done { border-color: #c9e3d4; padding: 28px; }
+.cs-done-head { display: flex; align-items: center; gap: 14px; }
+.cs-tick {
+  display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 50%;
+  background: #e3f2ec; color: var(--adm-ok); font-size: 26px; font-weight: 700;
+}
+.cs-done .cs-h2 { font-size: 24px; }
+.cs-done-figures { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 20px; }
+.cs-done .cs-big { font-size: 34px; }
+
+/* --- Today's sales --- */
+.cs-today-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.cs-row:hover { background: #fcfaf6; }
+.cs-sale {
+  display: grid; grid-template-columns: minmax(130px, 1.4fr) minmax(0, 1fr) 100px auto; gap: 12px; align-items: center;
+  padding: 6px 0; border-top: 1px solid var(--adm-border-soft); margin-top: 8px;
+}
+.cs-sale-ref { min-width: 0; }
+.cs-sale-note { font-size: 12.5px; color: var(--adm-muted-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-btn-small { min-height: 40px; }
+
+/* --- Cart --- */
+.cs-cart-head { display: flex; justify-content: space-between; align-items: baseline; }
+.cs-lines { max-height: 340px; overflow-y: auto; margin-top: 8px; }
+.cs-line {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 8px; align-items: center;
+  padding: 10px 4px; border-top: 1px solid var(--adm-border-soft);
+}
+.cs-line-name { min-width: 0; }
+.cs-line-title { font-weight: 600; font-size: 16px; line-height: 1.3; }
+.cs-line-unit { font-size: 13.5px; color: var(--adm-muted); }
+.cs-line-total { min-width: 60px; text-align: right; font-size: 16px; }
+.cs-fixed-qty { font-size: 15px; color: var(--adm-muted-2); }
+.cs-stepper { display: inline-flex; align-items: center; gap: 2px; }
+.cs-stepper-qty { min-width: 26px; text-align: center; font-weight: 600; font-size: 16px; }
+.cs-line-actions { display: inline-flex; gap: 2px; }
+.cs-sq {
+  width: 30px; height: 30px; padding: 0; border: 1px solid var(--adm-border); background: var(--adm-surface);
+  border-radius: 8px; font-size: 16px; line-height: 1; cursor: pointer; color: var(--adm-text);
+}
+.cs-sq:hover { border-color: var(--adm-brand); }
+.cs-sq.is-edit { color: var(--adm-brand-dark); font-size: 14px; }
+.cs-sq.is-remove { color: var(--adm-danger); font-size: 13px; }
+.cs-total-row {
+  display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; padding-top: 12px;
+  border-top: 2px solid var(--adm-text); font-size: 15px;
+}
+.cs-total-amount { font-size: 34px; font-weight: 700; color: var(--adm-brand-dark); }
+.cs-main-btn { width: 100%; justify-content: center; margin-top: 14px; min-height: 56px; font-size: 16px; }
+.cs-main-hint { margin-top: 8px; font-size: 12px; color: var(--adm-muted); text-align: center; }
+
+/* --- QR --- */
+.cs-qr { padding: 16px 20px; text-align: center; }
+.cs-qr-head { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: 600; font-size: 13px; }
+.cs-qr-img {
+  width: 196px; height: 196px; display: block; margin: 0 auto 8px; padding: 8px; box-sizing: border-box;
+  border: 1px solid var(--adm-border); border-radius: 10px; background: #fff;
+}
+.cs-qr .cs-small { color: var(--adm-muted-2); }
+
+@media (max-width: 640px) {
+  .cs-fields, .cs-pair { grid-template-columns: 1fr; }
+  .cs-sale { grid-template-columns: minmax(0, 1fr) auto; }
+  .cs-sale-note { display: none; }
+  .cs-aside { position: static; flex-basis: 100%; min-width: 0; }
+  .cs-big { font-size: 34px; }
 }
 
-/* --- POS layout --- */
-.pos-grid {
-  display: grid;
-  grid-template-columns: 1fr 340px;
-  gap: 24px;
-  max-width: 1100px;
-  margin: 0 auto;
-  align-items: start;
+/* --- Checkout: receipt preview --- */
+.cs-preview-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.cs-copy-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.cs-tag {
+  display: inline-flex; align-items: center; min-height: 28px; padding: 0 12px; border-radius: 999px;
+  border: 1px solid var(--adm-border); background: var(--adm-surface); font-size: 12.5px; font-weight: 500; color: var(--adm-muted);
 }
-.right-col {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+.cs-tag.is-on { border-color: var(--adm-brand); background: var(--adm-brand-tint); color: var(--adm-brand-dark); font-weight: 600; }
+/* a desk-coloured mat with the sheet on it; the sheet keeps its printed size and is scaled down to fit */
+.cs-sheet-wrap {
+  position: relative; overflow: hidden; padding: 0; border-radius: 10px;
+  background: var(--adm-border-soft); border: 1px solid var(--adm-border);
 }
-.panel {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-}
-.title {
-  color: #2d3436;
-  margin: 0 0 20px;
+.cs-sheet {
+  box-sizing: border-box; padding: 8mm; background: #fff; transform-origin: top left;
+  box-shadow: 0 1px 2px rgba(60, 45, 20, .12), 0 8px 24px rgba(60, 45, 20, .10);
 }
 
-/* --- Step tabs (Type / Price / Qty) --- */
-.step-tabs {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-bottom: 20px;
-}
-.step-tab {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 10px 6px;
-  border: 1px solid #e1e8ed;
-  border-radius: 12px;
-  background: #fafafa;
-  cursor: pointer;
-  transition: all 0.15s;
-  min-width: 0;
-}
-.step-tab:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-.step-tab.active {
-  background: #8b6f47;
-  border-color: #8b6f47;
-  color: #fff;
-}
-.step-tab.done:not(.active) {
-  border-color: #8b6f47;
-  background: #f6f1ea;
-}
-.step-num {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
-}
-.step-tab.active .step-num {
-  background: rgba(255, 255, 255, 0.25);
-}
-.step-label {
-  font-size: 13px;
-  font-weight: 600;
-}
-.step-val {
-  font-size: 11px;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  opacity: 0.85;
-}
+/* --- Checkout: payment column --- */
+.cs-aside.is-checkout { flex-basis: 400px; }
+.cs-pay-total { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 14px; border-bottom: 2px solid var(--adm-text); }
+.cs-block { margin-top: 16px; }
+.cs-seg-wide { display: flex; width: 100%; margin-bottom: 0; }
+.cs-seg-wide .adm-seg-btn { flex: 1; justify-content: center; min-height: 44px; font-size: 15px; }
+.cs-block .cs-sub { margin-top: 6px; }
+.cs-cash { padding-top: 16px; border-top: 1px solid var(--adm-border-soft); }
+.cs-cash .cs-pair { margin-top: 0; }
+.cs-back-btn { width: 100%; justify-content: center; margin-top: 10px; }
 
-/* --- Tab panes --- */
-.tab-pane {
-  min-height: 260px;
-}
-.entry-summary {
-  font-size: 15px;
-  font-weight: 700;
-  color: #8b6f47;
-  margin: 0 0 4px;
-}
-.big-input {
-  width: 100%;
-  padding: 16px;
-  border: 1px solid #ddd;
-  border-radius: 12px;
-  font-size: 26px;
-  font-weight: 700;
-  text-align: center;
-  box-sizing: border-box;
-}
-.big-input:focus {
-  outline: none;
-  border-color: #8b6f47;
-  box-shadow: 0 0 0 3px rgba(139, 111, 71, 0.12);
-}
-.qty-entry {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.qty-entry .qty-num {
-  flex: 1;
-}
-.qty-btn.big {
-  width: 56px;
-  height: 56px;
-  font-size: 28px;
-  border-radius: 12px;
-  flex-shrink: 0;
-}
-.line-preview {
-  text-align: center;
-  font-size: 18px;
-  font-weight: 700;
-  color: #2d3436;
-  margin: 14px 0;
-}
-.pane-nav {
-  display: flex;
-  gap: 12px;
-  margin-top: 18px;
-}
-.pane-nav button {
-  flex: 1;
-  padding: 14px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 15px;
-}
-.pane-nav button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.add-btn.full {
-  flex: 1.4;
-}
-.field-label {
-  display: block;
-  font-weight: 600;
-  color: #636e72;
-  margin: 16px 0 8px;
-  font-size: 14px;
-}
-.selected-pill {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 4px 16px;
-  background: #8b6f47;
-  color: #fff;
-  border-radius: 999px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  vertical-align: middle;
-}
-
-.type-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-  margin-bottom: 12px;
-}
-.type-search .search-icon {
-  position: absolute;
-  left: 12px;
-  font-size: 14px;
-  opacity: 0.6;
-  pointer-events: none;
-}
-.type-search input {
-  width: 100%;
-  padding: 11px 36px 11px 36px;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  font-size: 15px;
-  box-sizing: border-box;
-}
-.type-search input:focus {
-  outline: none;
-  border-color: #8b6f47;
-  box-shadow: 0 0 0 3px rgba(139, 111, 71, 0.12);
-}
-.clear-search {
-  position: absolute;
-  right: 8px;
-  width: 24px;
-  height: 24px;
-  border: none;
-  background: #eceae6;
-  color: #636e72;
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.clear-search:hover {
-  background: #ddd9d2;
-}
-
-.type-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  max-height: 200px;
-  overflow-y: auto;
-  padding: 4px;
-  border: 1px solid #f1f2f6;
-  border-radius: 10px;
-  background: #fcfcfb;
-}
-.no-match {
-  color: #b2bec3;
-  font-style: italic;
-  margin: 8px;
-  width: 100%;
-}
-.chip {
-  padding: 10px 16px;
-  border: 1px solid #e1e8ed;
-  border-radius: 999px;
-  background: #fafafa;
-  color: #2d3436;
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 0.8rem;
-}
-.chip:hover {
-  background: #ffcb835b;
-}
-.chip.active {
-  background: #8b6f47;
-  color: white;
-}
-.price-row {
-  display: flex;
-  gap: 10px;
-}
-.price-row input {
-  flex: 1;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 16px;
-}
-.add-btn {
-  padding: 12px 18px;
-  background: #2d3436;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.cart {
-  margin-top: 0;
-}
-.cart h2 {
-  margin-top: 0;
-  font-size: 18px;
-  color: #2d3436;
-}
-.cart .empty,
-.qr-panel .empty {
-  color: #b2bec3;
-  font-style: italic;
-}
-.cart ul {
-  list-style: none;
-  padding: 0;
-  margin: 12px 0;
-}
-.cart li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid #f1f2f6;
-}
-.cart-type {
-  flex: 1;
-  color: #2d3436;
-}
-.cart-unit {
-  color: #b2bec3;
-  font-size: 13px;
-  min-width: 56px;
-  text-align: right;
-}
-.qty-controls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.qty-btn {
-  width: 26px;
-  height: 26px;
-  border: 1px solid #e1e8ed;
-  background: #fafafa;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-  color: #2d3436;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.qty-btn:hover {
-  background: #f1f2f6;
-}
-.qty-value {
-  min-width: 22px;
-  text-align: center;
-  font-weight: 600;
-  color: #2d3436;
-}
-.cart-price {
-  font-weight: 600;
-  color: #2d3436;
-  min-width: 64px;
-  text-align: right;
-}
-.remove {
-  background: none;
-  border: none;
-  color: #ff7675;
-  cursor: pointer;
-  font-size: 16px;
-}
-.total-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 2px solid #2d3436;
-  font-weight: 700;
-  font-size: 18px;
-  color: #2d3436;
-}
-.total-amount {
-  color: #8b6f47;
-}
-
-.actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-}
-.actions button {
-  flex: 1;
-  padding: 14px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  border: none;
-}
-.actions button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.ghost {
-  background: #f1f2f6;
-  color: #2d3436;
-}
-.primary {
-  background: #00b894;
-  color: white;
-}
-
-.success {
-  color: #00b894;
-  font-weight: 600;
-  margin-top: 16px;
-}
-.error {
-  color: #d63031;
-  font-weight: 600;
-  margin-top: 16px;
-}
-
-/* --- Finalize bar (bottom of page) --- */
-.finalize-bar {
-  max-width: 1100px;
-  margin: 24px auto 0;
-  text-align: center;
-}
-.finalize-bar .success,
-.finalize-bar .error {
-  margin: 0 0 12px;
-}
-.finalize-btn {
-  width: 100%;
-  padding: 18px;
-  border: none;
-  border-radius: 12px;
-  font-size: 18px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.finalize-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* --- QR panel --- */
-.qr-panel {
-  text-align: center;
-  height: fit-content;
-}
-.qr-panel h2 {
-  color: #2d3436;
-  font-size: 18px;
-}
-.qr-img {
-  width: 240px;
-  max-width: 100%;
-  margin: 12px auto;
-  display: block;
-}
-.qr-amount {
-  font-size: 22px;
-  font-weight: 700;
-  color: #8b6f47;
-  margin: 8px 0 0;
-}
-.qr-hint {
-  color: #636e72;
-  font-size: 13px;
-}
-
-/* --- Receipt: hidden on screen --- */
-.receipt {
+/* --- Receipt: hidden on screen, shown only when printing --- */
+.receipt-print {
   display: none;
-}
-
-@media (max-width: 720px) {
-  .pos-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* --- Print: show ONLY the receipt --- */
@@ -987,8 +1114,9 @@ const formatPrice = (n) => `฿${n.toFixed(2)}`;
     margin: 8mm;
   }
   /* Hide all app chrome with display:none (NOT visibility:hidden) so these
-     elements take up zero space — otherwise the sticky nav, the 100vh page
-     wrapper and the tall footer reserve height and spill onto a blank 2nd page. */
+     elements take up zero space; the sticky nav, the 100vh page wrapper and the
+     tall footer would otherwise spill onto a blank 2nd page. The admin navbar is
+     hidden in assets/admin-ui.css. */
   :global(.NavBar),
   :global(.footer) {
     display: none !important;
@@ -996,164 +1124,14 @@ const formatPrice = (n) => `฿${n.toFixed(2)}`;
   .no-print {
     display: none !important;
   }
-  /* The page wrapper holds the receipt: strip the full-viewport height/padding
-     that was forcing extra pages, but keep it displayed. */
-  .sellcash-page {
+  /* The page wrapper holds the receipt: strip the padding that was forcing
+     extra pages, but keep it displayed. */
+  .cs-page {
     min-height: 0 !important;
     padding: 0 !important;
   }
-  /* full landscape sheet, split into two halves by a dashed center line.
-     min-height stays under the A5-landscape printable area (~132mm) to keep it to one page. */
-  .receipt {
-    display: flex;
-    align-items: stretch;
-    width: 100%;
-    min-height: 128mm;
-    margin: 0;
-    font-family: 'Inter', sans-serif;
-    color: #000;
-    font-size: 13px;
-    box-sizing: border-box;
-  }
-  .receipt-copy {
-    flex: 1 1 50%;
-    width: 50%;
-    padding: 0 16px;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-  }
-  /* blank hand-writing area near the top of each copy */
-  .r-note {
-    border: 1px dashed #999;
-    border-radius: 4px;
-    min-height: 56px;
-    margin: 4px 0 10px;
-    padding: 4px 8px;
-  }
-  .r-note-label {
-    font-size: 9px;
-    color: #666;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  /* totals / payment / QR block: pinned to the bottom so the product
-     table sits cleanly under the note area with open space between */
-  .r-bottom {
-    margin-top: auto;
-  }
-  .receipt-copy:first-child {
-    border-right: 1px dashed #000; /* vertical divider down the middle */
-  }
-  .receipt hr {
-    border: none;
-    border-top: 1px dashed #000;
-    margin: 5px 0;
-  }
-  .r-title {
-    text-align: center;
-    margin: 0 0 2px;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-  }
-  .r-meta {
-    text-align: center;
-    margin: 1px 0;
-    font-size: 10px;
-  }
-  /* line-item table */
-  .r-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-  }
-  .r-table th {
-    text-align: left;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 0 0 4px;
-    border-bottom: 1px solid #000;
-  }
-  .r-table td {
-    padding: 4px 0;
-    vertical-align: top;
-  }
-  .r-col-qty {
-    text-align: center;
-    width: 12%;
-  }
-  .r-col-price,
-  .r-col-amt {
-    text-align: right;
-    width: 22%;
-  }
-  /* totals lines (subtotal / grand total / amount paid) */
-  .r-line {
-    display: flex;
-    justify-content: flex-end;
-    gap: 16px;
-    margin: 3px 0;
-    font-size: 12px;
-  }
-  .r-line > span:first-child {
-    font-weight: 600;
-  }
-  .r-grand {
-    font-weight: 700;
-    font-size: 14px;
-    margin-top: 6px;
-  }
-  /* merchant payment-status block */
-  .r-payment {
-    margin-top: 16px;
-  }
-  .r-payment-title {
-    margin: 0 0 6px;
-    font-size: 12px;
-    font-weight: 600;
-  }
-  .r-check-line {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 5px 0;
-    font-size: 12px;
-  }
-  .r-box {
-    width: 11px;
-    height: 11px;
-    border: 1px solid #000;
-    flex: 0 0 auto;
-  }
-  .r-internal {
-    text-align: center;
-    margin-top: 18px;
-    font-size: 12px;
-    letter-spacing: 0.5px;
-  }
-  /* customer scan-to-pay block */
-  .r-scan-title {
-    text-align: center;
-    font-weight: 700;
-    font-size: 13px;
-    margin: 8px 0 4px;
-  }
-  .r-qr {
+  .receipt-print {
     display: block;
-    width: 96px;
-    margin: 2px auto;
-  }
-  .r-thanks {
-    text-align: center;
-    font-weight: 700;
-    font-size: 13px;
-    margin-top: 5px;
-  }
-  .r-dynamic {
-    text-align: center;
-    font-size: 9px;
-    margin: 0;
   }
 }
 </style>
