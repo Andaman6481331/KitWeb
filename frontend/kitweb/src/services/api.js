@@ -215,6 +215,18 @@ export const api = {
     return await response.json();
   },
 
+  // Tags a cash sale as excluded (or clears the tag). It is only a tag: the sale stays in the database.
+  async setCashSaleExcluded(id, excluded, reason = '') {
+    const response = await fetch(`${API_URL}/cashsales/${encodeURIComponent(id)}/exclude`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': this.getToken() },
+      body: JSON.stringify({ excluded, reason })
+    });
+    if (response.status === 401) throw sessionExpiredError();
+    if (!response.ok) throw new Error(await parseApiError(response, 'Could not update the sale'));
+    return await response.json();
+  },
+
   // The cash sales saved on one day (YYYY-MM-DD, Bangkok time), newest first.
   async listCashSales(day) {
     const response = await fetch(`${API_URL}/cashsales?date=${encodeURIComponent(day)}`, {

@@ -104,6 +104,17 @@ const en = {
   namesCopyFailed: 'Could not copy. Select the names and copy them by hand.',
   usedTimes: (n) => `used ${n}×`,
   addedAt: (when) => `added ${when}`,
+  removeName: 'Remove',
+  removeNameAria: (name) => `Remove the name ${name}`,
+  nameRemoved: (name) => `Removed “${name}” from the list.`,
+
+  exclude: 'Exclude',
+  include: 'Include',
+  excludedTag: 'excluded',
+  showExcluded: (n) => `Show ${n} excluded`,
+  excludedToast: (ref) => `${ref} is tagged as excluded. It stays in the database.`,
+  includedToast: (ref) => `${ref} is counted again.`,
+  excludeFailed: 'Could not update the sale. Try again.',
 };
 
 const th = {
@@ -211,6 +222,17 @@ const th = {
   namesCopyFailed: 'คัดลอกไม่ได้ ให้เลือกชื่อแล้วคัดลอกเอง',
   usedTimes: (n) => `ใช้ ${n} ครั้ง`,
   addedAt: (when) => `เพิ่มเมื่อ ${when}`,
+  removeName: 'ลบ',
+  removeNameAria: (name) => `ลบชื่อ ${name}`,
+  nameRemoved: (name) => `ลบ “${name}” ออกจากรายการแล้ว`,
+
+  exclude: 'ไม่นับ',
+  include: 'นับอีกครั้ง',
+  excludedTag: 'ไม่นับ',
+  showExcluded: (n) => `แสดงรายการที่ไม่นับ ${n} รายการ`,
+  excludedToast: (ref) => `ติดป้าย ${ref} เป็นไม่นับแล้ว ข้อมูลยังอยู่ในฐานข้อมูล`,
+  includedToast: (ref) => `นับ ${ref} อีกครั้งแล้ว`,
+  excludeFailed: 'อัปเดตรายการขายไม่สำเร็จ ลองอีกครั้ง',
 };
 
 export const cashSaleText = (lang) => (lang === 'th' ? th : en);

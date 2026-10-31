@@ -104,10 +104,13 @@ const itemName = (copy, item) => (!copy.merchant && props.copyLang === 'en' ? en
   display: flex;
   align-items: stretch;
   width: 100%;
-  min-height: 128mm;
+  min-height: 139mm; /* A5 landscape is 148mm tall; the print page has an 8mm top margin and none at the bottom */
   margin: 0;
   font-family: 'Inter', sans-serif;
-  color: #000;
+  /* ink colour: dark blue instead of black, so it still prints with a dead black cartridge */
+  --ink: #1e3a8a;
+  --ink-soft: #4a6bd0;
+  color: var(--ink);
   font-size: 13px;
   box-sizing: border-box;
 }
@@ -120,11 +123,15 @@ const itemName = (copy, item) => (!copy.merchant && props.copyLang === 'en' ? en
   flex-direction: column;
 }
 .receipt-copy:first-child {
-  border-right: 1px dashed #000; /* vertical divider down the middle */
+  padding-right: 30px;
+  border-right: 1px dashed var(--ink); /* vertical divider down the middle */
+}
+.receipt-copy:last-child {
+  padding-left: 30px;
 }
 .receipt hr {
   border: none;
-  border-top: 1px dashed #000;
+  border-top: 1px dashed var(--ink);
   margin: 5px 0;
 }
 .r-title {
@@ -143,7 +150,7 @@ const itemName = (copy, item) => (!copy.merchant && props.copyLang === 'en' ? en
 .r-note {
   flex: 1 1 0;
   min-width: 0;
-  border: 1px dashed #999;
+  border: 1px dashed var(--ink-soft);
   border-radius: 4px;
   min-height: 72px;
   margin: 4px 0 10px;
@@ -170,7 +177,7 @@ const itemName = (copy, item) => (!copy.merchant && props.copyLang === 'en' ? en
 }
 .r-note-label {
   font-size: 9px;
-  color: #666;
+  color: var(--ink-soft);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -193,7 +200,7 @@ const itemName = (copy, item) => (!copy.merchant && props.copyLang === 'en' ? en
   font-size: 11px;
   font-weight: 700;
   padding: 0 0 4px;
-  border-bottom: 1px solid #000;
+  border-bottom: 1px solid var(--ink);
 }
 .r-table td {
   padding: 4px 0;
@@ -247,7 +254,7 @@ const itemName = (copy, item) => (!copy.merchant && props.copyLang === 'en' ? en
 .r-box {
   width: 11px;
   height: 11px;
-  border: 1px solid #000;
+  border: 1px solid var(--ink);
   flex: 0 0 auto;
 }
 .r-internal {

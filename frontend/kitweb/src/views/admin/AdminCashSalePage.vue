@@ -16,8 +16,8 @@ import { cashSaleText } from '../../utils/adminCashSaleText';
 import {
   CASH_TYPES, frequentTypes, matchTypes, money, sanitizePrice, sanitizeQty, lineTotal, cartTotal, pieceCount,
   changeDue, quickAmounts, addLine as addToCart, removeLine, setLineQty, restoreLine, salePayload, saleFromRecord, newClientId, localDay,
-  clockTime, readJson, writeJson, pushSale, todaysSales, salesTotal, SALES_KEY, LAST_PRICES_KEY, COPY_LANG_KEY,
-  NEW_NAMES_KEY, NAME_MAX, addNewName, bumpNameUse, customTypes,
+  clockTime, readJson, writeJson, pushSale, todaysSales, countedSales, salesTotal, SALES_KEY, LAST_PRICES_KEY, COPY_LANG_KEY,
+  NEW_NAMES_KEY, NAME_MAX, addNewName, bumpNameUse, customTypes, removeNewName,
 } from '../../utils/adminCashSale';
 
 // ⚠️ Replace with the shop's real PromptPay mobile number (e.g. '0812345678').
@@ -217,7 +217,7 @@ let qrRun = 0;
 
 const makeQr = async (amount) => {
   try {
-    return await QRCode.toDataURL(generatePayload(PROMPTPAY_ID, { amount }), { margin: 1, width: 240 });
+    return await QRCode.toDataURL(generatePayload(PROMPTPAY_ID, { amount }), { margin: 1, width: 240, color: { dark: '#1e3a8a', light: '#ffffff' } });
   } catch {
     return '';
   }
@@ -462,7 +462,35 @@ watch(panelOpen, (open) => {
 
 // --- Today's sales on this till ---
 const todays = computed(() => todaysSales(sales.value));
-const todayRows = computed(() => todays.value.map((sale) => ({
+// Excluded sales are only tagged, so they stay in `todays`; the normal view hides them.
+const showExcluded = ref(false);
+const counted = computed(() => countedSales(todays.value));
+const excludedCount = computed(() => todays.value.length - counted.value.length);
+const shownSales = computed(() => (showExcluded.value ? todays.value : counted.value));
+const excludeBusy = ref('');
+
+const toggleExclude = async (sale) => {
+  excludeBusy.value = sale.orderId;
+  const excluding = !sale.excludedAt;
+  try {
+    const { sale: record } = await api.setCashSaleExcluded(sale.orderId, excluding);
+    sales.value = sales.value.map((s) => (s.orderId === sale.orderId ? saleFromRecord(record) : s));
+    writeJson(SALES_KEY, sales.value);
+    flash(excluding ? t.value.excludedToast(sale.ref) : t.value.includedToast(sale.ref));
+  } catch (e) {
+    if (!handleAuthError(e)) flash(t.value.excludeFailed, 5000, { error: true });
+  } finally {
+    excludeBusy.value = '';
+  }
+};
+
+// Takes a new name off the sidebar list (it is only a list kept on this device).
+const dropName = (name) => {
+  newNames.value = removeNewName(readJson(NEW_NAMES_KEY, newNames.value), name);
+  writeJson(NEW_NAMES_KEY, newNames.value);
+  flash(t.value.nameRemoved(name));
+};
+const todayRows = computed(() => shownSales.value.map((sale) => ({
   sale,
   time: clockTime(new Date(sale.savedAt)),
   pieces: pieceCount(sale.items),
@@ -525,7 +553,7 @@ onBeforeUnmount(() => {
             ><span class="cs-step-num">{{ i + 1 }}</span>{{ label }}</li>
           </ol>
           <button id="cs-records-btn" type="button" class="adm-btn cs-records-btn" :aria-expanded="panelOpen" aria-controls="cs-records" @click="panelOpen = !panelOpen">
-            {{ t.records }}<span class="cs-count">{{ todays.length + newNames.length }}</span>
+            {{ t.records }}<span class="cs-count">{{ counted.length + newNames.length }}</span>
           </button>
           <div role="group" aria-label="Language" class="adm-seg">
             <button type="button" class="adm-seg-btn is-lang" :class="{ 'is-on': !isThai }" :aria-pressed="!isThai" @click="setLang('en')">EN</button>
@@ -792,17 +820,25 @@ onBeforeUnmount(() => {
           <h2 class="cs-h3 adm-serif">{{ t.today }}</h2>
           <div class="adm-sub">{{ salesOffline ? t.salesOffline : t.todayNote }}</div>
         </div>
-        <div v-if="todays.length" class="cs-muted">{{ t.salesSummary(todays.length, money(salesTotal(todays))) }}</div>
+        <div v-if="counted.length" class="cs-muted">{{ t.salesSummary(counted.length, money(salesTotal(counted))) }}</div>
       </div>
-      <div v-if="todays.length === 0" class="cs-empty">{{ t.noSales }}</div>
-      <div v-for="row in todayRows" :key="row.sale.ref" class="cs-row cs-sale">
+      <label v-if="excludedCount" class="cs-show-excluded">
+        <input type="checkbox" v-model="showExcluded" /> {{ t.showExcluded(excludedCount) }}
+      </label>
+      <div v-if="todayRows.length === 0" class="cs-empty">{{ t.noSales }}</div>
+      <div v-for="row in todayRows" :key="row.sale.ref" class="cs-row cs-sale" :class="{ 'is-excluded': row.sale.excludedAt }">
         <div class="cs-sale-ref">
-          <div class="cs-strong">{{ row.sale.ref }}</div>
+          <div class="cs-strong">{{ row.sale.ref }} <span v-if="row.sale.excludedAt" class="cs-tag">{{ t.excludedTag }}</span></div>
           <div class="adm-sub">{{ row.time }} · {{ t.pcs(row.pieces) }}</div>
         </div>
         <span class="cs-sale-note">{{ row.sale.note }}</span>
         <b class="cs-nums cs-right">{{ money(row.sale.total) }}</b>
-        <button type="button" class="adm-btn cs-btn-small" @click="reprint(row.sale)">{{ t.reprint }}</button>
+        <div class="cs-sale-actions">
+          <button type="button" class="adm-btn cs-btn-small" @click="reprint(row.sale)">{{ t.reprint }}</button>
+          <button type="button" class="adm-btn cs-btn-small" :disabled="excludeBusy === row.sale.orderId" @click="toggleExclude(row.sale)">
+            {{ row.sale.excludedAt ? t.include : t.exclude }}
+          </button>
+        </div>
       </div>
     </section>
 
@@ -820,6 +856,7 @@ onBeforeUnmount(() => {
         <div v-for="r in nameRows" :key="r.name" class="cs-row cs-name-row">
           <b class="cs-name-text">{{ r.name }}</b>
           <span class="adm-sub">{{ t.addedAt(r.when) }} · {{ t.usedTimes(r.uses || 0) }}</span>
+          <button type="button" class="adm-btn cs-btn-small cs-name-remove" :aria-label="t.removeNameAria(r.name)" @click="dropName(r.name)">{{ t.removeName }}</button>
         </div>
       </div>
     </section>
@@ -975,7 +1012,16 @@ onBeforeUnmount(() => {
 .cs-drawer .cs-sale { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "ref total btn" "note note note"; }
 .cs-drawer .cs-sale-ref { grid-area: ref; }
 .cs-drawer .cs-sale > .cs-right { grid-area: total; }
-.cs-drawer .cs-sale > .adm-btn { grid-area: btn; }
+.cs-drawer .cs-sale > .cs-sale-actions { grid-area: btn; }
+.cs-sale-actions { display: flex; gap: 6px; }
+.cs-sale.is-excluded .cs-sale-ref, .cs-sale.is-excluded .cs-right, .cs-sale.is-excluded .cs-sale-note { opacity: .55; }
+.cs-sale.is-excluded .cs-right { text-decoration: line-through; }
+.cs-tag {
+  display: inline-block; margin-left: 4px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  background: #eeeae3; color: var(--adm-muted);
+}
+.cs-show-excluded { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; color: var(--adm-muted); }
+.cs-name-remove { margin-left: auto; }
 .cs-drawer .cs-sale-note { grid-area: note; white-space: normal; }
 .cs-drawer .cs-sale-note:empty { display: none; }
 .cs-drawer-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
@@ -1111,7 +1157,7 @@ onBeforeUnmount(() => {
 @media print {
   @page {
     size: A5 landscape;
-    margin: 8mm;
+    margin: 8mm 8mm 0;
   }
   /* Hide all app chrome with display:none (NOT visibility:hidden) so these
      elements take up zero space; the sticky nav, the 100vh page wrapper and the

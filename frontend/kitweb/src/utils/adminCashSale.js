@@ -118,6 +118,9 @@ export const saleFromRecord = (r) => ({
   received: r.received_amount || 0,
   note: r.note || '',
   copyLang: r.copy_lang === 'en' ? 'en' : 'th',
+  // set when staff tagged the sale as excluded (it stays in the database)
+  excludedAt: r.excluded_at || null,
+  excludeReason: r.exclude_reason || '',
 });
 
 // YYYY-MM-DD in this device's own time, the day to ask the Worker for.
@@ -164,7 +167,9 @@ const sameDay = (a, b) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
 export const todaysSales = (sales, now = new Date()) => sales.filter((s) => sameDay(new Date(s.savedAt), now));
-export const salesTotal = (sales) => cents(sales.reduce((sum, s) => sum + s.total, 0));
+// Excluded sales are tagged, not removed; they are left out of the day's count and total.
+export const countedSales = (sales) => sales.filter((s) => !s.excludedAt);
+export const salesTotal = (sales) => cents(countedSales(sales).reduce((sum, s) => sum + s.total, 0));
 
 // ---- new product names -------------------------------------------------------------------
 // A cashier can add a name that is not in the list. Every such name is recorded here, with
@@ -193,6 +198,10 @@ export const addNewName = (records, raw, now = new Date(), types = CASH_TYPES) =
   const record = { name, addedAt: now.toISOString(), uses: 0 };
   return { records: [record, ...records], type: customTypes([record])[0], isNew: true };
 };
+
+// Takes a recorded name off the list. Only the list kept on this device changes; sales that
+// already used the name keep it.
+export const removeNewName = (records, name) => records.filter((r) => r.name !== name);
 
 // Counts a recorded name going into a cart (other names are ignored).
 export const bumpNameUse = (records, name) => records.map((r) => (r.name === name ? { ...r, uses: (r.uses || 0) + 1 } : r));

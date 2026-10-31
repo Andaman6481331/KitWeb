@@ -3,7 +3,7 @@ import {
   cleanName, NAME_MAX, addNewName, bumpNameUse, customTypes,
   CASH_TYPES, frequentTypes, matchTypes, money, sanitizePrice, sanitizeQty, lineTotal, cartTotal, pieceCount,
   changeDue, quickAmounts, addLine, removeLine, setLineQty, restoreLine, salePayload, saleFromRecord, localDay, invoiceRef, clockTime,
-  readJson, writeJson, pushSale, todaysSales, salesTotal, HISTORY_LIMIT,
+  readJson, writeJson, pushSale, todaysSales, countedSales, salesTotal, HISTORY_LIMIT, removeNewName,
 } from './adminCashSale';
 import { EN_NAMES } from './adminCashSaleNamesEn';
 
@@ -163,7 +163,17 @@ describe('saving a sale', () => {
     expect(sale).toEqual({
       ref: 'INV-261031-A1B2C3', orderId: 'id-1', savedAt: '2026-10-31T06:00:00.000Z',
       items: [{ name: 'ริบบิ้น', price: 20, qty: 2 }], total: 75.5, received: 0, note: '', copyLang: 'en',
+      excludedAt: null, excludeReason: '',
     });
+  });
+
+  it('carries the excluded tag from the Worker', () => {
+    const sale = saleFromRecord({
+      id: 'id-2', invoice_ref: 'INV-1', sold_at: '2026-10-31T06:00:00.000Z', total_amount: 10, items: [],
+      excluded_at: '2026-10-31T07:00:00.000Z', exclude_reason: 'typed wrong',
+    });
+    expect(sale.excludedAt).toBe('2026-10-31T07:00:00.000Z');
+    expect(sale.excludeReason).toBe('typed wrong');
   });
 
   it('names the day to ask for in the device own time', () => {
@@ -218,10 +228,28 @@ describe('today’s sales', () => {
     expect(salesTotal(today)).toBe(150.5);
     expect(salesTotal([])).toBe(0);
   });
+
+  it('leaves excluded sales out of the count and the total, but not out of the list', () => {
+    const now = new Date(2026, 9, 31, 15, 0);
+    const sales = [
+      sale(new Date(2026, 9, 31, 9, 0), 100),
+      { ...sale(new Date(2026, 9, 31, 10, 0), 40), excludedAt: '2026-10-31T04:00:00Z' },
+    ];
+    const today = todaysSales(sales, now);
+    expect(today).toHaveLength(2);
+    expect(countedSales(today).map((s) => s.total)).toEqual([100]);
+    expect(salesTotal(today)).toBe(100);
+  });
 });
 
 describe('new product names', () => {
   const now = new Date('2026-10-31T09:30:00Z');
+
+  it('removes one recorded name and leaves the rest', () => {
+    const records = [{ name: 'A', uses: 1 }, { name: 'B', uses: 0 }];
+    expect(removeNewName(records, 'A')).toEqual([{ name: 'B', uses: 0 }]);
+    expect(removeNewName(records, 'zzz')).toEqual(records);
+  });
 
   it('tidies what was typed', () => {
     expect(cleanName('  ริบบิ้น   ลาย  ')).toBe('ริบบิ้น ลาย');
