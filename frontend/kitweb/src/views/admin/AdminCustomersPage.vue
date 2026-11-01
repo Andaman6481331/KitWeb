@@ -1,16 +1,39 @@
 <script setup>
 // Customers, in the Standard Inventory design language. There is no admin customer
 // backend yet: the rows come from useCustomers(), which today returns placeholder
-// data, and the page says so. Nothing here reads or writes the database.
-import { ref, reactive, computed, onMounted } from 'vue';
+// data (plus anyone added this visit, kept in memory), and the page says so. Nothing
+// here reads or writes the database.
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
+import { useRoute } from 'vue-router';
+import AddCustomerDialog from '../../components/admin/customers/AddCustomerDialog.vue';
 import { useAdminLang } from '../../composables/useAdminLang';
 import { useCustomers } from '../../composables/useCustomers';
 import { customersText } from '../../utils/adminMockText';
 import { filterCustomers, sortCustomers, customerSegmentChips, initials } from '../../utils/adminCustomers';
+import { LEVEL_COLORS } from '../../utils/adminInvoiceEdit';
 
 const { lang, isThai, setLang } = useAdminLang();
 const t = computed(() => customersText(lang.value));
-const { customers, loading, isPlaceholder, load } = useCustomers();
+const { customers, loading, isPlaceholder, load, addCustomer } = useCustomers();
+const route = useRoute();
+const routeLang = computed(() => route.params.lang || 'en');
+
+const adding = ref(false);
+const toast = ref(null);
+let toastTimer = null;
+const saveNew = (form) => {
+  const created = addCustomer(form);
+  adding.value = false;
+  filters.query = '';
+  filters.segment = 'all';
+  sort.value = { key: 'recent', dir: 'desc' };
+  toast.value = { message: t.value.added(isThai.value ? created.nameTh : created.name), customerId: created.id };
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.value = null; }, 8000);
+};
+onUnmounted(() => clearTimeout(toastTimer));
+const invoiceLink = (id) => ({ name: 'admin-invoice-new', params: { lang: routeLang.value }, query: { customer: id } });
+const levelStyle = (level) => ({ background: LEVEL_COLORS[level][0], color: LEVEL_COLORS[level][1] });
 
 const filters = reactive({ query: '', segment: 'all' });
 const sort = ref({ key: 'recent', dir: 'desc' });
@@ -34,6 +57,7 @@ const chipLabel = (key) => (key === 'all' ? t.value.all : t.value.segment[key]);
 const money = (n) => `฿${Number(n).toLocaleString('en-US')}`;
 const customerName = (r) => (isThai.value ? r.nameTh : r.name);
 const daysAgo = (ms) => Math.max(0, Math.floor((Date.now() - ms) / (24 * 60 * 60 * 1000)));
+const lastOrderText = (r) => (r.lastOrderAt ? t.value.lastOrder(daysAgo(r.lastOrderAt)) : t.value.noOrders);
 const clearFilters = () => { filters.query = ''; filters.segment = 'all'; };
 
 onMounted(load);
@@ -51,7 +75,7 @@ onMounted(load);
           <button type="button" class="adm-seg-btn is-lang" :class="{ 'is-on': !isThai }" :aria-pressed="!isThai" @click="setLang('en')">EN</button>
           <button type="button" class="adm-seg-btn is-lang" :class="{ 'is-on': isThai }" :aria-pressed="isThai" @click="setLang('th')">ไทย</button>
         </div>
-        <button type="button" class="adm-btn adm-btn-primary" disabled :title="t.comingSoon">
+        <button type="button" class="adm-btn adm-btn-primary" @click="adding = true">
           <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
           {{ t.newCustomer }}
         </button>
@@ -124,45 +148,61 @@ onMounted(load);
           <span class="adm-avatar">{{ initials(customerName(r)) }}</span>
           <div style="min-width: 0">
             <div class="adm-card-name">{{ customerName(r) }}</div>
-            <div class="adm-card-meta">{{ r.phone }} · LINE {{ r.line }}</div>
+            <div class="adm-card-meta">{{ r.contact }} · {{ r.phone }}</div>
           </div>
         </div>
-        <div><span class="adm-pill">{{ t.segment[r.segment] }}</span></div>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px">
+          <span class="adm-pill">{{ t.segment[r.segment] }}</span>
+          <span class="adm-level" :style="levelStyle(r.level)">{{ t.levels[r.level] }}</span>
+        </div>
         <div class="adm-card-pricing">
           <span class="adm-price adm-serif">{{ money(r.spent) }}</span>
           <span class="adm-box">{{ t.ordersN(r.orders) }}</span>
         </div>
+        <div v-if="r.outstanding > 0" class="adm-owes">{{ t.hBalance }}: {{ money(r.outstanding) }}</div>
         <div class="adm-card-foot">
-          <span class="adm-card-added">{{ t.lastOrder(daysAgo(r.lastOrderAt)) }}</span>
+          <span class="adm-card-added">{{ lastOrderText(r) }}</span>
+          <router-link class="adm-card-link" :to="invoiceLink(r.id)">{{ t.newInvoiceFor }}</router-link>
         </div>
       </div>
     </div>
 
     <div v-else class="adm-table-wrap">
-      <div class="adm-table is-narrow">
+      <div class="adm-table is-wide">
         <div class="adm-tr is-customers is-head">
           <button type="button" class="adm-th-btn" @click="pickSort('name', 'asc')">{{ t.hCustomer + arrow('name') }}</button>
           <span>{{ t.hSegment }}</span>
+          <span>{{ t.hLevel }}</span>
           <span>{{ t.hPhone }}</span>
-          <button type="button" class="adm-th-btn" @click="pickSort('orders', 'desc')">{{ t.hOrders + arrow('orders') }}</button>
+          <span>{{ t.hBalance }}</span>
           <button type="button" class="adm-th-btn" @click="pickSort('spent', 'desc')">{{ t.hSpent + arrow('spent') }}</button>
           <button type="button" class="adm-th-btn" @click="pickSort('recent', 'desc')">{{ t.hLast + arrow('recent') }}</button>
+          <span></span>
         </div>
         <div v-for="r in shown" :key="r.id" class="adm-tr is-customers is-row">
           <div class="adm-cell-product">
             <span class="adm-avatar">{{ initials(customerName(r)) }}</span>
             <div style="min-width: 0">
               <div class="adm-cell-name">{{ customerName(r) }}</div>
-              <div class="adm-cell-file">LINE {{ r.line }}</div>
+              <div class="adm-cell-file">{{ r.contact }} · {{ t.ordersN(r.orders) }}</div>
             </div>
           </div>
           <span><span class="adm-pill">{{ t.segment[r.segment] }}</span></span>
+          <span><span class="adm-level" :style="levelStyle(r.level)">{{ t.levels[r.level] }}</span></span>
           <span class="adm-cell-text">{{ r.phone }}</span>
-          <span class="adm-cell-text">{{ r.orders }}</span>
+          <span :class="r.outstanding > 0 ? 'adm-owes' : 'adm-cell-dim'">{{ r.outstanding > 0 ? money(r.outstanding) : '—' }}</span>
           <span class="adm-price adm-serif">{{ money(r.spent) }}</span>
-          <span class="adm-cell-dim">{{ t.lastOrder(daysAgo(r.lastOrderAt)) }}</span>
+          <span class="adm-cell-dim">{{ lastOrderText(r) }}</span>
+          <router-link class="adm-card-link" style="margin-left: 0" :to="invoiceLink(r.id)">{{ t.newInvoiceFor }}</router-link>
         </div>
       </div>
+    </div>
+
+    <AddCustomerDialog v-if="adding" :t="t" :customers="customers" @save="saveNew" @cancel="adding = false" />
+
+    <div v-if="toast" class="adm-toast" role="status">
+      <span>{{ toast.message }}</span>
+      <router-link class="adm-toast-undo" :to="invoiceLink(toast.customerId)">{{ t.newInvoiceFor }}</router-link>
     </div>
   </div>
 </template>

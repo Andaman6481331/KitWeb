@@ -6,6 +6,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const INVOICE_STATUSES = ['paid', 'sent', 'overdue', 'draft'];
 
 // issuedDaysAgo / dueInDays are relative to now; a negative dueInDays is already late.
+// Nothing is dated "today", so an invoice created on the New invoice page always lists first.
 const SAMPLE = [
   ['INV-2026-0112', 'Baan Ruam Mit Kindergarten', 'โรงเรียนอนุบาลบ้านรวมมิตร', 'sent', 18450, 4, 10],
   ['INV-2026-0111', 'Wat Sampeng Activity Group', 'กลุ่มกิจกรรมวัดสำเพ็ง', 'paid', 6200, 9, -2],
@@ -17,7 +18,7 @@ const SAMPLE = [
   ['INV-2026-0105', 'Phuket Bead Studio', 'ภูเก็ต บีด สตูดิโอ', 'overdue', 8420, 36, -6],
   ['INV-2026-0104', 'Chiang Mai Quilt Circle', 'วงควิลท์เชียงใหม่', 'paid', 22100, 28, -14],
   ['INV-2026-0103', 'Sunrise Learning Center', 'ศูนย์การเรียนซันไรส์', 'sent', 11900, 2, 12],
-  ['INV-2026-0102', 'Khun Anan (Retail)', 'คุณอนันต์ (ปลีก)', 'draft', 640, 0, 14],
+  ['INV-2026-0102', 'Khun Anan (Retail)', 'คุณอนันต์ (ปลีก)', 'draft', 640, 1, 13],
   ['INV-2026-0101', 'Bangkok Costume Atelier', 'ห้องเสื้อกรุงเทพ คอสตูม', 'paid', 47850, 55, -25],
 ];
 

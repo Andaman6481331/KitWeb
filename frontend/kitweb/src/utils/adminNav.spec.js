@@ -88,3 +88,16 @@ describe('admin route table', () => {
     expect(redirect('sellcash')).toMatchObject({ name: 'admin-cash-sale', params: { lang: 'en' } });
   });
 });
+
+describe('invoice editor routes', () => {
+  const child = (name) => adminShellRoute.children.find((r) => r.name === name);
+
+  it('opens a new invoice and a saved one under the Invoices section', () => {
+    expect(child('admin-invoice-new')).toMatchObject({ path: 'invoices/new', meta: { frame: 'page', navParent: 'admin-invoices' } });
+    expect(child('admin-invoice-open')).toMatchObject({ path: 'invoices/:number', meta: { frame: 'page', navParent: 'admin-invoices' } });
+  });
+
+  it('stays out of the navbar, so no tab is added for them', () => {
+    expect(adminNav.map((i) => i.name)).not.toContain('admin-invoice-new');
+  });
+});

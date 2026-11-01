@@ -13,6 +13,8 @@ const { lang } = useAdminLang();
 const { logout } = useAdminSession();
 
 const routeLang = computed(() => route.params.lang || 'en');
+// A page opened from a tab (the invoice editor) keeps its tab lit via meta.navParent.
+const isCurrent = (item) => route.name === item.name || route.meta?.navParent === item.name;
 const mainItems = adminNav.filter((item) => item.group === 'main');
 const moreItems = adminNav.filter((item) => item.group === 'more');
 
@@ -37,7 +39,7 @@ const moreLabel = computed(() => (activeMore.value ? adminNavLabel(activeMore.va
         v-for="item in mainItems"
         :key="item.name"
         class="adm-nav-link"
-        :class="{ 'is-active': route.name === item.name }"
+        :class="{ 'is-active': isCurrent(item) }"
         :aria-current="route.name === item.name ? 'page' : undefined"
         :to="{ name: item.name, params: { lang: routeLang } }"
       >{{ adminNavLabel(item, lang) }}</router-link>

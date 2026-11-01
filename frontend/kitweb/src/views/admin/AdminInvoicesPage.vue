@@ -1,8 +1,10 @@
 <script setup>
 // Invoices, in the Standard Inventory design language. There is no invoice backend
 // yet: the rows come from useInvoices(), which today returns placeholder data, and
-// the page says so. Nothing here reads or writes the database.
+// the page says so (invoices saved from the New invoice page are kept in memory and
+// shown first). Nothing here reads or writes the database.
 import { ref, reactive, computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { useAdminLang } from '../../composables/useAdminLang';
 import { useInvoices } from '../../composables/useInvoices';
 import { invoicesText } from '../../utils/adminMockText';
@@ -11,6 +13,11 @@ import { filterInvoices, sortInvoices, summarizeInvoices, invoiceStatusChips } f
 const { lang, isThai, setLang } = useAdminLang();
 const t = computed(() => invoicesText(lang.value));
 const { invoices, loading, isPlaceholder, load } = useInvoices();
+const route = useRoute();
+const routeLang = computed(() => route.params.lang || 'en');
+const newLink = computed(() => ({ name: 'admin-invoice-new', params: { lang: routeLang.value } }));
+// Only invoices saved this visit carry their editor state; the sample rows can't be opened.
+const openLink = (r) => ({ name: 'admin-invoice-open', params: { lang: routeLang.value, number: r.id } });
 
 const filters = reactive({ query: '', status: 'all' });
 const sort = ref({ key: 'issued', dir: 'desc' });
@@ -51,10 +58,10 @@ onMounted(load);
           <button type="button" class="adm-seg-btn is-lang" :class="{ 'is-on': !isThai }" :aria-pressed="!isThai" @click="setLang('en')">EN</button>
           <button type="button" class="adm-seg-btn is-lang" :class="{ 'is-on': isThai }" :aria-pressed="isThai" @click="setLang('th')">ไทย</button>
         </div>
-        <button type="button" class="adm-btn adm-btn-primary" disabled :title="t.comingSoon">
+        <router-link class="adm-btn adm-btn-primary" :to="newLink">
           <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
           {{ t.newInvoice }}
-        </button>
+        </router-link>
       </div>
     </div>
 
@@ -135,7 +142,8 @@ onMounted(load);
           <span>{{ t.hStatus }}</span>
         </div>
         <div v-for="r in shown" :key="r.id" class="adm-tr is-invoices is-row">
-          <span class="adm-cell-text" style="font-weight: 600">{{ r.id }}</span>
+          <router-link v-if="r.draft" class="adm-cell-text adm-card-link" style="margin-left: 0" :to="openLink(r)">{{ r.id }}</router-link>
+          <span v-else class="adm-cell-text" style="font-weight: 600">{{ r.id }}</span>
           <span class="adm-cell-name">{{ customerName(r) }}</span>
           <span class="adm-cell-text">{{ date(r.issuedAt) }}</span>
           <span class="adm-cell-text">{{ date(r.dueAt) }}</span>

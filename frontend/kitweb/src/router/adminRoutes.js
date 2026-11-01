@@ -9,6 +9,7 @@ const pages = {
   'admin-inventory': () => import('../views/admin/AdminInventoryPage.vue'),
   'admin-invoices': () => import('../views/admin/AdminInvoicesPage.vue'),
   'admin-customers': () => import('../views/admin/AdminCustomersPage.vue'),
+  'admin-invoice-edit': () => import('../views/admin/AdminInvoiceEditPage.vue'),
   'admin-orders': () => import('../views/ManageOrdersPage.vue'),
   'admin-diy-sets': () => import('../components/admin-diy-sets.vue'),
   'admin-projects': () => import('../components/admin-projects.vue'),
@@ -34,6 +35,10 @@ export const adminShellRoute = {
       component: pages[item.name],
       meta: { frame: item.frame },
     })),
+    // The invoice editor is a page inside the Invoices section, not a tab of its own:
+    // navParent keeps the Invoices tab lit while it is open.
+    { path: 'invoices/new', name: 'admin-invoice-new', component: pages['admin-invoice-edit'], meta: { frame: 'page', navParent: 'admin-invoices' } },
+    { path: 'invoices/:number', name: 'admin-invoice-open', component: pages['admin-invoice-edit'], meta: { frame: 'page', navParent: 'admin-invoices' } },
   ],
 };
 

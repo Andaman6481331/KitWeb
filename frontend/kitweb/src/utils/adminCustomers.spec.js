@@ -1,13 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
     customerRows, filterCustomers, sortCustomers, customerSegmentChips, initials, CUSTOMER_SEGMENTS,
+    newCustomer, isDuplicateName,
 } from './adminCustomers';
 
 const NOW = Date.parse('2026-10-23T12:00:00Z');
 const DAY = 24 * 60 * 60 * 1000;
 const row = (over) => ({
     id: 'C-1', name: 'Somchai Jaidee', nameTh: 'สมชาย ใจดี', phone: '081-234-5678', line: 'somchai.j',
-    segment: 'retail', orders: 3, spent: 4500, lastOrderAt: NOW - 5 * DAY, ...over,
+    segment: 'retail', orders: 3, spent: 4500, lastOrderAt: NOW - 5 * DAY,
+    contact: 'Khun Somchai', level: 0, outstanding: 0, ...over,
 });
 
 describe('customerRows (placeholder data)', () => {
@@ -77,5 +79,49 @@ describe('initials', () => {
     });
     it('copes with Thai names', () => {
         expect(initials('สมชาย ใจดี')).toBe('สใ');
+    });
+});
+
+describe('placeholder customers carry what invoices need', () => {
+    const rows = customerRows(NOW);
+    it('has a contact person, a price level 0-4 and a balance', () => {
+        expect(rows.every((r) => r.contact && Number.isInteger(r.level) && r.level >= 0 && r.level <= 4 && r.outstanding >= 0)).toBe(true);
+    });
+    it('covers several levels and at least one customer with a balance', () => {
+        expect(new Set(rows.map((r) => r.level)).size).toBeGreaterThanOrEqual(3);
+        expect(rows.some((r) => r.outstanding > 0)).toBe(true);
+    });
+});
+
+describe('isDuplicateName', () => {
+    const rows = [row({ name: 'Alpha Shop', nameTh: 'อัลฟา' })];
+    it('ignores case and surrounding spaces, in either language', () => {
+        expect(isDuplicateName(rows, '  alpha shop ')).toBe(true);
+        expect(isDuplicateName(rows, 'อัลฟา')).toBe(true);
+    });
+    it('is false for a new or empty name', () => {
+        expect(isDuplicateName(rows, 'Beta')).toBe(false);
+        expect(isDuplicateName(rows, '   ')).toBe(false);
+    });
+});
+
+describe('newCustomer', () => {
+    const rows = [row({ id: 'C-1001' }), row({ id: 'C-1007' })];
+    const made = newCustomer(rows, { name: '  Nong Mai  ', contact: ' Khun Mai ', phone: '', level: '3' }, NOW);
+
+    it('trims the fields and uses the name for both languages', () => {
+        expect(made).toMatchObject({ name: 'Nong Mai', nameTh: 'Nong Mai', contact: 'Khun Mai', level: 3 });
+    });
+    it('starts with no orders, spend or balance and shows missing fields as a dash', () => {
+        expect(made).toMatchObject({ orders: 0, spent: 0, outstanding: 0, phone: '—', line: '—', lastOrderAt: null });
+    });
+    it('gets the next free id and a segment that follows the level', () => {
+        expect(made.id).toBe('C-1008');
+        expect(made.segment).toBe('wholesale');
+        expect(newCustomer(rows, { name: 'X', level: '0' }, NOW).segment).toBe('retail');
+    });
+    it('defaults the level to Small wholesale like the design and rejects junk levels', () => {
+        expect(newCustomer(rows, { name: 'X' }, NOW).level).toBe(1);
+        expect(newCustomer(rows, { name: 'X', level: '9' }, NOW).level).toBe(1);
     });
 });
