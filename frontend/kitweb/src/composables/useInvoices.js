@@ -1,26 +1,37 @@
 import { ref, computed } from 'vue';
-import { invoiceRows } from '../utils/adminInvoices';
 import { nextInvoiceNumber } from '../utils/adminInvoiceEdit';
+import { legacyInvoiceRow } from '../utils/adminLegacy';
+import { api } from '../services/api';
 import { mockDirectory } from './useMockDirectory';
 
 // The single place the Invoices page and the New invoice page get their data. Today that
-// is placeholder rows plus the invoices saved this visit (kept in memory); to wire the
-// real thing, make load() fetch from the Worker, make saveInvoice() post to it, and set
-// `isPlaceholder` false. The pages need no other change.
+// is the invoices imported from the old Access database (read-only, tagged legacy) plus the
+// invoices saved this visit on the New invoice page, which are kept in memory only. To store
+// those for real, make saveInvoice() post to the Worker; the pages need no other change.
 //
 // A saved invoice is a list row (id, customer, customerTh, status, amount, issuedAt,
 // dueAt) plus `draft`, the editor state needed to reopen it.
-const sample = ref([]);
+const legacy = ref([]);
+let loaded = false;
 
 export function useInvoices() {
-  const loading = ref(true);
-  const isPlaceholder = true;
-  const invoices = computed(() => mockDirectory.invoices.concat(sample.value));
+  const loading = ref(!loaded);
+  const error = ref('');
+  const isPlaceholder = false;
+  const invoices = computed(() => mockDirectory.invoices.concat(legacy.value));
 
   const load = async () => {
+    if (loaded) { loading.value = false; return; }
     loading.value = true;
-    if (!sample.value.length) sample.value = invoiceRows(Date.now());
-    loading.value = false;
+    error.value = '';
+    try {
+      legacy.value = (await api.listLegacyInvoices()).map(legacyInvoiceRow);
+      loaded = true;
+    } catch (err) {
+      error.value = err.message || 'Could not load the invoices';
+    } finally {
+      loading.value = false;
+    }
   };
 
   const findInvoice = (id) => mockDirectory.invoices.find((r) => r.id === id) || null;
@@ -32,10 +43,8 @@ export function useInvoices() {
     return record;
   };
 
-  const nextNumber = (year = new Date().getFullYear()) => {
-    if (!sample.value.length) sample.value = invoiceRows(Date.now());
-    return nextInvoiceNumber(invoices.value.map((r) => r.id), year);
-  };
+  const nextNumber = (year = new Date().getFullYear()) =>
+    nextInvoiceNumber(invoices.value.map((r) => r.id), year);
 
-  return { invoices, loading, isPlaceholder, load, findInvoice, saveInvoice, nextNumber };
+  return { invoices, loading, error, isPlaceholder, load, findInvoice, saveInvoice, nextNumber };
 }

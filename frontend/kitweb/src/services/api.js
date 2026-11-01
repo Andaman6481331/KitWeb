@@ -202,6 +202,18 @@ export const api = {
     }
   },
 
+  // Read-only history imported from the old Access database (admin only).
+  async legacyGet(path, fallback) {
+    const response = await fetch(`${API_URL}/legacy/${path}`, { headers: { 'Authorization': this.getToken() } });
+    if (response.status === 401) throw sessionExpiredError();
+    if (!response.ok) throw new Error(await parseApiError(response, fallback));
+    return await response.json();
+  },
+  listLegacyCustomers() { return this.legacyGet('customers', 'Could not load the customers'); },
+  getLegacyCustomer(id) { return this.legacyGet(`customers/${encodeURIComponent(id)}`, 'Could not load the customer'); },
+  listLegacyInvoices() { return this.legacyGet('invoices', 'Could not load the invoices'); },
+  getLegacyInvoice(id) { return this.legacyGet(`invoices/${encodeURIComponent(id)}`, 'Could not load the invoice'); },
+
   // Walk-in cash sale, saved to cash_sales. payload: { client_id, items: [{ name, name_en, price, qty, custom }],
   // received, note, copy_lang }. The Worker works out the total; resending a client_id returns the saved sale.
   async submitCashSale(payload) {

@@ -1,8 +1,7 @@
 <script setup>
-// Invoices, in the Standard Inventory design language. There is no invoice backend
-// yet: the rows come from useInvoices(), which today returns placeholder data, and
-// the page says so (invoices saved from the New invoice page are kept in memory and
-// shown first). Nothing here reads or writes the database.
+// Invoices, in the Standard Inventory design language. The rows come from useInvoices():
+// the history imported from the old Access database (read-only, tagged Legacy), plus
+// invoices saved from the New invoice page this visit (in memory, shown first).
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAdminLang } from '../../composables/useAdminLang';
@@ -12,12 +11,13 @@ import { filterInvoices, sortInvoices, summarizeInvoices, invoiceStatusChips } f
 
 const { lang, isThai, setLang } = useAdminLang();
 const t = computed(() => invoicesText(lang.value));
-const { invoices, loading, isPlaceholder, load } = useInvoices();
+const { invoices, loading, error, isPlaceholder, load } = useInvoices();
 const route = useRoute();
 const routeLang = computed(() => route.params.lang || 'en');
 const newLink = computed(() => ({ name: 'admin-invoice-new', params: { lang: routeLang.value } }));
 // Only invoices saved this visit carry their editor state; the sample rows can't be opened.
 const openLink = (r) => ({ name: 'admin-invoice-open', params: { lang: routeLang.value, number: r.id } });
+const legacyLink = (r) => ({ name: 'admin-legacy-invoice', params: { lang: routeLang.value, id: r.id } });
 
 const filters = reactive({ query: '', status: 'all' });
 const sort = ref({ key: 'issued', dir: 'desc' });
@@ -38,9 +38,11 @@ const pickSort = (key, dir) => {
 
 const chipLabel = (key) => (key === 'all' ? t.value.all : t.value.status[key]);
 const money = (n) => `฿${Number(n).toLocaleString('en-US')}`;
-const date = (ms) => new Date(ms).toLocaleDateString(isThai.value ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+const date = (ms) => (ms == null
+  ? '—'
+  : new Date(ms).toLocaleDateString(isThai.value ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }));
 const customerName = (r) => (isThai.value ? r.customerTh : r.customer);
-const statusClass = (status) => ({ paid: 'is-ok', overdue: 'is-danger', draft: 'is-hidden', sent: '' }[status]);
+const statusClass = (status) => ({ paid: 'is-ok', overdue: 'is-danger', unpaid: 'is-danger', draft: 'is-hidden', sent: '' }[status]);
 const clearFilters = () => { filters.query = ''; filters.status = 'all'; };
 
 onMounted(load);
@@ -66,6 +68,7 @@ onMounted(load);
     </div>
 
     <div v-if="isPlaceholder" class="adm-banner" role="note">{{ t.preview }}</div>
+    <div v-if="error" class="adm-error" role="alert">{{ error }}</div>
 
     <div class="adm-tiles">
       <div class="adm-tile">
@@ -84,6 +87,7 @@ onMounted(load);
         <span class="adm-tile-note">{{ t.invoicesN(summary.paidRecentlyCount) }}</span>
       </div>
     </div>
+    <div v-if="invoices.some((r) => r.source === 'legacy')" class="adm-sub">{{ t.summaryNote }}</div>
 
     <div class="adm-toolbar">
       <div class="adm-row">
@@ -142,7 +146,11 @@ onMounted(load);
           <span>{{ t.hStatus }}</span>
         </div>
         <div v-for="r in shown" :key="r.id" class="adm-tr is-invoices is-row">
-          <router-link v-if="r.draft" class="adm-cell-text adm-card-link" style="margin-left: 0" :to="openLink(r)">{{ r.id }}</router-link>
+          <span v-if="r.source === 'legacy'" class="adm-cell-text">
+            <router-link class="adm-card-link" style="margin-left: 0" :to="legacyLink(r)">{{ t.orderN(r.number) }}</router-link>
+            <span class="adm-badge is-flat is-legacy" style="margin-left: 6px">{{ t.legacy }}</span>
+          </span>
+          <router-link v-else-if="r.draft" class="adm-cell-text adm-card-link" style="margin-left: 0" :to="openLink(r)">{{ r.id }}</router-link>
           <span v-else class="adm-cell-text" style="font-weight: 600">{{ r.id }}</span>
           <span class="adm-cell-name">{{ customerName(r) }}</span>
           <span class="adm-cell-text">{{ date(r.issuedAt) }}</span>

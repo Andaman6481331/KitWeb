@@ -488,3 +488,17 @@ textarea.adm-inv-field { padding: 10px 12px; min-height: 84px; resize: vertical;
 }
 @media print { .adm-inv-foot, .adm-inv-drawer { display: none !important; } }
 .adm-btn.is-added { background: var(--adm-brand-tint); border-color: var(--adm-brand); color: var(--adm-brand-dark); }
+
+/* ── Legacy (imported Access history) ───────────────────────── */
+.adm-badge.is-legacy { background: #e6ecf8; color: #2f4a8a; box-shadow: none; }
+.adm-tr.is-legacy-lines { grid-template-columns: minmax(220px, 3fr) 90px 80px 110px 120px; }
+.adm-tr.is-legacy-lines.is-adjust { background: #faf6ee; }
+.adm-table.is-lines { min-width: 640px; }
+.adm-legacy-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 24px; background: var(--adm-surface); border: 1px solid var(--adm-border); border-radius: 14px; padding: 16px 18px; margin: 0; }
+.adm-legacy-meta dt { color: var(--adm-muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin: 0 0 2px; }
+.adm-legacy-meta dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
+.adm-modal.is-legacy { width: min(720px, 100%); max-height: 100%; overflow-y: auto; }
+.adm-modal.is-legacy h3 { margin: 18px 0 8px; font-size: 14px; color: var(--adm-muted-2); }
+.adm-legacy-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
+.adm-legacy-list li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--adm-border-soft); }
+.adm-pill.is-legacy { background: #e6ecf8; color: #2f4a8a; }

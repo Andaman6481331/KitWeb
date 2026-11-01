@@ -125,6 +125,32 @@ const DDL = [
 		name TEXT NOT NULL, name_en TEXT, unit_price REAL NOT NULL, quantity INTEGER NOT NULL,
 		line_total REAL NOT NULL, is_custom INTEGER NOT NULL DEFAULT 0,
 		FOREIGN KEY (sale_id) REFERENCES cash_sales(id)
+	)`,
+	// Mirrors migrations/0027_legacy_import.sql.
+	`CREATE TABLE IF NOT EXISTS legacy_customers (
+		id TEXT PRIMARY KEY, access_ref TEXT NOT NULL UNIQUE, name TEXT NOT NULL, code_name TEXT, phone TEXT,
+		email TEXT, address TEXT, province TEXT, tax_id TEXT, vat_name TEXT, branch TEXT, transport TEXT,
+		line_note TEXT, note TEXT, status TEXT NOT NULL DEFAULT 'unverified', merged_into TEXT,
+		imported_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	)`,
+	`CREATE TABLE IF NOT EXISTS legacy_products (
+		id TEXT PRIMARY KEY, access_ref TEXT NOT NULL UNIQUE, code_name TEXT, name TEXT NOT NULL, group_name TEXT,
+		unit TEXT, cost REAL, price_1 REAL, price_2 REAL, price_3 REAL, price_4 REAL,
+		on_sell INTEGER NOT NULL DEFAULT 1, note TEXT
+	)`,
+	`CREATE TABLE IF NOT EXISTS legacy_invoices (
+		id TEXT PRIMARY KEY, order_no TEXT NOT NULL, customer_id TEXT, customer_name TEXT NOT NULL,
+		sold_on TEXT NOT NULL, paid INTEGER NOT NULL DEFAULT 0, access_type TEXT, vat_bill_no TEXT,
+		total REAL NOT NULL DEFAULT 0, line_count INTEGER NOT NULL DEFAULT 0,
+		UNIQUE (order_no, customer_name, sold_on)
+	)`,
+	`CREATE TABLE IF NOT EXISTS legacy_invoice_lines (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, access_id INTEGER NOT NULL, invoice_id TEXT NOT NULL,
+		line_no INTEGER NOT NULL, product_name TEXT NOT NULL, unit TEXT, qty REAL NOT NULL,
+		unit_price REAL NOT NULL, line_total REAL NOT NULL, line_kind TEXT NOT NULL DEFAULT 'product',
+		paid INTEGER NOT NULL DEFAULT 0, legacy_product_id TEXT,
+		UNIQUE (invoice_id, line_no),
+		FOREIGN KEY (invoice_id) REFERENCES legacy_invoices(id)
 	)`
 ];
 
@@ -133,7 +159,8 @@ const TABLES = [
 	"order_items", "orders", "diy_products",
 	"product_set_items", "product_sets", "product_variants", "product_images",
 	"product_categories", "categories", "products", "admin_sessions", "catalog_version",
-	"cash_sale_items", "cash_sales"
+	"cash_sale_items", "cash_sales",
+	"legacy_invoice_lines", "legacy_invoices", "legacy_products", "legacy_customers"
 ];
 
 // Raw bearer token for protected routes in tests. resetDb() stores its hash as a live

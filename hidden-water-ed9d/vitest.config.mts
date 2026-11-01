@@ -2,6 +2,8 @@ import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
 
 export default defineWorkersConfig({
 	test: {
+		// legacy-import/ has Node-runner tests (node --test), not Worker tests.
+		exclude: ["node_modules/**", "legacy-import/**"],
 		poolOptions: {
 			workers: {
 				wrangler: { configPath: "./wrangler.jsonc" },

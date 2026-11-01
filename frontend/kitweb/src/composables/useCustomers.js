@@ -1,22 +1,34 @@
 import { ref, computed } from 'vue';
-import { customerRows, newCustomer } from '../utils/adminCustomers';
+import { newCustomer } from '../utils/adminCustomers';
+import { legacyCustomerRow } from '../utils/adminLegacy';
+import { api } from '../services/api';
 import { mockDirectory } from './useMockDirectory';
 
 // The single place the Customers page (and the invoice customer picker) gets its data.
-// Today that is placeholder rows plus whatever was added this visit; to wire the real
-// thing, make load() fetch from the Worker, make addCustomer() post to it, and set
-// `isPlaceholder` false. The pages need no other change.
-const sample = ref([]);
+// Today that is the customers imported from the old Access database (read-only, tagged
+// legacy) plus anyone added this visit, which is kept in memory only. To store new
+// customers for real, make addCustomer() post to the Worker; the pages need no other change.
+const legacy = ref([]);
+let loaded = false;
 
 export function useCustomers() {
-  const loading = ref(true);
-  const isPlaceholder = true;
-  const customers = computed(() => sample.value.concat(mockDirectory.customers));
+  const loading = ref(!loaded);
+  const error = ref('');
+  const isPlaceholder = false;
+  const customers = computed(() => legacy.value.concat(mockDirectory.customers));
 
   const load = async () => {
+    if (loaded) { loading.value = false; return; }
     loading.value = true;
-    if (!sample.value.length) sample.value = customerRows(Date.now());
-    loading.value = false;
+    error.value = '';
+    try {
+      legacy.value = (await api.listLegacyCustomers()).map(legacyCustomerRow);
+      loaded = true;
+    } catch (err) {
+      error.value = err.message || 'Could not load the customers';
+    } finally {
+      loading.value = false;
+    }
   };
 
   const addCustomer = (form) => {
@@ -25,5 +37,5 @@ export function useCustomers() {
     return created;
   };
 
-  return { customers, loading, isPlaceholder, load, addCustomer };
+  return { customers, loading, error, isPlaceholder, load, addCustomer };
 }

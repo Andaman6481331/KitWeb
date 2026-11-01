@@ -1,11 +1,12 @@
 <script setup>
-// Customers, in the Standard Inventory design language. There is no admin customer
-// backend yet: the rows come from useCustomers(), which today returns placeholder
-// data (plus anyone added this visit, kept in memory), and the page says so. Nothing
-// here reads or writes the database.
+// Customers, in the Standard Inventory design language. The rows come from useCustomers():
+// the customers imported from the old Access database (read-only, tagged Legacy), plus
+// anyone added this visit, kept in memory.
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import AddCustomerDialog from '../../components/admin/customers/AddCustomerDialog.vue';
+import LegacyCustomerPanel from '../../components/admin/customers/LegacyCustomerPanel.vue';
+import { legacyText } from '../../utils/adminLegacyText';
 import { useAdminLang } from '../../composables/useAdminLang';
 import { useCustomers } from '../../composables/useCustomers';
 import { customersText } from '../../utils/adminMockText';
@@ -14,7 +15,9 @@ import { LEVEL_COLORS } from '../../utils/adminInvoiceEdit';
 
 const { lang, isThai, setLang } = useAdminLang();
 const t = computed(() => customersText(lang.value));
-const { customers, loading, isPlaceholder, load, addCustomer } = useCustomers();
+const lt = computed(() => legacyText(lang.value));
+const { customers, loading, error, isPlaceholder, load, addCustomer } = useCustomers();
+const detailsId = ref('');
 const route = useRoute();
 const routeLang = computed(() => route.params.lang || 'en');
 
@@ -33,7 +36,10 @@ const saveNew = (form) => {
 };
 onUnmounted(() => clearTimeout(toastTimer));
 const invoiceLink = (id) => ({ name: 'admin-invoice-new', params: { lang: routeLang.value }, query: { customer: id } });
-const levelStyle = (level) => ({ background: LEVEL_COLORS[level][0], color: LEVEL_COLORS[level][1] });
+const levelStyle = (r) => (r.levelUnset
+  ? { background: '#eeeae3', color: '#6b6358' }
+  : { background: LEVEL_COLORS[r.level][0], color: LEVEL_COLORS[r.level][1] });
+const levelLabel = (r) => (r.levelUnset ? t.value.levelUnset : t.value.levels[r.level]);
 
 const filters = reactive({ query: '', segment: 'all' });
 const sort = ref({ key: 'recent', dir: 'desc' });
@@ -83,6 +89,7 @@ onMounted(load);
     </div>
 
     <div v-if="isPlaceholder" class="adm-banner" role="note">{{ t.preview }}</div>
+    <div v-if="error" class="adm-error" role="alert">{{ error }}</div>
 
     <div class="adm-toolbar">
       <div class="adm-row">
@@ -152,8 +159,8 @@ onMounted(load);
           </div>
         </div>
         <div style="display: flex; flex-wrap: wrap; gap: 6px">
-          <span class="adm-pill">{{ t.segment[r.segment] }}</span>
-          <span class="adm-level" :style="levelStyle(r.level)">{{ t.levels[r.level] }}</span>
+          <span class="adm-pill" :class="{ 'is-legacy': r.source === 'legacy' }">{{ t.segment[r.segment] }}</span>
+          <span class="adm-level" :style="levelStyle(r)">{{ levelLabel(r) }}</span>
         </div>
         <div class="adm-card-pricing">
           <span class="adm-price adm-serif">{{ money(r.spent) }}</span>
@@ -162,6 +169,7 @@ onMounted(load);
         <div v-if="r.outstanding > 0" class="adm-owes">{{ t.hBalance }}: {{ money(r.outstanding) }}</div>
         <div class="adm-card-foot">
           <span class="adm-card-added">{{ lastOrderText(r) }}</span>
+          <button v-if="r.source === 'legacy'" type="button" class="adm-btn adm-btn-link" @click="detailsId = r.id">{{ t.details }}</button>
           <router-link class="adm-card-link" :to="invoiceLink(r.id)">{{ t.newInvoiceFor }}</router-link>
         </div>
       </div>
@@ -187,17 +195,21 @@ onMounted(load);
               <div class="adm-cell-file">{{ r.contact }} · {{ t.ordersN(r.orders) }}</div>
             </div>
           </div>
-          <span><span class="adm-pill">{{ t.segment[r.segment] }}</span></span>
-          <span><span class="adm-level" :style="levelStyle(r.level)">{{ t.levels[r.level] }}</span></span>
+          <span><span class="adm-pill" :class="{ 'is-legacy': r.source === 'legacy' }">{{ t.segment[r.segment] }}</span></span>
+          <span><span class="adm-level" :style="levelStyle(r)">{{ levelLabel(r) }}</span></span>
           <span class="adm-cell-text">{{ r.phone }}</span>
           <span :class="r.outstanding > 0 ? 'adm-owes' : 'adm-cell-dim'">{{ r.outstanding > 0 ? money(r.outstanding) : '—' }}</span>
           <span class="adm-price adm-serif">{{ money(r.spent) }}</span>
           <span class="adm-cell-dim">{{ lastOrderText(r) }}</span>
-          <router-link class="adm-card-link" style="margin-left: 0" :to="invoiceLink(r.id)">{{ t.newInvoiceFor }}</router-link>
+          <span>
+            <button v-if="r.source === 'legacy'" type="button" class="adm-btn adm-btn-link" @click="detailsId = r.id">{{ t.details }}</button>
+            <router-link class="adm-card-link" style="margin-left: 0" :to="invoiceLink(r.id)">{{ t.newInvoiceFor }}</router-link>
+          </span>
         </div>
       </div>
     </div>
 
+    <LegacyCustomerPanel v-if="detailsId" :t="lt" :customer-id="detailsId" :is-thai="isThai" @close="detailsId = ''" />
     <AddCustomerDialog v-if="adding" :t="t" :customers="customers" @save="saveNew" @cancel="adding = false" />
 
     <div v-if="toast" class="adm-toast" role="status">

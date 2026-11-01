@@ -16,6 +16,7 @@ import { bangkokDay, listCashSales, parseCashSale, saveCashSale, setCashSaleExcl
 import { validateContact } from "./order-validation";
 import { extractOrderIds, newViewKey, phonesMatch, secretsMatch, toOrderView, verifyLineSignature } from "./order-view";
 import { InventoryError, applyInventory, prepareInventory, readInventory } from "./product-inventory";
+import { getLegacyCustomer, getLegacyInvoice, listLegacyCustomers, listLegacyInvoices } from "./legacy";
 
 // The shop never contacts web customers first: an order is only a request until
 // the customer sends their order number to the OA or WhatsApp. Staff look for
@@ -1983,6 +1984,27 @@ const router = {
 			// 3. PROTECTED ROUTES
 			if (!(await isAdminRequest(request, env))) {
 				return corsResponse("Unauthorized", { status: 401 });
+			}
+
+			// Read-only history imported from the old Access database (legacy.ts, migration 0027).
+			// There is no write route: legacy rows are never edited or deleted through the app.
+			if (request.method === "GET" && url.pathname === "/legacy/customers") {
+				return corsResponse(await listLegacyCustomers(env.DB));
+			}
+			const legacyCustomerMatch = url.pathname.match(/^\/legacy\/customers\/([A-Za-z0-9-]{1,40})$/);
+			if (request.method === "GET" && legacyCustomerMatch) {
+				const found = await getLegacyCustomer(env.DB, legacyCustomerMatch[1]);
+				return found ? corsResponse(found) : corsResponse({ error: "Customer not found" }, { status: 404 });
+			}
+			if (request.method === "GET" && url.pathname === "/legacy/invoices") {
+				return corsResponse(await listLegacyInvoices(env.DB, {
+					q: url.searchParams.get("q"), paid: url.searchParams.get("paid")
+				}));
+			}
+			const legacyInvoiceMatch = url.pathname.match(/^\/legacy\/invoices\/([A-Za-z0-9-]{1,60})$/);
+			if (request.method === "GET" && legacyInvoiceMatch) {
+				const found = await getLegacyInvoice(env.DB, legacyInvoiceMatch[1]);
+				return found ? corsResponse(found) : corsResponse({ error: "Invoice not found" }, { status: 404 });
 			}
 
 			// ── Projects: create / update ─────────────────────────────────

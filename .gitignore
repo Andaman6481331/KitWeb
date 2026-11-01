@@ -18,3 +18,9 @@ Thumbs.db
 # Agent scratch: worktrees and subagent-driven-development workspaces
 .claude/worktrees/
 .superpowers/
+
+# Session handoff notes
+docs/handoff/
+
+# Legacy Access import: staging JSON/SQL hold customer phones and addresses
+hidden-water-ed9d/legacy-import/staging/

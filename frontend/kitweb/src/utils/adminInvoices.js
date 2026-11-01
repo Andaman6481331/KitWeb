@@ -35,8 +35,9 @@ export const invoiceRows = (now = Date.now()) => SAMPLE.map(([id, customer, cust
 export const filterInvoices = (rows, { query, status }) => {
   const q = query.trim().toLowerCase();
   return rows.filter((r) =>
-    (status === 'all' || r.status === status) &&
-    (!q || r.id.toLowerCase().includes(q) || r.customer.toLowerCase().includes(q) || r.customerTh.toLowerCase().includes(q))
+    (status === 'all' || r.status === status || (status === 'legacy' && r.source === 'legacy')) &&
+    (!q || r.id.toLowerCase().includes(q) || (r.number && r.number.toLowerCase().includes(q)) ||
+      r.customer.toLowerCase().includes(q) || r.customerTh.toLowerCase().includes(q))
   );
 };
 
@@ -52,7 +53,9 @@ export const sortInvoices = (rows, sort, lang) => {
   return rows.slice().sort((a, b) => sign * compare(a, b) || a.id.localeCompare(b.id));
 };
 
-export const summarizeInvoices = (rows, now = Date.now()) => {
+// Legacy (Access) rows are history, not this system's books, so the summary cards skip them.
+export const summarizeInvoices = (allRows, now = Date.now()) => {
+  const rows = allRows.filter((r) => r.source !== 'legacy');
   const open = rows.filter((r) => r.status === 'sent' || r.status === 'overdue');
   const late = rows.filter((r) => r.status === 'overdue');
   const paid = rows.filter((r) => r.status === 'paid' && now - r.issuedAt <= 30 * DAY_MS);
@@ -64,6 +67,14 @@ export const summarizeInvoices = (rows, now = Date.now()) => {
   };
 };
 
-export const invoiceStatusChips = (rows) => [{ key: 'all', count: rows.length }].concat(
-  INVOICE_STATUSES.map((key) => ({ key, count: rows.filter((r) => r.status === key).length }))
-);
+// Unpaid and Legacy chips exist only for legacy (Access) rows, so they appear once those load.
+export const invoiceStatusChips = (rows) => {
+  const chips = [{ key: 'all', count: rows.length }].concat(
+    INVOICE_STATUSES.map((key) => ({ key, count: rows.filter((r) => r.status === key).length }))
+  );
+  const unpaid = rows.filter((r) => r.status === 'unpaid').length;
+  const legacy = rows.filter((r) => r.source === 'legacy').length;
+  if (unpaid) chips.push({ key: 'unpaid', count: unpaid });
+  if (legacy) chips.push({ key: 'legacy', count: legacy });
+  return chips;
+};

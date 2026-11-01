@@ -75,9 +75,15 @@ export const sortCustomers = (rows, sort, lang) => {
   return rows.slice().sort((a, b) => sign * compare(a, b) || a.id.localeCompare(b.id));
 };
 
-export const customerSegmentChips = (rows) => [{ key: 'all', count: rows.length }].concat(
-  CUSTOMER_SEGMENTS.map((key) => ({ key, count: rows.filter((r) => r.segment === key).length }))
-);
+// A Legacy chip (customers imported from the old Access database) appears once any exist.
+export const customerSegmentChips = (rows) => {
+  const chips = [{ key: 'all', count: rows.length }].concat(
+    CUSTOMER_SEGMENTS.map((key) => ({ key, count: rows.filter((r) => r.segment === key).length }))
+  );
+  const legacy = rows.filter((r) => r.segment === 'legacy').length;
+  if (legacy) chips.push({ key: 'legacy', count: legacy });
+  return chips;
+};
 
 // First letter of up to two words, for the avatar circle.
 export const initials = (name) => {
