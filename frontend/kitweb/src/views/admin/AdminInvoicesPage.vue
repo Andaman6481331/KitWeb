@@ -2,12 +2,14 @@
 // Invoices, in the Standard Inventory design language. The rows come from useInvoices():
 // the history imported from the old Access database (read-only, tagged Legacy), plus
 // invoices saved from the New invoice page this visit (in memory, shown first).
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAdminLang } from '../../composables/useAdminLang';
 import { useInvoices } from '../../composables/useInvoices';
 import { invoicesText } from '../../utils/adminMockText';
 import { filterInvoices, sortInvoices, summarizeInvoices, invoiceStatusChips } from '../../utils/adminInvoices';
+import { paginate } from '../../utils/adminInventory';
+import InventoryPager from '../../components/admin/inventory/InventoryPager.vue';
 
 const { lang, isThai, setLang } = useAdminLang();
 const t = computed(() => invoicesText(lang.value));
@@ -23,6 +25,10 @@ const filters = reactive({ query: '', status: 'all' });
 const sort = ref({ key: 'issued', dir: 'desc' });
 
 const shown = computed(() => sortInvoices(filterInvoices(invoices.value, filters), sort.value, lang.value));
+// Only one page of `shown` is drawn (20 rows, like the product list), not all of the history.
+const pageNum = ref(1);
+const pager = computed(() => paginate(shown.value, pageNum.value));
+const pageItems = computed(() => pager.value.items);
 const chips = computed(() => invoiceStatusChips(invoices.value));
 const summary = computed(() => summarizeInvoices(invoices.value, Date.now()));
 
@@ -44,6 +50,17 @@ const date = (ms) => (ms == null
 const customerName = (r) => (isThai.value ? r.customerTh : r.customer);
 const statusClass = (status) => ({ paid: 'is-ok', overdue: 'is-danger', unpaid: 'is-danger', draft: 'is-hidden', sent: '' }[status]);
 const clearFilters = () => { filters.query = ''; filters.status = 'all'; };
+
+// Anything that changes which invoices are listed, or in what order, starts again at page one.
+watch(() => [filters.query, filters.status, sort.value, lang.value], () => { pageNum.value = 1; });
+// If the list shrinks under the current page, paginate() shows the nearest page that exists;
+// keep the stored number in step with it.
+watch(() => pager.value.page, (page) => { pageNum.value = page; });
+const goToPage = (page) => {
+  pageNum.value = page;
+  // The controls are at the bottom of a long list; bring the new page into view.
+  if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+};
 
 onMounted(load);
 </script>
@@ -123,7 +140,10 @@ onMounted(load);
             @click="pickSort(s[0], s[2])"
           >{{ s[1] + arrow(s[0]) }}</button>
         </div>
-        <div class="adm-count">{{ t.showing(shown.length, invoices.length) }}</div>
+        <div class="adm-count-group">
+          <div class="adm-count">{{ t.showingRange(pager.from, pager.to, shown.length, invoices.length) }}</div>
+          <InventoryPager compact :pager="pager" :t="t" @go="goToPage" />
+        </div>
       </div>
     </div>
 
@@ -145,7 +165,7 @@ onMounted(load);
           <button type="button" class="adm-th-btn" @click="pickSort('amount', 'desc')">{{ t.hAmount + arrow('amount') }}</button>
           <span>{{ t.hStatus }}</span>
         </div>
-        <div v-for="r in shown" :key="r.id" class="adm-tr is-invoices is-row">
+        <div v-for="r in pageItems" :key="r.id" class="adm-tr is-invoices is-row">
           <span v-if="r.source === 'legacy'" class="adm-cell-text">
             <router-link class="adm-card-link" style="margin-left: 0" :to="legacyLink(r)">{{ t.orderN(r.number) }}</router-link>
             <span class="adm-badge is-flat is-legacy" style="margin-left: 6px">{{ t.legacy }}</span>
@@ -160,5 +180,7 @@ onMounted(load);
         </div>
       </div>
     </div>
+
+    <InventoryPager v-if="!loading" :pager="pager" :t="t" @go="goToPage" />
   </div>
 </template>

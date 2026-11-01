@@ -2,8 +2,9 @@
 // Customers, in the Standard Inventory design language. The rows come from useCustomers():
 // the customers imported from the old Access database (read-only, tagged Legacy), plus
 // anyone added this visit, kept in memory.
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
+import InventoryPager from '../../components/admin/inventory/InventoryPager.vue';
 import AddCustomerDialog from '../../components/admin/customers/AddCustomerDialog.vue';
 import LegacyCustomerPanel from '../../components/admin/customers/LegacyCustomerPanel.vue';
 import { legacyText } from '../../utils/adminLegacyText';
@@ -11,6 +12,7 @@ import { useAdminLang } from '../../composables/useAdminLang';
 import { useCustomers } from '../../composables/useCustomers';
 import { customersText } from '../../utils/adminMockText';
 import { filterCustomers, sortCustomers, customerSegmentChips, initials } from '../../utils/adminCustomers';
+import { paginate } from '../../utils/adminInventory';
 import { LEVEL_COLORS } from '../../utils/adminInvoiceEdit';
 
 const { lang, isThai, setLang } = useAdminLang();
@@ -46,6 +48,10 @@ const sort = ref({ key: 'recent', dir: 'desc' });
 const view = ref('grid');
 
 const shown = computed(() => sortCustomers(filterCustomers(customers.value, filters), sort.value, lang.value));
+// Only one page of `shown` is drawn (20 customers, like the product list), not all of them.
+const pageNum = ref(1);
+const pager = computed(() => paginate(shown.value, pageNum.value));
+const pageItems = computed(() => pager.value.items);
 const chips = computed(() => customerSegmentChips(customers.value));
 
 const sortDefs = computed(() => [
@@ -65,6 +71,17 @@ const customerName = (r) => (isThai.value ? r.nameTh : r.name);
 const daysAgo = (ms) => Math.max(0, Math.floor((Date.now() - ms) / (24 * 60 * 60 * 1000)));
 const lastOrderText = (r) => (r.lastOrderAt ? t.value.lastOrder(daysAgo(r.lastOrderAt)) : t.value.noOrders);
 const clearFilters = () => { filters.query = ''; filters.segment = 'all'; };
+
+// Anything that changes which customers are listed, or in what order, starts again at page one.
+watch(() => [filters.query, filters.segment, sort.value, lang.value], () => { pageNum.value = 1; });
+// If the list shrinks under the current page, paginate() shows the nearest page that exists;
+// keep the stored number in step with it.
+watch(() => pager.value.page, (page) => { pageNum.value = page; });
+const goToPage = (page) => {
+  pageNum.value = page;
+  // The controls are at the bottom of a long list; bring the new page into view.
+  if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+};
 
 onMounted(load);
 </script>
@@ -135,7 +152,10 @@ onMounted(load);
             @click="pickSort(s[0], s[2])"
           >{{ s[1] + arrow(s[0]) }}</button>
         </div>
-        <div class="adm-count">{{ t.showing(shown.length, customers.length) }}</div>
+        <div class="adm-count-group">
+          <div class="adm-count">{{ t.showingRange(pager.from, pager.to, shown.length, customers.length) }}</div>
+          <InventoryPager compact :pager="pager" :t="t" @go="goToPage" />
+        </div>
       </div>
     </div>
 
@@ -150,7 +170,7 @@ onMounted(load);
     </div>
 
     <div v-else-if="view === 'grid'" class="adm-grid">
-      <div v-for="r in shown" :key="r.id" class="adm-card">
+      <div v-for="r in pageItems" :key="r.id" class="adm-card">
         <div style="display: flex; align-items: center; gap: 12px">
           <span class="adm-avatar">{{ initials(customerName(r)) }}</span>
           <div style="min-width: 0">
@@ -187,7 +207,7 @@ onMounted(load);
           <button type="button" class="adm-th-btn" @click="pickSort('recent', 'desc')">{{ t.hLast + arrow('recent') }}</button>
           <span></span>
         </div>
-        <div v-for="r in shown" :key="r.id" class="adm-tr is-customers is-row">
+        <div v-for="r in pageItems" :key="r.id" class="adm-tr is-customers is-row">
           <div class="adm-cell-product">
             <span class="adm-avatar">{{ initials(customerName(r)) }}</span>
             <div style="min-width: 0">
@@ -208,6 +228,8 @@ onMounted(load);
         </div>
       </div>
     </div>
+
+    <InventoryPager v-if="!loading" :pager="pager" :t="t" @go="goToPage" />
 
     <LegacyCustomerPanel v-if="detailsId" :t="lt" :customer-id="detailsId" :is-thai="isThai" @close="detailsId = ''" />
     <AddCustomerDialog v-if="adding" :t="t" :customers="customers" @save="saveNew" @cancel="adding = false" />

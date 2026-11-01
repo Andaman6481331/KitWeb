@@ -29,7 +29,14 @@ const invoicesEn = {
   hDue: 'Due',
   hAmount: 'Amount',
   hStatus: 'Status',
-  showing: (shown, total) => `Showing ${shown} of ${total} invoices`,
+  // from–to is the page on screen, matching is what the filters leave, total is every invoice.
+  showingRange: (from, to, matching, total) => (matching === 0
+    ? `Showing 0 of ${total} invoices`
+    : `Showing ${from}–${to} of ${matching} invoices${matching === total ? '' : ` · ${total} in total`}`),
+  pagesLabel: 'Pages',
+  pagePrev: 'Previous',
+  pageNext: 'Next',
+  goToPage: (n) => `Go to page ${n}`,
   noResult: 'No invoices found',
   noResultSub: 'Try a different keyword or clear the filters.',
   clear: 'Clear filters',
@@ -62,7 +69,13 @@ const invoicesTh = {
   hDue: 'ครบกำหนด',
   hAmount: 'จำนวนเงิน',
   hStatus: 'สถานะ',
-  showing: (shown, total) => `แสดง ${shown} จาก ${total} ฉบับ`,
+  showingRange: (from, to, matching, total) => (matching === 0
+    ? `แสดง 0 จาก ${total} ฉบับ`
+    : `แสดง ${from}–${to} จาก ${matching} ฉบับ${matching === total ? '' : ` · ทั้งหมด ${total}`}`),
+  pagesLabel: 'หน้า',
+  pagePrev: 'ก่อนหน้า',
+  pageNext: 'ถัดไป',
+  goToPage: (n) => `ไปหน้า ${n}`,
   noResult: 'ไม่พบใบแจ้งหนี้',
   noResultSub: 'ลองเปลี่ยนคำค้นหา หรือล้างตัวกรอง',
   clear: 'ล้างตัวกรอง',
@@ -111,7 +124,13 @@ const customersEn = {
   saveCust: 'Add customer',
   added: (name) => `${name} added.`,
   noOrders: 'No orders yet',
-  showing: (shown, total) => `Showing ${shown} of ${total} customers`,
+  showingRange: (from, to, matching, total) => (matching === 0
+    ? `Showing 0 of ${total} customers`
+    : `Showing ${from}–${to} of ${matching} customers${matching === total ? '' : ` · ${total} in total`}`),
+  pagesLabel: 'Pages',
+  pagePrev: 'Previous',
+  pageNext: 'Next',
+  goToPage: (n) => `Go to page ${n}`,
   noResult: 'No customers found',
   noResultSub: 'Try a different keyword or clear the filters.',
   clear: 'Clear filters',
@@ -160,7 +179,13 @@ const customersTh = {
   saveCust: 'เพิ่มลูกค้า',
   added: (name) => `เพิ่ม ${name} แล้ว`,
   noOrders: 'ยังไม่มีออเดอร์',
-  showing: (shown, total) => `แสดง ${shown} จาก ${total} ราย`,
+  showingRange: (from, to, matching, total) => (matching === 0
+    ? `แสดง 0 จาก ${total} ราย`
+    : `แสดง ${from}–${to} จาก ${matching} ราย${matching === total ? '' : ` · ทั้งหมด ${total}`}`),
+  pagesLabel: 'หน้า',
+  pagePrev: 'ก่อนหน้า',
+  pageNext: 'ถัดไป',
+  goToPage: (n) => `ไปหน้า ${n}`,
   noResult: 'ไม่พบลูกค้า',
   noResultSub: 'ลองเปลี่ยนคำค้นหา หรือล้างตัวกรอง',
   clear: 'ล้างตัวกรอง',
